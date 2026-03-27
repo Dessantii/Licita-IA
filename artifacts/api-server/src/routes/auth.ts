@@ -79,6 +79,48 @@ router.post("/login", async (req, res) => {
   res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
+router.post("/change-password", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  let userId: number;
+  try {
+    const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as { sub: number };
+    userId = payload.sub;
+  } catch {
+    res.status(401).json({ error: "Token inválido" });
+    return;
+  }
+
+  const schema = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(6),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Dados inválidos. A nova senha deve ter pelo menos 6 caracteres." });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) {
+    res.status(404).json({ error: "Usuário não encontrado." });
+    return;
+  }
+
+  const valid = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "Senha atual incorreta." });
+    return;
+  }
+
+  const newHash = await bcrypt.hash(parsed.data.newPassword, 12);
+  await db.update(usersTable).set({ passwordHash: newHash }).where(eq(usersTable.id, userId));
+  res.json({ ok: true });
+});
+
 router.get("/me", async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {

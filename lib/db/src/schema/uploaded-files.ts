@@ -13,6 +13,7 @@ export const uploadedFilesTable = pgTable("uploaded_files", {
   path: text("path").notNull(),
   mimeType: text("mime_type").notNull(),
   size: integer("size").notNull().default(0),
+  dataValidade: text("data_validade"),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

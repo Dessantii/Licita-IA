@@ -12,7 +12,10 @@ import {
   Save,
   CheckCircle2,
   Info,
+  Lock,
+  Loader2,
 } from "lucide-react";
+import { getToken } from "@/hooks/use-auth";
 
 const STORAGE_KEY = "licitaia_settings";
 
@@ -46,8 +49,45 @@ function loadSettings(): Settings {
 
 export function ConfiguraçõesPage() {
   const { toast } = useToast();
+  const token = getToken();
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [saved, setSaved] = useState(false);
+
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError(null);
+    if (pwForm.next !== pwForm.confirm) {
+      setPwError("As senhas não coincidem.");
+      return;
+    }
+    if (pwForm.next.length < 6) {
+      setPwError("A nova senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao alterar senha.");
+      setPwSuccess(true);
+      setPwForm({ current: "", next: "", confirm: "" });
+      toast({ title: "Senha alterada com sucesso!" });
+      setTimeout(() => setPwSuccess(false), 3000);
+    } catch (err: any) {
+      setPwError(err.message);
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   const handleChange = (field: keyof Settings) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -187,6 +227,80 @@ export function ConfiguraçõesPage() {
             )}
           </Button>
         </div>
+
+        {/* Change password */}
+        <Card className="overflow-hidden">
+          <div className="bg-slate-50 border-b p-4 flex items-center gap-2">
+            <Lock className="w-5 h-5 text-slate-500" />
+            <h3 className="font-bold text-slate-900">Alterar Senha</h3>
+          </div>
+          <div className="p-5">
+            {pwError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {pwError}
+              </div>
+            )}
+            {pwSuccess && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                Senha alterada com sucesso!
+              </div>
+            )}
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentPw">Senha Atual</Label>
+                <Input
+                  id="currentPw"
+                  type="password"
+                  placeholder="••••••••"
+                  value={pwForm.current}
+                  onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPw">Nova Senha</Label>
+                  <Input
+                    id="newPw"
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={pwForm.next}
+                    onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPw">Confirmar Nova Senha</Label>
+                  <Input
+                    id="confirmPw"
+                    type="password"
+                    placeholder="Repita a nova senha"
+                    value={pwForm.confirm}
+                    onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={pwLoading} className="gap-2">
+                  {pwLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Alterando...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      Alterar Senha
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </Card>
       </div>
     </AppLayout>
   );

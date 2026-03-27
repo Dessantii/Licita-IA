@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck } from "lucide-react";
+import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
 
@@ -216,6 +216,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                               </div>
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
+                              <Link
+                                href="/processes"
+                                onClick={() => {
+                                  sessionStorage.setItem("licitaia_alert_prefill", JSON.stringify({
+                                    title: alert.titulo,
+                                    agency: alert.orgao ?? "",
+                                    modality: alert.modalidade ?? "",
+                                    source: alert.urlPncp ?? "",
+                                  }));
+                                  if (!alert.isRead) markRead(alert.id);
+                                  setBellOpen(false);
+                                }}
+                                className="p-1 text-slate-400 hover:text-green-600 transition"
+                                title="Criar processo a partir deste edital"
+                              >
+                                <FilePlus className="w-3.5 h-3.5" />
+                              </Link>
                               {alert.urlPncp && (
                                 <a
                                   href={alert.urlPncp}

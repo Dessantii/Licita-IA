@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useListProcesses } from "@workspace/api-client-react";
 import { ProcessStatusBadge } from "@/components/processes/ProcessStatusBadge";
@@ -22,9 +22,27 @@ import {
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+interface AlertPrefill {
+  title?: string;
+  agency?: string;
+  modality?: string;
+  source?: string;
+}
+
 export function ProcessesPage() {
   const { data: processes, isLoading } = useListProcesses();
   const [search, setSearch] = useState("");
+  const [alertPrefill, setAlertPrefill] = useState<AlertPrefill | undefined>(undefined);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem("licitaia_alert_prefill");
+    if (raw) {
+      try {
+        setAlertPrefill(JSON.parse(raw));
+      } catch {}
+      sessionStorage.removeItem("licitaia_alert_prefill");
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     if (!processes) return [];
@@ -57,7 +75,7 @@ export function ProcessesPage() {
           <h1 className="text-3xl font-display font-bold text-slate-900">Processos Licitatórios</h1>
           <p className="text-slate-500 mt-1">Gerencie conferências e editais.</p>
         </div>
-        <CreateProcessDialog />
+        <CreateProcessDialog prefill={alertPrefill} defaultOpen={!!alertPrefill} />
       </div>
 
       {/* Metric cards */}

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -48,8 +48,15 @@ type FormValues = z.infer<typeof formSchema>;
 type Mode = "choose" | "manual" | "import";
 type ImportStep = "upload" | "extracting" | "review";
 
-export function CreateProcessDialog() {
-  const [open, setOpen] = useState(false);
+interface Prefill {
+  title?: string;
+  agency?: string;
+  modality?: string;
+  source?: string;
+}
+
+export function CreateProcessDialog({ prefill, defaultOpen }: { prefill?: Prefill; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
   const [mode, setMode] = useState<Mode>("choose");
   const [importStep, setImportStep] = useState<ImportStep>("upload");
   const [isDragging, setIsDragging] = useState(false);
@@ -66,6 +73,15 @@ export function CreateProcessDialog() {
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
+
+  useEffect(() => {
+    if (open && prefill) {
+      setMode("manual");
+      if (prefill.title) setValue("title", prefill.title);
+      if (prefill.agency) setValue("agency", prefill.agency);
+      if (prefill.modality) setValue("modality", prefill.modality);
+    }
+  }, [open, prefill]);
 
   const handleClose = () => {
     setOpen(false);

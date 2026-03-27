@@ -110,6 +110,25 @@ router.post("/processes/:id/upload-document", upload.single("file"), async (req,
   res.json({ ...file, uploadedAt: file!.uploadedAt.toISOString() });
 });
 
+router.patch("/files/:id/validity", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+  const { dataValidade } = req.body;
+  const [file] = await db
+    .update(uploadedFilesTable)
+    .set({ dataValidade: dataValidade || null })
+    .where(eq(uploadedFilesTable.id, id))
+    .returning();
+  if (!file) {
+    res.status(404).json({ error: "File not found" });
+    return;
+  }
+  res.json({ ...file, uploadedAt: file.uploadedAt.toISOString() });
+});
+
 router.delete("/files/:id", async (req, res) => {
   const id = parseInt(req.params.id!);
   if (isNaN(id)) {
