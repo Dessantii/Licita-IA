@@ -13,6 +13,7 @@ import { ProcessDetailPage } from "@/pages/ProcessDetailPage";
 import { ProcessChecklistPage } from "@/pages/ProcessChecklistPage";
 import { RelatóriosPage } from "@/pages/RelatóriosPage";
 import { ConfiguraçõesPage } from "@/pages/ConfiguraçõesPage";
+import { MonitoramentosPage } from "@/pages/MonitoramentosPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -46,6 +47,9 @@ function Router() {
       </Route>
       <Route path="/processes/:id">
         {() => <ProtectedRoute component={ProcessDetailPage} />}
+      </Route>
+      <Route path="/monitors">
+        {() => <ProtectedRoute component={MonitoramentosPage} />}
       </Route>
       <Route path="/reports">
         {() => <ProtectedRoute component={RelatóriosPage} />}

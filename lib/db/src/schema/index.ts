@@ -5,3 +5,5 @@ export * from "./submitted-documents";
 export * from "./validation-items";
 export * from "./final-reports";
 export * from "./users";
+export * from "./monitors";
+export * from "./monitor-alerts";
