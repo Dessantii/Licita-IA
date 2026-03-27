@@ -22,6 +22,7 @@ interface Monitor {
   id: number;
   name: string;
   uf: string | null;
+  municipio: string | null;
   modalidadeId: number | null;
   palavrasChave: string[] | null;
   isActive: boolean;
@@ -51,7 +52,7 @@ export function MonitoramentosPage() {
   const [checking, setChecking] = useState<number | null>(null);
   const [checkResult, setCheckResult] = useState<Record<number, number>>({});
 
-  const [form, setForm] = useState({ name: "", uf: "", modalidadeId: "", palavrasChave: "" });
+  const [form, setForm] = useState({ name: "", uf: "", municipio: "", modalidadeId: "", palavrasChave: "" });
 
   async function load() {
     try {
@@ -76,11 +77,12 @@ export function MonitoramentosPage() {
       body: JSON.stringify({
         name: form.name,
         uf: form.uf || undefined,
+        municipio: form.municipio || undefined,
         modalidadeId: form.modalidadeId ? Number(form.modalidadeId) : undefined,
         palavrasChave: palavras.length > 0 ? palavras : undefined,
       }),
     });
-    setForm({ name: "", uf: "", modalidadeId: "", palavrasChave: "" });
+    setForm({ name: "", uf: "", municipio: "", modalidadeId: "", palavrasChave: "" });
     setShowForm(false);
     load();
   }
@@ -157,6 +159,15 @@ export function MonitoramentosPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Cidade</label>
+                  <input
+                    value={form.municipio}
+                    onChange={(e) => setForm((f) => ({ ...f, municipio: e.target.value }))}
+                    placeholder="Ex: São Paulo, Campinas..."
+                    className="w-full border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium">Modalidade</label>
                   <select
                     value={form.modalidadeId}
@@ -216,10 +227,10 @@ export function MonitoramentosPage() {
                     <StatusBadge active={m.isActive} />
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    {m.uf && (
+                    {(m.municipio || m.uf) && (
                       <span className="flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5" />
-                        {m.uf}
+                        {[m.municipio, m.uf].filter(Boolean).join(" — ")}
                       </span>
                     )}
                     {m.modalidadeId && (

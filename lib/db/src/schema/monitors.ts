@@ -8,6 +8,7 @@ export const monitorsTable = pgTable("monitors", {
   uf: text("uf"),
   modalidadeId: integer("modalidade_id"),
   palavrasChave: text("palavras_chave").array(),
+  municipio: text("municipio"),
   isActive: boolean("is_active").notNull().default(true),
   lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

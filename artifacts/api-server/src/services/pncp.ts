@@ -44,6 +44,7 @@ export async function buscarPublicacoesPncp(params: {
   dataInicial: Date;
   dataFinal: Date;
   uf?: string;
+  municipio?: string;
   modalidadeId?: number;
   pagina?: number;
   tamanhoPagina?: number;
@@ -57,6 +58,7 @@ export async function buscarPublicacoesPncp(params: {
 
   if (params.uf) query.set("uf", params.uf);
   if (params.modalidadeId) query.set("modalidadeId", String(params.modalidadeId));
+  if (params.municipio) query.set("municipio", params.municipio);
 
   const url = `https://pncp.gov.br/api/pncp/v1/contratacoes/publicacoes?${query}`;
 

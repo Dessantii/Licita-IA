@@ -20,6 +20,7 @@ router.get("/", async (req, res) => {
 const monitorSchema = z.object({
   name: z.string().min(1),
   uf: z.string().length(2).optional(),
+  municipio: z.string().optional(),
   modalidadeId: z.number().int().optional(),
   palavrasChave: z.array(z.string()).optional(),
 });
@@ -154,12 +155,16 @@ export async function checkMonitor(monitor: typeof monitorsTable.$inferSelect, u
     dataInicial,
     dataFinal,
     uf: monitor.uf ?? undefined,
+    municipio: monitor.municipio ?? undefined,
     modalidadeId: monitor.modalidadeId ?? undefined,
   });
 
-  const filtrados = result.data.filter((c) =>
-    filtragemPorPalavras(c, monitor.palavrasChave ?? []),
-  );
+  const municipioFiltro = monitor.municipio?.toLowerCase().trim();
+  const filtrados = result.data.filter((c) => {
+    const municipioOk = !municipioFiltro ||
+      c.unidadeOrgao.municipioNome?.toLowerCase().includes(municipioFiltro);
+    return municipioOk && filtragemPorPalavras(c, monitor.palavrasChave ?? []);
+  });
 
   const existingIds = filtrados.length > 0
     ? (await db.select({ pncpId: monitorAlertsTable.pncpId })
