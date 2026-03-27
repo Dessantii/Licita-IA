@@ -1,0 +1,17 @@
+packages:
+  "framer-motion": "For subtle UI animations and transitions"
+  "date-fns": "For formatting dates and deadlines"
+  "react-hook-form": "For form state management"
+  "@hookform/resolvers": "For Zod schema validation in forms"
+  "clsx": "For constructing className strings conditionally"
+  "tailwind-merge": "For merging tailwind classes safely"
+  "lucide-react": "For UI icons"
+
+images:
+  - path: "artifacts/licitaia/public/images/logo-mark.png"
+    description: "Minimal geometric logo mark representing documents and AI, deep blue and slate colors, clean transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - Application uses generated hooks from @workspace/api-client-react
+  - File uploads use standard FormData mapped to the generated mutation hooks

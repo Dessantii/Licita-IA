@@ -1,0 +1,332 @@
+Quero que você atue como arquiteto de produto, designer de UX para SaaS B2B e engenheiro full stack sênior.
+
+Sua missão é projetar e implementar o MVP do sistema chamado LicitaIA.
+
+## O que é o LicitaIA
+LicitaIA é um sistema de conferência documental guiado por edital para processos licitatórios.
+
+O objetivo do produto NÃO é ser um portal de licitações, um CRM, um ERP ou um dashboard técnico.
+O objetivo é transformar um edital em uma checklist documental verificável e ajudar o usuário a conferir se a documentação da empresa atende ao que foi exigido.
+
+## Problema que o sistema resolve
+Hoje, empresas perdem licitações por:
+- documentos faltando
+- documentos vencidos
+- documentos incorretos
+- exigências mal interpretadas
+- checklist manual incompleta
+- falta de visão clara do que ainda precisa ser providenciado
+
+O sistema deve reduzir essa incerteza.
+
+## Fluxo principal do usuário
+O sistema deve ser construído em torno deste fluxo principal:
+
+1. O usuário cria um processo licitatório
+2. O usuário faz upload do edital principal em PDF
+3. O sistema lê o edital e extrai:
+   - dados principais do processo
+   - documentos exigidos
+   - observações relevantes
+   - regras e alertas
+4. O sistema gera uma checklist estruturada
+5. O usuário visualiza o que precisa separar
+6. O usuário faz upload dos documentos da empresa
+7. O sistema lê esses documentos e compara com o edital
+8. O sistema sinaliza:
+   - documento encontrado
+   - documento faltante
+   - documento vencido
+   - documento divergente
+   - documento que precisa de revisão humana
+9. O sistema entrega um retorno final e orienta o próximo passo
+
+## Regra central do produto
+O produto deve ser orientado por ação, não por dashboard institucional.
+
+O usuário deve entrar no sistema e entender rapidamente:
+- qual processo está em andamento
+- em que etapa ele está
+- o que falta
+- qual o próximo passo
+
+## O que o sistema NÃO deve ser
+Não criar:
+- painel técnico de infraestrutura
+- saúde do sistema
+- cards sobre ambiente, storage, banco, etc.
+- dashboard genérica de SaaS
+- excesso de informações institucionais
+- blocos explicando o sistema
+- navegação complexa demais
+
+## Estrutura ideal do MVP
+O MVP deve girar em torno de 3 telas principais:
+
+### 1. Tela de processos
+Objetivo:
+- mostrar os processos existentes
+- mostrar status, prazo, etapa atual e principal pendência
+- permitir criar novo processo
+- permitir continuar processo existente
+
+Essa tela deve ser simples, clara e operacional.
+
+### 2. Tela de detalhe do processo
+Objetivo:
+- mostrar dados principais do processo
+- mostrar etapa atual
+- mostrar edital enviado
+- mostrar status da leitura
+- mostrar documentos enviados
+- mostrar pendências
+- mostrar próxima ação
+
+Essa é a tela central do sistema.
+
+### 3. Tela de checklist / conferência
+Objetivo:
+- listar exigências extraídas do edital
+- mostrar o status de cada item
+- relacionar com os documentos enviados
+- informar o que está ok, faltando, vencido, divergente ou pendente de revisão
+
+Essa é a tela de valor real do produto.
+
+## Navegação do MVP
+A navegação deve ser enxuta:
+- Processos
+- Relatórios
+- Configurações
+
+Se necessário no início, pode ser apenas:
+- Processos
+- Configurações
+
+## Design e UX
+Quero uma interface:
+- clean
+- profissional
+- moderna
+- premium
+- orientada por fluxo
+- simples de usar
+- sem excesso de cards decorativos
+- sem poluição visual
+- sem cara de painel técnico
+
+### Regras visuais
+- foco em hierarquia clara
+- muito mais clareza do que ornamentação
+- sidebar simples
+- títulos objetivos
+- botões de ação claros
+- blocos úteis
+- status fáceis de entender
+- aparência de ferramenta operacional B2B
+
+## Funcionalidades do MVP
+
+### Autenticação
+- login básico
+- sessão do usuário
+
+### Gestão de processos
+- criar processo
+- editar processo
+- listar processos
+- abrir processo
+
+Campos mínimos do processo:
+- nome do processo
+- órgão
+- modalidade
+- número do edital
+- prazo final
+- observações internas
+
+### Upload de edital
+- upload do edital principal em PDF
+- armazenar arquivo
+- mostrar status do arquivo
+
+### Leitura do edital
+- extrair texto do edital
+- identificar informações do processo
+- identificar documentos exigidos
+- identificar observações relevantes
+- gerar checklist inicial
+- guardar trechos de origem quando possível
+- marcar itens ambíguos para revisão
+
+### Upload de documentos da empresa
+- permitir envio de múltiplos arquivos
+- armazenar documentos
+- listar arquivos enviados
+
+### Leitura dos documentos enviados
+- tentar identificar o tipo do documento
+- extrair dados relevantes quando possível
+- identificar validade quando possível
+- sinalizar necessidade de revisão quando houver baixa confiança
+
+### Conferência documental
+Comparar exigências do edital com os documentos enviados e classificar itens como:
+- OK
+- Faltando
+- Vencido
+- Divergente
+- Revisar manualmente
+
+### Resultado final
+- resumo da conferência
+- pendências encontradas
+- itens atendidos
+- próximos passos
+- relatório final simples
+
+## Uso da IA
+A IA deve ser usada para:
+- ler o edital
+- extrair requisitos e exigências documentais
+- estruturar a checklist
+- ajudar a classificar documentos enviados
+- sinalizar possíveis inconsistências
+
+A IA NÃO deve:
+- dar parecer jurídico definitivo
+- afirmar conformidade legal absoluta
+- substituir revisão humana
+- esconder ambiguidade
+
+Sempre tratar o sistema como conferência assistida com humano no loop.
+
+## Estrutura de dados sugerida
+
+### Process
+- id
+- title
+- agency
+- modality
+- editalNumber
+- deadline
+- notes
+- status
+- createdAt
+- updatedAt
+
+### UploadedFile
+- id
+- processId
+- fileType (edital, anexo, documento_empresa)
+- name
+- path
+- mimeType
+- uploadedAt
+
+### ExtractedRequirement
+- id
+- processId
+- title
+- description
+- category
+- mandatory
+- sourceExcerpt
+- sourcePage
+- confidence
+- needsReview
+
+### SubmittedDocument
+- id
+- processId
+- fileId
+- detectedType
+- detectedDate
+- detectedValidity
+- confidence
+- needsReview
+
+### ValidationItem
+- id
+- processId
+- requirementId
+- submittedDocumentId
+- status
+- notes
+
+### FinalReport
+- id
+- processId
+- summary
+- generatedAt
+
+## Estados principais do processo
+- criado
+- edital_enviado
+- edital_processando
+- exigencias_extraidas
+- aguardando_documentos
+- documentos_enviados
+- em_conferencia
+- pendencias_encontradas
+- pronto_para_revisao
+- concluido
+
+## Stack sugerida
+Use esta stack, salvo se houver impossibilidade técnica:
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- PostgreSQL
+- Prisma
+- Zod
+- Storage para arquivos
+- Integração com IA para leitura e extração
+- arquitetura simples por feature
+
+## Organização desejada
+- projeto limpo
+- código legível
+- tipos fortes
+- validação de schema
+- tratamento claro de erros
+- sem abstrações enterprise desnecessárias
+- sem microserviços no MVP
+- sem complexidade desnecessária
+
+## Regras de implementação
+1. Não gerar o sistema inteiro de forma caótica
+2. Primeiro me mostre a arquitetura proposta
+3. Depois me mostre a estrutura de páginas
+4. Depois me mostre a estrutura de dados
+5. Depois implemente o MVP com foco nas 3 telas centrais
+6. Preserve simplicidade
+7. Toda tela deve responder “o que o usuário faz agora?”
+
+## O que espero como resposta
+Quero que você entregue, nesta ordem:
+
+1. resumo do entendimento do produto
+2. arquitetura de informação do MVP
+3. estrutura das telas
+4. fluxo do usuário
+5. modelagem de dados
+6. stack e decisões técnicas
+7. estrutura de pastas
+8. plano de implementação por etapas
+9. código inicial do sistema
+10. microcopy da interface
+11. melhorias futuras fora do MVP
+
+## Importante
+Não quero uma dashboard genérica.
+Não quero excesso de informações sobre o sistema.
+Não quero design institucional.
+Quero um produto simples, direto e operacional, orientado a:
+- edital
+- exigências
+- documentos
+- conferência
+- resultado
