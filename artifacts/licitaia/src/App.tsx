@@ -22,10 +22,10 @@ const queryClient = new QueryClient({
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={LoginPage} />
       <Route path="/">
         {() => <Redirect to="/login" />}
       </Route>
+      <Route path="/login" component={LoginPage} />
       <Route path="/processes" component={ProcessesPage} />
       <Route path="/processes/:id" component={ProcessDetailPage} />
       <Route path="/processes/:id/checklist" component={ProcessChecklistPage} />
