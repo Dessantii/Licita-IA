@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus } from "lucide-react";
+import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
 
@@ -34,6 +34,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/processes", icon: FolderKanban, label: "Processos" },
     { href: "/monitors", icon: Activity, label: "Monitoramentos" },
     { href: "/reports", icon: BarChart3, label: "Relatórios" },
+    ...(user?.role === "admin" ? [{ href: "/admin/users", icon: Users, label: "Usuários" }] : []),
     { href: "/settings", icon: Settings, label: "Configurações" },
   ];
 

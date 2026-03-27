@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useListProcesses } from "@workspace/api-client-react";
 import { ProcessStatusBadge } from "@/components/processes/ProcessStatusBadge";
@@ -16,8 +16,10 @@ import {
   TrendingUp,
   Calendar,
   Building2,
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const statusLabels: Record<string, string> = {
   criado: "Criado",
@@ -31,6 +33,23 @@ const statusLabels: Record<string, string> = {
   pronto_para_revisao: "Pronto para Revisão",
   concluido: "Concluído",
 };
+
+function exportPDF() {
+  const style = document.createElement("style");
+  style.id = "__print_override";
+  style.textContent = `
+    @media print {
+      body > * { display: none !important; }
+      #relatorio-print-root { display: block !important; }
+      nav, aside, header, [data-sidebar], [data-nav] { display: none !important; }
+      .no-print { display: none !important; }
+      @page { margin: 1.5cm; }
+    }
+  `;
+  document.head.appendChild(style);
+  window.print();
+  setTimeout(() => document.getElementById("__print_override")?.remove(), 1000);
+}
 
 export function RelatóriosPage() {
   const { data: processes, isLoading } = useListProcesses();
@@ -68,9 +87,21 @@ export function RelatóriosPage() {
 
   return (
     <AppLayout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold text-slate-900">Relatórios</h1>
-        <p className="text-slate-500 mt-1">Visão geral dos processos licitatórios.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 no-print">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-slate-900">Relatórios</h1>
+          <p className="text-slate-500 mt-1">Visão geral dos processos licitatórios.</p>
+        </div>
+        {stats && stats.total > 0 && (
+          <Button onClick={exportPDF} variant="outline" className="gap-2 shrink-0">
+            <Download className="w-4 h-4" />
+            Exportar PDF
+          </Button>
+        )}
+      </div>
+      <div className="hidden print:block mb-6">
+        <h1 className="text-2xl font-bold">Relatório — LicitaIA</h1>
+        <p className="text-sm text-gray-500">Emitido em {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
       </div>
 
       {isLoading ? (

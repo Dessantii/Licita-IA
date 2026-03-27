@@ -14,6 +14,7 @@ import { ProcessChecklistPage } from "@/pages/ProcessChecklistPage";
 import { RelatóriosPage } from "@/pages/RelatóriosPage";
 import { ConfiguraçõesPage } from "@/pages/ConfiguraçõesPage";
 import { MonitoramentosPage } from "@/pages/MonitoramentosPage";
+import { UsuáriosPage } from "@/pages/UsuáriosPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -56,6 +57,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         {() => <ProtectedRoute component={ConfiguraçõesPage} />}
+      </Route>
+      <Route path="/admin/users">
+        {() => <ProtectedRoute component={UsuáriosPage} />}
       </Route>
       <Route component={NotFound} />
     </Switch>
