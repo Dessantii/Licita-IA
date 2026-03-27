@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "@workspace/db";
@@ -20,6 +21,15 @@ const { PDFParse } = require("pdf-parse") as { PDFParse: new (opts: { url: strin
 const router: IRouter = Router();
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const tempUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, _file, cb) => cb(null, `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`),
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
 
 async function extractTextFromFile(filePath: string, mimeType: string): Promise<string> {
   const fullPath = path.join(UPLOADS_DIR, filePath);
@@ -36,6 +46,67 @@ async function extractTextFromFile(filePath: string, mimeType: string): Promise<
 
   return "";
 }
+
+router.post("/processes/extract-meta", tempUpload.single("file"), async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: "Nenhum arquivo enviado" });
+    return;
+  }
+
+  const tmpPath = req.file.path;
+
+  let editalText = "";
+  try {
+    const parser = new PDFParse({ url: `file://${tmpPath}` });
+    const data = await parser.getText();
+    editalText = data.text;
+  } catch (err) {
+    fs.existsSync(tmpPath) && fs.unlinkSync(tmpPath);
+    res.status(500).json({ error: "Não foi possível ler o PDF" });
+    return;
+  }
+
+  fs.existsSync(tmpPath) && fs.unlinkSync(tmpPath);
+
+  const textSample = editalText.slice(0, 10000);
+
+  const prompt = `Você é um especialista em licitações públicas brasileiras. Analise o trecho do edital abaixo e extraia as informações básicas do processo licitatório.
+
+EDITAL (primeiros 10.000 caracteres):
+${textSample}
+
+Retorne um JSON com a seguinte estrutura exata (sem markdown, sem texto extra):
+{
+  "title": "Descrição do objeto/escopo da licitação (resumido em até 120 caracteres)",
+  "agency": "Nome do órgão promotor/contratante",
+  "modality": "Modalidade licitatória (ex: Pregão Eletrônico, Concorrência, Tomada de Preços...)",
+  "editalNumber": "Número do edital (ex: 033/2026) ou null se não encontrado",
+  "deadline": "Data e hora de abertura no formato ISO 8601 (YYYY-MM-DDTHH:MM) ou null se não encontrado"
+}`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      max_completion_tokens: 512,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const content = completion.choices[0]?.message?.content ?? "{}";
+    const clean = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(clean);
+
+    res.json({
+      title: parsed.title ?? null,
+      agency: parsed.agency ?? null,
+      modality: parsed.modality ?? null,
+      editalNumber: parsed.editalNumber ?? null,
+      deadline: parsed.deadline ?? null,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to extract metadata from edital");
+    res.status(500).json({ error: "Falha ao processar o edital com IA" });
+  }
+});
 
 router.post("/processes/:id/analyze-edital", async (req, res) => {
   const id = parseInt(req.params.id!);
