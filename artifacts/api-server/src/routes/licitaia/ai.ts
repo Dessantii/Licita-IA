@@ -14,7 +14,7 @@ import { eq } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string }>;
+const { PDFParse } = require("pdf-parse") as { PDFParse: new (opts: { url: string }) => { getText: () => Promise<{ text: string }> } };
 
 
 const router: IRouter = Router();
@@ -28,8 +28,9 @@ async function extractTextFromFile(filePath: string, mimeType: string): Promise<
   }
 
   if (mimeType.includes("pdf")) {
-    const buffer = fs.readFileSync(fullPath);
-    const data = await pdfParse(buffer);
+    const fileUrl = `file://${fullPath}`;
+    const parser = new PDFParse({ url: fileUrl });
+    const data = await parser.getText();
     return data.text;
   }
 
@@ -62,10 +63,22 @@ router.post("/processes/:id/analyze-edital", async (req, res) => {
     .set({ status: "edital_processando" })
     .where(eq(processesTable.id, id));
 
-  const editalText = await extractTextFromFile(editalFile.path, editalFile.mimeType);
+  let editalText = "";
+  try {
+    editalText = await extractTextFromFile(editalFile.path, editalFile.mimeType);
+  } catch (extractErr) {
+    req.log.error({ extractErr }, "Failed to extract text from edital");
+    await db.update(processesTable).set({ status: "edital_enviado" }).where(eq(processesTable.id, id));
+    res.status(500).json({ error: "Failed to read edital file" });
+    return;
+  }
+
   const textSample = editalText.slice(0, 12000);
 
-  const prompt = `Você é um especialista em licitações públicas brasileiras. Analise o edital abaixo e extraia TODOS os documentos e exigências que a empresa licitante precisa apresentar.
+  const prompt = `Você é um especialista em licitações públicas brasileiras. Analise o edital abaixo e extraia:
+
+1. INFORMAÇÕES PRINCIPAIS do edital (objeto, valor, prazos, critérios, etc.)
+2. TODOS os documentos e exigências que a empresa licitante precisa apresentar
 
 EDITAL (primeiros 12.000 caracteres):
 ${textSample}
@@ -74,11 +87,11 @@ Retorne um JSON com a seguinte estrutura exata:
 {
   "requirements": [
     {
-      "title": "Nome curto e claro do documento ou exigência",
-      "description": "Descrição detalhada do que é exigido",
-      "category": "habilitacao_juridica | habilitacao_fiscal | habilitacao_financeira | qualificacao_tecnica | documentacao_complementar | proposta",
+      "title": "Nome curto e claro do item",
+      "description": "Descrição detalhada ou valor extraído do edital",
+      "category": "informacao_principal | habilitacao_juridica | habilitacao_fiscal | habilitacao_financeira | qualificacao_tecnica | documentacao_complementar | proposta",
       "mandatory": true,
-      "sourceExcerpt": "Trecho exato do edital que menciona esta exigência (máximo 200 chars)",
+      "sourceExcerpt": "Trecho exato do edital que menciona este item (máximo 200 chars)",
       "sourcePage": null,
       "confidence": 0.95,
       "needsReview": false
@@ -86,12 +99,25 @@ Retorne um JSON com a seguinte estrutura exata:
   ]
 }
 
-Instruções:
+INSTRUÇÕES PARA INFORMAÇÕES PRINCIPAIS (category = "informacao_principal"):
+Extraia obrigatoriamente os seguintes campos se presentes no edital (cada um como um item separado):
+- "Objeto / Escopo": descrição do que está sendo licitado
+- "Valor Estimado": valor total ou unitário estimado do contrato
+- "Prazo de Entrega / Execução": prazo para entrega dos produtos ou execução dos serviços
+- "Critério de Julgamento": menor preço, técnica e preço, etc.
+- "Forma de Pagamento": condições de pagamento
+- "Vigência do Contrato": duração do contrato
+- "Local de Entrega / Execução": onde deve ser entregue ou executado
+- "Validade da Proposta": por quantos dias a proposta permanece válida
+- Para esses itens, mandatory = false e description = valor/texto extraído do edital
+
+INSTRUÇÕES PARA EXIGÊNCIAS DOCUMENTAIS:
 - Liste TODOS os documentos exigidos, mesmo que apareçam em seções diferentes
 - Seja específico: "Certidão Negativa de Débitos Federais" em vez de "certidões negativas"
 - Inclua prazos de validade quando mencionados na descrição
 - Para itens ambíguos, defina needsReview: true e confidence menor
-- Responda APENAS com o JSON, sem texto adicional`;
+
+Responda APENAS com o JSON, sem texto adicional`;
 
   let requirements: {
     title: string;
