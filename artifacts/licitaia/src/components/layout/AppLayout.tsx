@@ -3,7 +3,7 @@ import { FolderKanban, BarChart3, Settings, LogOut, Bell, Search } from "lucide-
 import { cn } from "@/lib/utils";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
 
   const navItems = [
     { href: "/processes", icon: FolderKanban, label: "Processos" },
@@ -48,7 +48,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-4 border-t border-sidebar-border">
-          <button className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+          <button
+            onClick={() => navigate("/login")}
+            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          >
             <LogOut className="w-5 h-5" />
             Sair
           </button>

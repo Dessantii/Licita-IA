@@ -1,20 +1,20 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
+import { LoginPage } from "@/pages/LoginPage";
 import { ProcessesPage } from "@/pages/ProcessesPage";
 import { ProcessDetailPage } from "@/pages/ProcessDetailPage";
 import { ProcessChecklistPage } from "@/pages/ProcessChecklistPage";
 
-// Default QueryClient configuration for the app
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
     },
   },
 });
@@ -22,12 +22,14 @@ const queryClient = new QueryClient({
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={ProcessesPage} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/">
+        {() => <Redirect to="/login" />}
+      </Route>
       <Route path="/processes" component={ProcessesPage} />
       <Route path="/processes/:id" component={ProcessDetailPage} />
       <Route path="/processes/:id/checklist" component={ProcessChecklistPage} />
-      
-      {/* Placeholder routes for sidebar links */}
+
       <Route path="/reports">
         {() => (
           <div className="p-8 text-center">
