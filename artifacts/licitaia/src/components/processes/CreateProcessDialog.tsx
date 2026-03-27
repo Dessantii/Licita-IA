@@ -57,7 +57,7 @@ export function CreateProcessDialog() {
           Novo Processo
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo Processo Licitatório</DialogTitle>
           <DialogDescription>
