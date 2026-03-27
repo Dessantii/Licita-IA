@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
+import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
 
 interface Alert {
   id: number;
@@ -95,14 +96,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside className="w-full md:w-64 bg-sidebar border-r border-sidebar-border flex-shrink-0 flex flex-col">
         <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <img
-              src={`${import.meta.env.BASE_URL}images/logo-mark.png`}
-              alt="LicitaIA Logo"
-              className="w-8 h-8 rounded-md bg-white p-1"
-            />
-            <span className="text-sidebar-foreground font-display font-bold text-xl tracking-tight">LicitaIA</span>
-          </div>
+          <LicitaIALogo variant="full" size="sm" theme="white" />
         </div>
 
         <nav className="flex-1 py-6 px-3 space-y-1">

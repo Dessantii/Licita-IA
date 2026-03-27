@@ -1,3 +1,22 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.12)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="36" fill="url(#bg)"/>
+  <rect width="180" height="180" rx="36" fill="url(#shine)"/>
+  <!-- Line 1 -->
+  <rect x="36" y="52" width="108" height="13" rx="6.5" fill="rgba(255,255,255,0.9)"/>
+  <!-- Line 2 -->
+  <rect x="36" y="83" width="108" height="13" rx="6.5" fill="rgba(255,255,255,0.9)"/>
+  <!-- Line 3 short -->
+  <rect x="36" y="114" width="58" height="13" rx="6.5" fill="rgba(255,255,255,0.3)"/>
+  <!-- Checkmark -->
+  <polyline points="108,125 119,138 144,108" stroke="#2dd4bf" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>

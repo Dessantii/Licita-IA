@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, UserPlus } from "lucide-react";
 import { saveAuth, isAuthenticated } from "@/hooks/use-auth";
+import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
 
 type Mode = "loading" | "setup" | "login";
 
@@ -74,13 +75,8 @@ export function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-sidebar flex-col justify-between p-12">
-        <div className="flex items-center gap-3">
-          <img
-            src={`${import.meta.env.BASE_URL}images/logo-mark.png`}
-            alt="LicitaIA"
-            className="w-9 h-9 rounded-lg bg-white p-1"
-          />
-          <span className="text-white font-bold text-2xl tracking-tight">LicitaIA</span>
+        <div className="flex items-center">
+          <LicitaIALogo variant="full" size="md" theme="white" />
         </div>
 
         <div className="space-y-8">
@@ -116,13 +112,8 @@ export function LoginPage() {
       <div className="flex-1 flex items-center justify-center bg-background px-6 py-12">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <img
-              src={`${import.meta.env.BASE_URL}images/logo-mark.png`}
-              alt="LicitaIA"
-              className="w-8 h-8 rounded-lg bg-sidebar p-1"
-            />
-            <span className="font-bold text-xl tracking-tight">LicitaIA</span>
+          <div className="flex items-center mb-8 lg:hidden">
+            <LicitaIALogo variant="full" size="sm" theme="dark" />
           </div>
 
           {mode === "loading" && (
