@@ -66,10 +66,7 @@ function Router() {
         {() => <ProtectedRoute component={ChamamentoDetailPage} />}
       </Route>
       <Route path="/empresas">
-        {() => <ProtectedRoute component={EmpresasPage} />}
-      </Route>
-      <Route path="/empresas/:id">
-        {() => <ProtectedRoute component={EmpresaDetailPage} />}
+        {() => <Redirect to="/companies" />}
       </Route>
       <Route path="/monitors">
         {() => <ProtectedRoute component={MonitoramentosPage} />}

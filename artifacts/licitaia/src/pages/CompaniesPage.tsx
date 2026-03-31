@@ -558,7 +558,7 @@ export function CompaniesPage() {
                     </div>
 
                     <h3 className="font-semibold text-slate-900 text-sm leading-snug mb-0.5 line-clamp-2">
-                      {company.razaoSocial}
+                      {company.razaoSocial || <span className="text-slate-400 italic">Sem nome cadastrado</span>}
                     </h3>
                     {company.nomeFantasia && (
                       <p className="text-xs text-slate-400 mb-1">{company.nomeFantasia}</p>
