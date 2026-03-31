@@ -6,6 +6,9 @@ import aiRouter from "./licitaia/ai";
 import authRouter, { requireAuth, requireAdmin } from "./auth";
 import monitorsRouter from "./licitaia/monitors";
 import adminRouter from "./admin";
+import chamamentosRouter from "./chamamentos/notices";
+import chamamentosFilesRouter from "./chamamentos/files";
+import chamamentosAiRouter from "./chamamentos/ai";
 
 const router: IRouter = Router();
 
@@ -19,5 +22,9 @@ router.use(filesRouter);
 router.use(aiRouter);
 router.use("/monitors", monitorsRouter);
 router.use("/admin", requireAdmin, adminRouter);
+
+router.use("/chamamentos", chamamentosRouter);
+router.use("/chamamentos", chamamentosFilesRouter);
+router.use("/chamamentos/ai", chamamentosAiRouter);
 
 export default router;

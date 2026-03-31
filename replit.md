@@ -52,7 +52,7 @@ artifacts-monorepo/
 
 ## Database Schema
 
-Tables:
+### Módulo de Licitações
 - `processes` - Bidding processes (status, agency, modality, edital number, deadline)
 - `uploaded_files` - Files uploaded per process (edital PDFs, company documents)
 - `extracted_requirements` - Requirements/documents extracted from edital by AI
@@ -60,26 +60,48 @@ Tables:
 - `validation_items` - Checklist items linking requirements to submitted docs with status
 - `final_reports` - Final conference reports with summary and counts
 
-## Process States
+### Módulo de Chamamentos Públicos (OSC)
+- `call_notices` - Public call notices (status, agency, reference number, category, deadline)
+- `notice_files` - Files for chamamentos (edital, documento_osc, proposta, plano_trabalho, cronograma)
+- `call_extracted_requirements` - Requirements extracted from chamamento edital by AI (with requirementType for OSC-specific types)
+- `call_submitted_documents` - OSC documents matched to requirements
+- `call_validation_items` - Checklist items with statuses: ok, pendente, divergente, vencido, incompleto, revisar_manualmente
+
+## Process States (Licitações)
 
 criado → edital_enviado → edital_processando → exigencias_extraidas → aguardando_documentos → documentos_enviados → em_conferencia → pendencias_encontradas | pronto_para_revisao → concluido
 
-## Validation Statuses
+## Call Notice States (Chamamentos)
 
-- ok: document found and correct
-- faltando: document missing
-- vencido: document expired
-- divergente: document inconsistent
-- revisar: needs human review
+criado → edital_enviado → edital_processando → requisitos_extraidos → aguardando_documentos → documentos_enviados → em_conferencia → pendencias_encontradas | pronto_para_submissao → concluido
+
+## Validation Statuses (Licitações)
+
+- ok, faltando, vencido, divergente, revisar
+
+## Call Validation Statuses (Chamamentos)
+
+- ok, pendente, divergente, vencido, incompleto, revisar_manualmente
+
+## Requirement Types (Chamamentos)
+
+documento_institucional, certidao_regularidade, comprovacao_experiencia, declaracao, anexo_obrigatorio, proposta_tecnica, plano_trabalho, cronograma, requisito_elegibilidade, documento_parceria
 
 ## Frontend Pages
 
+### Licitações
 - `/` → ProcessesPage (list of processes, create new)
 - `/processes/:id` → ProcessDetailPage (edital upload, doc upload, AI analysis)
 - `/processes/:id/checklist` → ProcessChecklistPage (full checklist, manual overrides, report)
 
+### Chamamentos Públicos
+- `/chamamentos` → ChamamentosPage (list, filter by status, create new)
+- `/chamamentos/:id` → ChamamentoDetailPage (edital upload, OSC docs, proposal section, AI analysis, next-step guidance)
+- `/chamamentos/:id/checklist` → ChamamentoChecklistPage (checklist with filter by type/status, manual edit)
+
 ## API Routes (all under /api)
 
+### Licitações
 - GET/POST /processes
 - GET/PATCH/DELETE /processes/:id
 - POST /processes/:id/upload-edital (multipart)
@@ -92,6 +114,20 @@ criado → edital_enviado → edital_processando → exigencias_extraidas → ag
 - PATCH /validation/:id
 - GET /processes/:id/report
 - GET /processes/:id/files
+
+### Chamamentos Públicos
+- GET/POST /chamamentos
+- GET/PATCH/DELETE /chamamentos/:id
+- POST /chamamentos/:id/upload-edital (multipart)
+- POST /chamamentos/:id/upload-document (multipart, with fileType body field)
+- DELETE /chamamentos/files/:id
+- POST /chamamentos/ai/extract-meta (multipart, temp file)
+- POST /chamamentos/ai/:id/analyze-edital (AI)
+- POST /chamamentos/ai/:id/analyze-documents (AI)
+- GET /chamamentos/:id/requirements
+- GET /chamamentos/:id/validation
+- PATCH /chamamentos/validation/:id
+- GET /chamamentos/:id/files
 
 ## TypeScript & Composite Projects
 

@@ -207,10 +207,234 @@ export interface AnalysisResult {
   processStatus: string;
 }
 
+export type CallNoticeStatus =
+  (typeof CallNoticeStatus)[keyof typeof CallNoticeStatus];
+
+export const CallNoticeStatus = {
+  criado: "criado",
+  edital_enviado: "edital_enviado",
+  edital_processando: "edital_processando",
+  requisitos_extraidos: "requisitos_extraidos",
+  aguardando_documentos: "aguardando_documentos",
+  documentos_enviados: "documentos_enviados",
+  em_conferencia: "em_conferencia",
+  pendencias_encontradas: "pendencias_encontradas",
+  pronto_para_submissao: "pronto_para_submissao",
+  concluido: "concluido",
+} as const;
+
+export interface CallNotice {
+  id: number;
+  title: string;
+  agency: string;
+  /** @nullable */
+  referenceNumber?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  deadline?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  status: CallNoticeStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NoticeFileFileType =
+  (typeof NoticeFileFileType)[keyof typeof NoticeFileFileType];
+
+export const NoticeFileFileType = {
+  edital: "edital",
+  anexo: "anexo",
+  documento_osc: "documento_osc",
+  proposta: "proposta",
+  plano_trabalho: "plano_trabalho",
+  cronograma: "cronograma",
+} as const;
+
+export interface NoticeFile {
+  id: number;
+  callNoticeId: number;
+  fileType: NoticeFileFileType;
+  name: string;
+  path: string;
+  mimeType: string;
+  size: number;
+  /** @nullable */
+  dataValidade?: string | null;
+  uploadedAt: string;
+}
+
+export interface CallExtractedRequirement {
+  id: number;
+  callNoticeId: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  requirementType?: string | null;
+  mandatory: boolean;
+  /** @nullable */
+  sourceExcerpt?: string | null;
+  /** @nullable */
+  sourcePage?: number | null;
+  confidence: number;
+  needsReview: boolean;
+  createdAt: string;
+}
+
+export type CallValidationItemStatus =
+  (typeof CallValidationItemStatus)[keyof typeof CallValidationItemStatus];
+
+export const CallValidationItemStatus = {
+  ok: "ok",
+  pendente: "pendente",
+  divergente: "divergente",
+  vencido: "vencido",
+  incompleto: "incompleto",
+  revisar_manualmente: "revisar_manualmente",
+} as const;
+
+export interface CallSubmittedDocument {
+  id: number;
+  callNoticeId: number;
+  fileId: number;
+  /** @nullable */
+  detectedType?: string | null;
+  /** @nullable */
+  detectedDate?: string | null;
+  /** @nullable */
+  detectedValidity?: string | null;
+  confidence: number;
+  needsReview: boolean;
+  createdAt: string;
+}
+
+export interface CallValidationItem {
+  id: number;
+  callNoticeId: number;
+  requirementId: number;
+  /** @nullable */
+  submittedDocumentId?: number | null;
+  status: CallValidationItemStatus;
+  /** @nullable */
+  notes?: string | null;
+  requirement: CallExtractedRequirement;
+  submittedDocument?: CallSubmittedDocument | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CallNoticeDetail = CallNotice & {
+  editalFile?: NoticeFile | null;
+  documentFiles: NoticeFile[];
+  requirements: CallExtractedRequirement[];
+  validationItems: CallValidationItem[];
+};
+
+export interface CreateCallNoticeBody {
+  title: string;
+  agency: string;
+  /** @nullable */
+  referenceNumber?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  deadline?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export type UpdateCallNoticeBodyStatus =
+  (typeof UpdateCallNoticeBodyStatus)[keyof typeof UpdateCallNoticeBodyStatus];
+
+export const UpdateCallNoticeBodyStatus = {
+  criado: "criado",
+  edital_enviado: "edital_enviado",
+  edital_processando: "edital_processando",
+  requisitos_extraidos: "requisitos_extraidos",
+  aguardando_documentos: "aguardando_documentos",
+  documentos_enviados: "documentos_enviados",
+  em_conferencia: "em_conferencia",
+  pendencias_encontradas: "pendencias_encontradas",
+  pronto_para_submissao: "pronto_para_submissao",
+  concluido: "concluido",
+} as const;
+
+export interface UpdateCallNoticeBody {
+  title?: string;
+  agency?: string;
+  /** @nullable */
+  referenceNumber?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  deadline?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  status?: UpdateCallNoticeBodyStatus;
+}
+
+export type UpdateCallValidationItemBodyStatus =
+  (typeof UpdateCallValidationItemBodyStatus)[keyof typeof UpdateCallValidationItemBodyStatus];
+
+export const UpdateCallValidationItemBodyStatus = {
+  ok: "ok",
+  pendente: "pendente",
+  divergente: "divergente",
+  vencido: "vencido",
+  incompleto: "incompleto",
+  revisar_manualmente: "revisar_manualmente",
+} as const;
+
+export interface UpdateCallValidationItemBody {
+  status?: UpdateCallValidationItemBodyStatus;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  submittedDocumentId?: number | null;
+}
+
+export interface CallAnalysisResult {
+  success: boolean;
+  message: string;
+  noticeStatus: string;
+  /** @nullable */
+  summary?: string | null;
+  /** @nullable */
+  nextSteps?: string | null;
+}
+
+export interface ExtractCallMetaResult {
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  agency?: string | null;
+  /** @nullable */
+  referenceNumber?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  deadline?: string | null;
+}
+
 export type UploadEditalBody = {
   file: Blob;
 };
 
 export type UploadDocumentBody = {
+  file: Blob;
+};
+
+export type UploadNoticeEditalBody = {
+  file: Blob;
+};
+
+export type UploadNoticeDocumentBody = {
+  file: Blob;
+  fileType?: string;
+};
+
+export type ExtractCallMetaBody = {
   file: Blob;
 };

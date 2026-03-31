@@ -23,6 +23,12 @@ tags:
     description: Final reports
   - name: ai
     description: AI processing operations
+  - name: chamamentos
+    description: Public call notice management (OSC)
+  - name: chamamentos-files
+    description: File upload for call notices
+  - name: chamamentos-ai
+    description: AI processing for call notices
 
 paths:
   /healthz:
@@ -426,6 +432,401 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /chamamentos:
+    get:
+      operationId: listCallNotices
+      tags: [chamamentos]
+      summary: List all call notices
+      responses:
+        "200":
+          description: List of call notices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CallNotice"
+    post:
+      operationId: createCallNotice
+      tags: [chamamentos]
+      summary: Create a new call notice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCallNoticeBody"
+      responses:
+        "201":
+          description: Created call notice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallNotice"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chamamentos/{id}:
+    get:
+      operationId: getCallNotice
+      tags: [chamamentos]
+      summary: Get a call notice by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Call notice details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallNoticeDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateCallNotice
+      tags: [chamamentos]
+      summary: Update a call notice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCallNoticeBody"
+      responses:
+        "200":
+          description: Updated call notice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallNotice"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteCallNotice
+      tags: [chamamentos]
+      summary: Delete a call notice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chamamentos/{id}/files:
+    get:
+      operationId: listNoticeFiles
+      tags: [chamamentos-files]
+      summary: List files for a call notice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NoticeFile"
+
+  /chamamentos/{id}/requirements:
+    get:
+      operationId: listCallRequirements
+      tags: [chamamentos]
+      summary: List extracted requirements for a call notice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of requirements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CallExtractedRequirement"
+
+  /chamamentos/{id}/validation:
+    get:
+      operationId: listCallValidationItems
+      tags: [chamamentos]
+      summary: List validation items for a call notice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Validation checklist
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CallValidationItem"
+
+  /chamamentos/{id}/upload-edital:
+    post:
+      operationId: uploadNoticeEdital
+      tags: [chamamentos-files]
+      summary: Upload edital PDF for a call notice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        "200":
+          description: Uploaded file info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoticeFile"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chamamentos/{id}/upload-document:
+    post:
+      operationId: uploadNoticeDocument
+      tags: [chamamentos-files]
+      summary: Upload a document for a call notice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                fileType:
+                  type: string
+              required:
+                - file
+      responses:
+        "200":
+          description: Uploaded file info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoticeFile"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chamamentos/ai/extract-meta:
+    post:
+      operationId: extractCallMeta
+      tags: [chamamentos-ai]
+      summary: Extract metadata from a call notice edital via AI
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        "200":
+          description: Extracted metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractCallMetaResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chamamentos/ai/{id}/analyze-edital:
+    post:
+      operationId: analyzeCallEdital
+      tags: [chamamentos-ai]
+      summary: Trigger AI analysis of the uploaded call notice edital
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallAnalysisResult"
+        "400":
+          description: No edital uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chamamentos/ai/{id}/analyze-documents:
+    post:
+      operationId: analyzeCallDocuments
+      tags: [chamamentos-ai]
+      summary: Trigger AI analysis of submitted OSC documents
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallAnalysisResult"
+        "400":
+          description: No documents or requirements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chamamentos/validation/{id}:
+    patch:
+      operationId: updateCallValidationItem
+      tags: [chamamentos]
+      summary: Update a call validation item status or notes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCallValidationItemBody"
+      responses:
+        "200":
+          description: Updated validation item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallValidationItem"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chamamentos/files/{id}:
+    delete:
+      operationId: deleteNoticeFile
+      tags: [chamamentos-files]
+      summary: Delete an uploaded notice file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -740,3 +1141,292 @@ components:
         - success
         - message
         - processStatus
+
+    CallNotice:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        agency:
+          type: string
+        referenceNumber:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        deadline:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum:
+            - criado
+            - edital_enviado
+            - edital_processando
+            - requisitos_extraidos
+            - aguardando_documentos
+            - documentos_enviados
+            - em_conferencia
+            - pendencias_encontradas
+            - pronto_para_submissao
+            - concluido
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - title
+        - agency
+        - status
+        - createdAt
+        - updatedAt
+
+    CallNoticeDetail:
+      allOf:
+        - $ref: "#/components/schemas/CallNotice"
+        - type: object
+          properties:
+            editalFile:
+              oneOf:
+                - $ref: "#/components/schemas/NoticeFile"
+                - type: "null"
+            documentFiles:
+              type: array
+              items:
+                $ref: "#/components/schemas/NoticeFile"
+            requirements:
+              type: array
+              items:
+                $ref: "#/components/schemas/CallExtractedRequirement"
+            validationItems:
+              type: array
+              items:
+                $ref: "#/components/schemas/CallValidationItem"
+          required:
+            - documentFiles
+            - requirements
+            - validationItems
+
+    CreateCallNoticeBody:
+      type: object
+      properties:
+        title:
+          type: string
+        agency:
+          type: string
+        referenceNumber:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        deadline:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+      required:
+        - title
+        - agency
+
+    UpdateCallNoticeBody:
+      type: object
+      properties:
+        title:
+          type: string
+        agency:
+          type: string
+        referenceNumber:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        deadline:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum:
+            - criado
+            - edital_enviado
+            - edital_processando
+            - requisitos_extraidos
+            - aguardando_documentos
+            - documentos_enviados
+            - em_conferencia
+            - pendencias_encontradas
+            - pronto_para_submissao
+            - concluido
+
+    NoticeFile:
+      type: object
+      properties:
+        id:
+          type: integer
+        callNoticeId:
+          type: integer
+        fileType:
+          type: string
+          enum: [edital, anexo, documento_osc, proposta, plano_trabalho, cronograma]
+        name:
+          type: string
+        path:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+        dataValidade:
+          type: ["string", "null"]
+        uploadedAt:
+          type: string
+      required:
+        - id
+        - callNoticeId
+        - fileType
+        - name
+        - path
+        - mimeType
+        - size
+        - uploadedAt
+
+    CallExtractedRequirement:
+      type: object
+      properties:
+        id:
+          type: integer
+        callNoticeId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        requirementType:
+          type: ["string", "null"]
+        mandatory:
+          type: boolean
+        sourceExcerpt:
+          type: ["string", "null"]
+        sourcePage:
+          type: ["integer", "null"]
+        confidence:
+          type: number
+        needsReview:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - callNoticeId
+        - title
+        - mandatory
+        - confidence
+        - needsReview
+        - createdAt
+
+    CallSubmittedDocument:
+      type: object
+      properties:
+        id:
+          type: integer
+        callNoticeId:
+          type: integer
+        fileId:
+          type: integer
+        detectedType:
+          type: ["string", "null"]
+        detectedDate:
+          type: ["string", "null"]
+        detectedValidity:
+          type: ["string", "null"]
+        confidence:
+          type: number
+        needsReview:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - callNoticeId
+        - fileId
+        - confidence
+        - needsReview
+        - createdAt
+
+    CallValidationItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        callNoticeId:
+          type: integer
+        requirementId:
+          type: integer
+        submittedDocumentId:
+          type: ["integer", "null"]
+        status:
+          type: string
+          enum: [ok, pendente, divergente, vencido, incompleto, revisar_manualmente]
+        notes:
+          type: ["string", "null"]
+        requirement:
+          $ref: "#/components/schemas/CallExtractedRequirement"
+        submittedDocument:
+          oneOf:
+            - $ref: "#/components/schemas/CallSubmittedDocument"
+            - type: "null"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - callNoticeId
+        - requirementId
+        - status
+        - requirement
+        - createdAt
+        - updatedAt
+
+    UpdateCallValidationItemBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, pendente, divergente, vencido, incompleto, revisar_manualmente]
+        notes:
+          type: ["string", "null"]
+        submittedDocumentId:
+          type: ["integer", "null"]
+
+    CallAnalysisResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        noticeStatus:
+          type: string
+        summary:
+          type: ["string", "null"]
+        nextSteps:
+          type: ["string", "null"]
+      required:
+        - success
+        - message
+        - noticeStatus
+
+    ExtractCallMetaResult:
+      type: object
+      properties:
+        title:
+          type: ["string", "null"]
+        agency:
+          type: ["string", "null"]
+        referenceNumber:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        deadline:
+          type: ["string", "null"]

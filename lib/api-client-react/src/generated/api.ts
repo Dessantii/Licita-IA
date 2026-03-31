@@ -18,17 +18,30 @@ import type {
 
 import type {
   AnalysisResult,
+  CallAnalysisResult,
+  CallExtractedRequirement,
+  CallNotice,
+  CallNoticeDetail,
+  CallValidationItem,
+  CreateCallNoticeBody,
   CreateProcessBody,
   ErrorResponse,
+  ExtractCallMetaBody,
+  ExtractCallMetaResult,
   ExtractedRequirement,
   FinalReport,
   HealthStatus,
+  NoticeFile,
   Process,
   ProcessDetail,
+  UpdateCallNoticeBody,
+  UpdateCallValidationItemBody,
   UpdateProcessBody,
   UpdateValidationItemBody,
   UploadDocumentBody,
   UploadEditalBody,
+  UploadNoticeDocumentBody,
+  UploadNoticeEditalBody,
   UploadedFile,
   ValidationItem,
 } from "./api.schemas";
@@ -1397,4 +1410,1300 @@ export const useDeleteFile = <
   TContext
 > => {
   return useMutation(getDeleteFileMutationOptions(options));
+};
+
+/**
+ * @summary List all call notices
+ */
+export const getListCallNoticesUrl = () => {
+  return `/api/chamamentos`;
+};
+
+export const listCallNotices = async (
+  options?: RequestInit,
+): Promise<CallNotice[]> => {
+  return customFetch<CallNotice[]>(getListCallNoticesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCallNoticesQueryKey = () => {
+  return [`/api/chamamentos`] as const;
+};
+
+export const getListCallNoticesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCallNotices>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCallNotices>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCallNoticesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCallNotices>>> = ({
+    signal,
+  }) => listCallNotices({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCallNotices>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCallNoticesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCallNotices>>
+>;
+export type ListCallNoticesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all call notices
+ */
+
+export function useListCallNotices<
+  TData = Awaited<ReturnType<typeof listCallNotices>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCallNotices>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCallNoticesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new call notice
+ */
+export const getCreateCallNoticeUrl = () => {
+  return `/api/chamamentos`;
+};
+
+export const createCallNotice = async (
+  createCallNoticeBody: CreateCallNoticeBody,
+  options?: RequestInit,
+): Promise<CallNotice> => {
+  return customFetch<CallNotice>(getCreateCallNoticeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createCallNoticeBody),
+  });
+};
+
+export const getCreateCallNoticeMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCallNotice>>,
+    TError,
+    { data: BodyType<CreateCallNoticeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCallNotice>>,
+  TError,
+  { data: BodyType<CreateCallNoticeBody> },
+  TContext
+> => {
+  const mutationKey = ["createCallNotice"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCallNotice>>,
+    { data: BodyType<CreateCallNoticeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCallNotice(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCallNoticeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCallNotice>>
+>;
+export type CreateCallNoticeMutationBody = BodyType<CreateCallNoticeBody>;
+export type CreateCallNoticeMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create a new call notice
+ */
+export const useCreateCallNotice = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCallNotice>>,
+    TError,
+    { data: BodyType<CreateCallNoticeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCallNotice>>,
+  TError,
+  { data: BodyType<CreateCallNoticeBody> },
+  TContext
+> => {
+  return useMutation(getCreateCallNoticeMutationOptions(options));
+};
+
+/**
+ * @summary Get a call notice by ID
+ */
+export const getGetCallNoticeUrl = (id: number) => {
+  return `/api/chamamentos/${id}`;
+};
+
+export const getCallNotice = async (
+  id: number,
+  options?: RequestInit,
+): Promise<CallNoticeDetail> => {
+  return customFetch<CallNoticeDetail>(getGetCallNoticeUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCallNoticeQueryKey = (id: number) => {
+  return [`/api/chamamentos/${id}`] as const;
+};
+
+export const getGetCallNoticeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCallNotice>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCallNotice>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCallNoticeQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCallNotice>>> = ({
+    signal,
+  }) => getCallNotice(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCallNotice>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCallNoticeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCallNotice>>
+>;
+export type GetCallNoticeQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get a call notice by ID
+ */
+
+export function useGetCallNotice<
+  TData = Awaited<ReturnType<typeof getCallNotice>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCallNotice>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCallNoticeQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update a call notice
+ */
+export const getUpdateCallNoticeUrl = (id: number) => {
+  return `/api/chamamentos/${id}`;
+};
+
+export const updateCallNotice = async (
+  id: number,
+  updateCallNoticeBody: UpdateCallNoticeBody,
+  options?: RequestInit,
+): Promise<CallNotice> => {
+  return customFetch<CallNotice>(getUpdateCallNoticeUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateCallNoticeBody),
+  });
+};
+
+export const getUpdateCallNoticeMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCallNotice>>,
+    TError,
+    { id: number; data: BodyType<UpdateCallNoticeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCallNotice>>,
+  TError,
+  { id: number; data: BodyType<UpdateCallNoticeBody> },
+  TContext
+> => {
+  const mutationKey = ["updateCallNotice"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCallNotice>>,
+    { id: number; data: BodyType<UpdateCallNoticeBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateCallNotice(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCallNoticeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCallNotice>>
+>;
+export type UpdateCallNoticeMutationBody = BodyType<UpdateCallNoticeBody>;
+export type UpdateCallNoticeMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Update a call notice
+ */
+export const useUpdateCallNotice = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCallNotice>>,
+    TError,
+    { id: number; data: BodyType<UpdateCallNoticeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCallNotice>>,
+  TError,
+  { id: number; data: BodyType<UpdateCallNoticeBody> },
+  TContext
+> => {
+  return useMutation(getUpdateCallNoticeMutationOptions(options));
+};
+
+/**
+ * @summary Delete a call notice
+ */
+export const getDeleteCallNoticeUrl = (id: number) => {
+  return `/api/chamamentos/${id}`;
+};
+
+export const deleteCallNotice = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteCallNoticeUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteCallNoticeMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCallNotice>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteCallNotice>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteCallNotice"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteCallNotice>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteCallNotice(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteCallNoticeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteCallNotice>>
+>;
+
+export type DeleteCallNoticeMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Delete a call notice
+ */
+export const useDeleteCallNotice = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCallNotice>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCallNotice>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteCallNoticeMutationOptions(options));
+};
+
+/**
+ * @summary List files for a call notice
+ */
+export const getListNoticeFilesUrl = (id: number) => {
+  return `/api/chamamentos/${id}/files`;
+};
+
+export const listNoticeFiles = async (
+  id: number,
+  options?: RequestInit,
+): Promise<NoticeFile[]> => {
+  return customFetch<NoticeFile[]>(getListNoticeFilesUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListNoticeFilesQueryKey = (id: number) => {
+  return [`/api/chamamentos/${id}/files`] as const;
+};
+
+export const getListNoticeFilesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listNoticeFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listNoticeFiles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListNoticeFilesQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listNoticeFiles>>> = ({
+    signal,
+  }) => listNoticeFiles(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listNoticeFiles>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListNoticeFilesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listNoticeFiles>>
+>;
+export type ListNoticeFilesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List files for a call notice
+ */
+
+export function useListNoticeFiles<
+  TData = Awaited<ReturnType<typeof listNoticeFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listNoticeFiles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListNoticeFilesQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List extracted requirements for a call notice
+ */
+export const getListCallRequirementsUrl = (id: number) => {
+  return `/api/chamamentos/${id}/requirements`;
+};
+
+export const listCallRequirements = async (
+  id: number,
+  options?: RequestInit,
+): Promise<CallExtractedRequirement[]> => {
+  return customFetch<CallExtractedRequirement[]>(
+    getListCallRequirementsUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListCallRequirementsQueryKey = (id: number) => {
+  return [`/api/chamamentos/${id}/requirements`] as const;
+};
+
+export const getListCallRequirementsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCallRequirements>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCallRequirements>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCallRequirementsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCallRequirements>>
+  > = ({ signal }) => listCallRequirements(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCallRequirements>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCallRequirementsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCallRequirements>>
+>;
+export type ListCallRequirementsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List extracted requirements for a call notice
+ */
+
+export function useListCallRequirements<
+  TData = Awaited<ReturnType<typeof listCallRequirements>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCallRequirements>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCallRequirementsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List validation items for a call notice
+ */
+export const getListCallValidationItemsUrl = (id: number) => {
+  return `/api/chamamentos/${id}/validation`;
+};
+
+export const listCallValidationItems = async (
+  id: number,
+  options?: RequestInit,
+): Promise<CallValidationItem[]> => {
+  return customFetch<CallValidationItem[]>(getListCallValidationItemsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCallValidationItemsQueryKey = (id: number) => {
+  return [`/api/chamamentos/${id}/validation`] as const;
+};
+
+export const getListCallValidationItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCallValidationItems>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCallValidationItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCallValidationItemsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCallValidationItems>>
+  > = ({ signal }) =>
+    listCallValidationItems(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCallValidationItems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCallValidationItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCallValidationItems>>
+>;
+export type ListCallValidationItemsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List validation items for a call notice
+ */
+
+export function useListCallValidationItems<
+  TData = Awaited<ReturnType<typeof listCallValidationItems>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCallValidationItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCallValidationItemsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Upload edital PDF for a call notice
+ */
+export const getUploadNoticeEditalUrl = (id: number) => {
+  return `/api/chamamentos/${id}/upload-edital`;
+};
+
+export const uploadNoticeEdital = async (
+  id: number,
+  uploadNoticeEditalBody: UploadNoticeEditalBody,
+  options?: RequestInit,
+): Promise<NoticeFile> => {
+  const formData = new FormData();
+  formData.append(`file`, uploadNoticeEditalBody.file);
+
+  return customFetch<NoticeFile>(getUploadNoticeEditalUrl(id), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getUploadNoticeEditalMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadNoticeEdital>>,
+    TError,
+    { id: number; data: BodyType<UploadNoticeEditalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadNoticeEdital>>,
+  TError,
+  { id: number; data: BodyType<UploadNoticeEditalBody> },
+  TContext
+> => {
+  const mutationKey = ["uploadNoticeEdital"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadNoticeEdital>>,
+    { id: number; data: BodyType<UploadNoticeEditalBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return uploadNoticeEdital(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UploadNoticeEditalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadNoticeEdital>>
+>;
+export type UploadNoticeEditalMutationBody = BodyType<UploadNoticeEditalBody>;
+export type UploadNoticeEditalMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Upload edital PDF for a call notice
+ */
+export const useUploadNoticeEdital = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadNoticeEdital>>,
+    TError,
+    { id: number; data: BodyType<UploadNoticeEditalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uploadNoticeEdital>>,
+  TError,
+  { id: number; data: BodyType<UploadNoticeEditalBody> },
+  TContext
+> => {
+  return useMutation(getUploadNoticeEditalMutationOptions(options));
+};
+
+/**
+ * @summary Upload a document for a call notice
+ */
+export const getUploadNoticeDocumentUrl = (id: number) => {
+  return `/api/chamamentos/${id}/upload-document`;
+};
+
+export const uploadNoticeDocument = async (
+  id: number,
+  uploadNoticeDocumentBody: UploadNoticeDocumentBody,
+  options?: RequestInit,
+): Promise<NoticeFile> => {
+  const formData = new FormData();
+  formData.append(`file`, uploadNoticeDocumentBody.file);
+  if (uploadNoticeDocumentBody.fileType !== undefined) {
+    formData.append(`fileType`, uploadNoticeDocumentBody.fileType);
+  }
+
+  return customFetch<NoticeFile>(getUploadNoticeDocumentUrl(id), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getUploadNoticeDocumentMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadNoticeDocument>>,
+    TError,
+    { id: number; data: BodyType<UploadNoticeDocumentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadNoticeDocument>>,
+  TError,
+  { id: number; data: BodyType<UploadNoticeDocumentBody> },
+  TContext
+> => {
+  const mutationKey = ["uploadNoticeDocument"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadNoticeDocument>>,
+    { id: number; data: BodyType<UploadNoticeDocumentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return uploadNoticeDocument(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UploadNoticeDocumentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadNoticeDocument>>
+>;
+export type UploadNoticeDocumentMutationBody =
+  BodyType<UploadNoticeDocumentBody>;
+export type UploadNoticeDocumentMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Upload a document for a call notice
+ */
+export const useUploadNoticeDocument = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadNoticeDocument>>,
+    TError,
+    { id: number; data: BodyType<UploadNoticeDocumentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uploadNoticeDocument>>,
+  TError,
+  { id: number; data: BodyType<UploadNoticeDocumentBody> },
+  TContext
+> => {
+  return useMutation(getUploadNoticeDocumentMutationOptions(options));
+};
+
+/**
+ * @summary Extract metadata from a call notice edital via AI
+ */
+export const getExtractCallMetaUrl = () => {
+  return `/api/chamamentos/ai/extract-meta`;
+};
+
+export const extractCallMeta = async (
+  extractCallMetaBody: ExtractCallMetaBody,
+  options?: RequestInit,
+): Promise<ExtractCallMetaResult> => {
+  const formData = new FormData();
+  formData.append(`file`, extractCallMetaBody.file);
+
+  return customFetch<ExtractCallMetaResult>(getExtractCallMetaUrl(), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getExtractCallMetaMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof extractCallMeta>>,
+    TError,
+    { data: BodyType<ExtractCallMetaBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof extractCallMeta>>,
+  TError,
+  { data: BodyType<ExtractCallMetaBody> },
+  TContext
+> => {
+  const mutationKey = ["extractCallMeta"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof extractCallMeta>>,
+    { data: BodyType<ExtractCallMetaBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return extractCallMeta(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExtractCallMetaMutationResult = NonNullable<
+  Awaited<ReturnType<typeof extractCallMeta>>
+>;
+export type ExtractCallMetaMutationBody = BodyType<ExtractCallMetaBody>;
+export type ExtractCallMetaMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Extract metadata from a call notice edital via AI
+ */
+export const useExtractCallMeta = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof extractCallMeta>>,
+    TError,
+    { data: BodyType<ExtractCallMetaBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof extractCallMeta>>,
+  TError,
+  { data: BodyType<ExtractCallMetaBody> },
+  TContext
+> => {
+  return useMutation(getExtractCallMetaMutationOptions(options));
+};
+
+/**
+ * @summary Trigger AI analysis of the uploaded call notice edital
+ */
+export const getAnalyzeCallEditalUrl = (id: number) => {
+  return `/api/chamamentos/ai/${id}/analyze-edital`;
+};
+
+export const analyzeCallEdital = async (
+  id: number,
+  options?: RequestInit,
+): Promise<CallAnalysisResult> => {
+  return customFetch<CallAnalysisResult>(getAnalyzeCallEditalUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAnalyzeCallEditalMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeCallEdital>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof analyzeCallEdital>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["analyzeCallEdital"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof analyzeCallEdital>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return analyzeCallEdital(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AnalyzeCallEditalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof analyzeCallEdital>>
+>;
+
+export type AnalyzeCallEditalMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Trigger AI analysis of the uploaded call notice edital
+ */
+export const useAnalyzeCallEdital = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeCallEdital>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof analyzeCallEdital>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAnalyzeCallEditalMutationOptions(options));
+};
+
+/**
+ * @summary Trigger AI analysis of submitted OSC documents
+ */
+export const getAnalyzeCallDocumentsUrl = (id: number) => {
+  return `/api/chamamentos/ai/${id}/analyze-documents`;
+};
+
+export const analyzeCallDocuments = async (
+  id: number,
+  options?: RequestInit,
+): Promise<CallAnalysisResult> => {
+  return customFetch<CallAnalysisResult>(getAnalyzeCallDocumentsUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAnalyzeCallDocumentsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeCallDocuments>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof analyzeCallDocuments>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["analyzeCallDocuments"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof analyzeCallDocuments>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return analyzeCallDocuments(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AnalyzeCallDocumentsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof analyzeCallDocuments>>
+>;
+
+export type AnalyzeCallDocumentsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Trigger AI analysis of submitted OSC documents
+ */
+export const useAnalyzeCallDocuments = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeCallDocuments>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof analyzeCallDocuments>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAnalyzeCallDocumentsMutationOptions(options));
+};
+
+/**
+ * @summary Update a call validation item status or notes
+ */
+export const getUpdateCallValidationItemUrl = (id: number) => {
+  return `/api/chamamentos/validation/${id}`;
+};
+
+export const updateCallValidationItem = async (
+  id: number,
+  updateCallValidationItemBody: UpdateCallValidationItemBody,
+  options?: RequestInit,
+): Promise<CallValidationItem> => {
+  return customFetch<CallValidationItem>(getUpdateCallValidationItemUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateCallValidationItemBody),
+  });
+};
+
+export const getUpdateCallValidationItemMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCallValidationItem>>,
+    TError,
+    { id: number; data: BodyType<UpdateCallValidationItemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCallValidationItem>>,
+  TError,
+  { id: number; data: BodyType<UpdateCallValidationItemBody> },
+  TContext
+> => {
+  const mutationKey = ["updateCallValidationItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCallValidationItem>>,
+    { id: number; data: BodyType<UpdateCallValidationItemBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateCallValidationItem(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCallValidationItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCallValidationItem>>
+>;
+export type UpdateCallValidationItemMutationBody =
+  BodyType<UpdateCallValidationItemBody>;
+export type UpdateCallValidationItemMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Update a call validation item status or notes
+ */
+export const useUpdateCallValidationItem = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCallValidationItem>>,
+    TError,
+    { id: number; data: BodyType<UpdateCallValidationItemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCallValidationItem>>,
+  TError,
+  { id: number; data: BodyType<UpdateCallValidationItemBody> },
+  TContext
+> => {
+  return useMutation(getUpdateCallValidationItemMutationOptions(options));
+};
+
+/**
+ * @summary Delete an uploaded notice file
+ */
+export const getDeleteNoticeFileUrl = (id: number) => {
+  return `/api/chamamentos/files/${id}`;
+};
+
+export const deleteNoticeFile = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteNoticeFileUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteNoticeFileMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteNoticeFile>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteNoticeFile>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteNoticeFile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteNoticeFile>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteNoticeFile(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteNoticeFileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteNoticeFile>>
+>;
+
+export type DeleteNoticeFileMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Delete an uploaded notice file
+ */
+export const useDeleteNoticeFile = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteNoticeFile>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteNoticeFile>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteNoticeFileMutationOptions(options));
 };

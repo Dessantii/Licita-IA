@@ -486,3 +486,536 @@ export const GetReportResponse = zod.object({
 export const DeleteFileParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary List all call notices
+ */
+export const ListCallNoticesResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  agency: zod.string(),
+  referenceNumber: zod.string().nullish(),
+  category: zod.string().nullish(),
+  deadline: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  status: zod.enum([
+    "criado",
+    "edital_enviado",
+    "edital_processando",
+    "requisitos_extraidos",
+    "aguardando_documentos",
+    "documentos_enviados",
+    "em_conferencia",
+    "pendencias_encontradas",
+    "pronto_para_submissao",
+    "concluido",
+  ]),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListCallNoticesResponse = zod.array(ListCallNoticesResponseItem);
+
+/**
+ * @summary Create a new call notice
+ */
+export const CreateCallNoticeBody = zod.object({
+  title: zod.string(),
+  agency: zod.string(),
+  referenceNumber: zod.string().nullish(),
+  category: zod.string().nullish(),
+  deadline: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Get a call notice by ID
+ */
+export const GetCallNoticeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCallNoticeResponse = zod
+  .object({
+    id: zod.number(),
+    title: zod.string(),
+    agency: zod.string(),
+    referenceNumber: zod.string().nullish(),
+    category: zod.string().nullish(),
+    deadline: zod.string().nullish(),
+    notes: zod.string().nullish(),
+    status: zod.enum([
+      "criado",
+      "edital_enviado",
+      "edital_processando",
+      "requisitos_extraidos",
+      "aguardando_documentos",
+      "documentos_enviados",
+      "em_conferencia",
+      "pendencias_encontradas",
+      "pronto_para_submissao",
+      "concluido",
+    ]),
+    createdAt: zod.string(),
+    updatedAt: zod.string(),
+  })
+  .and(
+    zod.object({
+      editalFile: zod
+        .union([
+          zod.object({
+            id: zod.number(),
+            callNoticeId: zod.number(),
+            fileType: zod.enum([
+              "edital",
+              "anexo",
+              "documento_osc",
+              "proposta",
+              "plano_trabalho",
+              "cronograma",
+            ]),
+            name: zod.string(),
+            path: zod.string(),
+            mimeType: zod.string(),
+            size: zod.number(),
+            dataValidade: zod.string().nullish(),
+            uploadedAt: zod.string(),
+          }),
+          zod.null(),
+        ])
+        .optional(),
+      documentFiles: zod.array(
+        zod.object({
+          id: zod.number(),
+          callNoticeId: zod.number(),
+          fileType: zod.enum([
+            "edital",
+            "anexo",
+            "documento_osc",
+            "proposta",
+            "plano_trabalho",
+            "cronograma",
+          ]),
+          name: zod.string(),
+          path: zod.string(),
+          mimeType: zod.string(),
+          size: zod.number(),
+          dataValidade: zod.string().nullish(),
+          uploadedAt: zod.string(),
+        }),
+      ),
+      requirements: zod.array(
+        zod.object({
+          id: zod.number(),
+          callNoticeId: zod.number(),
+          title: zod.string(),
+          description: zod.string().nullish(),
+          requirementType: zod.string().nullish(),
+          mandatory: zod.boolean(),
+          sourceExcerpt: zod.string().nullish(),
+          sourcePage: zod.number().nullish(),
+          confidence: zod.number(),
+          needsReview: zod.boolean(),
+          createdAt: zod.string(),
+        }),
+      ),
+      validationItems: zod.array(
+        zod.object({
+          id: zod.number(),
+          callNoticeId: zod.number(),
+          requirementId: zod.number(),
+          submittedDocumentId: zod.number().nullish(),
+          status: zod.enum([
+            "ok",
+            "pendente",
+            "divergente",
+            "vencido",
+            "incompleto",
+            "revisar_manualmente",
+          ]),
+          notes: zod.string().nullish(),
+          requirement: zod.object({
+            id: zod.number(),
+            callNoticeId: zod.number(),
+            title: zod.string(),
+            description: zod.string().nullish(),
+            requirementType: zod.string().nullish(),
+            mandatory: zod.boolean(),
+            sourceExcerpt: zod.string().nullish(),
+            sourcePage: zod.number().nullish(),
+            confidence: zod.number(),
+            needsReview: zod.boolean(),
+            createdAt: zod.string(),
+          }),
+          submittedDocument: zod
+            .union([
+              zod.object({
+                id: zod.number(),
+                callNoticeId: zod.number(),
+                fileId: zod.number(),
+                detectedType: zod.string().nullish(),
+                detectedDate: zod.string().nullish(),
+                detectedValidity: zod.string().nullish(),
+                confidence: zod.number(),
+                needsReview: zod.boolean(),
+                createdAt: zod.string(),
+              }),
+              zod.null(),
+            ])
+            .optional(),
+          createdAt: zod.string(),
+          updatedAt: zod.string(),
+        }),
+      ),
+    }),
+  );
+
+/**
+ * @summary Update a call notice
+ */
+export const UpdateCallNoticeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCallNoticeBody = zod.object({
+  title: zod.string().optional(),
+  agency: zod.string().optional(),
+  referenceNumber: zod.string().nullish(),
+  category: zod.string().nullish(),
+  deadline: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  status: zod
+    .enum([
+      "criado",
+      "edital_enviado",
+      "edital_processando",
+      "requisitos_extraidos",
+      "aguardando_documentos",
+      "documentos_enviados",
+      "em_conferencia",
+      "pendencias_encontradas",
+      "pronto_para_submissao",
+      "concluido",
+    ])
+    .optional(),
+});
+
+export const UpdateCallNoticeResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  agency: zod.string(),
+  referenceNumber: zod.string().nullish(),
+  category: zod.string().nullish(),
+  deadline: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  status: zod.enum([
+    "criado",
+    "edital_enviado",
+    "edital_processando",
+    "requisitos_extraidos",
+    "aguardando_documentos",
+    "documentos_enviados",
+    "em_conferencia",
+    "pendencias_encontradas",
+    "pronto_para_submissao",
+    "concluido",
+  ]),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete a call notice
+ */
+export const DeleteCallNoticeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List files for a call notice
+ */
+export const ListNoticeFilesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListNoticeFilesResponseItem = zod.object({
+  id: zod.number(),
+  callNoticeId: zod.number(),
+  fileType: zod.enum([
+    "edital",
+    "anexo",
+    "documento_osc",
+    "proposta",
+    "plano_trabalho",
+    "cronograma",
+  ]),
+  name: zod.string(),
+  path: zod.string(),
+  mimeType: zod.string(),
+  size: zod.number(),
+  dataValidade: zod.string().nullish(),
+  uploadedAt: zod.string(),
+});
+export const ListNoticeFilesResponse = zod.array(ListNoticeFilesResponseItem);
+
+/**
+ * @summary List extracted requirements for a call notice
+ */
+export const ListCallRequirementsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListCallRequirementsResponseItem = zod.object({
+  id: zod.number(),
+  callNoticeId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  requirementType: zod.string().nullish(),
+  mandatory: zod.boolean(),
+  sourceExcerpt: zod.string().nullish(),
+  sourcePage: zod.number().nullish(),
+  confidence: zod.number(),
+  needsReview: zod.boolean(),
+  createdAt: zod.string(),
+});
+export const ListCallRequirementsResponse = zod.array(
+  ListCallRequirementsResponseItem,
+);
+
+/**
+ * @summary List validation items for a call notice
+ */
+export const ListCallValidationItemsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListCallValidationItemsResponseItem = zod.object({
+  id: zod.number(),
+  callNoticeId: zod.number(),
+  requirementId: zod.number(),
+  submittedDocumentId: zod.number().nullish(),
+  status: zod.enum([
+    "ok",
+    "pendente",
+    "divergente",
+    "vencido",
+    "incompleto",
+    "revisar_manualmente",
+  ]),
+  notes: zod.string().nullish(),
+  requirement: zod.object({
+    id: zod.number(),
+    callNoticeId: zod.number(),
+    title: zod.string(),
+    description: zod.string().nullish(),
+    requirementType: zod.string().nullish(),
+    mandatory: zod.boolean(),
+    sourceExcerpt: zod.string().nullish(),
+    sourcePage: zod.number().nullish(),
+    confidence: zod.number(),
+    needsReview: zod.boolean(),
+    createdAt: zod.string(),
+  }),
+  submittedDocument: zod
+    .union([
+      zod.object({
+        id: zod.number(),
+        callNoticeId: zod.number(),
+        fileId: zod.number(),
+        detectedType: zod.string().nullish(),
+        detectedDate: zod.string().nullish(),
+        detectedValidity: zod.string().nullish(),
+        confidence: zod.number(),
+        needsReview: zod.boolean(),
+        createdAt: zod.string(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListCallValidationItemsResponse = zod.array(
+  ListCallValidationItemsResponseItem,
+);
+
+/**
+ * @summary Upload edital PDF for a call notice
+ */
+export const UploadNoticeEditalParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UploadNoticeEditalBody = zod.object({
+  file: zod.instanceof(File),
+});
+
+export const UploadNoticeEditalResponse = zod.object({
+  id: zod.number(),
+  callNoticeId: zod.number(),
+  fileType: zod.enum([
+    "edital",
+    "anexo",
+    "documento_osc",
+    "proposta",
+    "plano_trabalho",
+    "cronograma",
+  ]),
+  name: zod.string(),
+  path: zod.string(),
+  mimeType: zod.string(),
+  size: zod.number(),
+  dataValidade: zod.string().nullish(),
+  uploadedAt: zod.string(),
+});
+
+/**
+ * @summary Upload a document for a call notice
+ */
+export const UploadNoticeDocumentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UploadNoticeDocumentBody = zod.object({
+  file: zod.instanceof(File),
+  fileType: zod.string().optional(),
+});
+
+export const UploadNoticeDocumentResponse = zod.object({
+  id: zod.number(),
+  callNoticeId: zod.number(),
+  fileType: zod.enum([
+    "edital",
+    "anexo",
+    "documento_osc",
+    "proposta",
+    "plano_trabalho",
+    "cronograma",
+  ]),
+  name: zod.string(),
+  path: zod.string(),
+  mimeType: zod.string(),
+  size: zod.number(),
+  dataValidade: zod.string().nullish(),
+  uploadedAt: zod.string(),
+});
+
+/**
+ * @summary Extract metadata from a call notice edital via AI
+ */
+export const ExtractCallMetaBody = zod.object({
+  file: zod.instanceof(File),
+});
+
+export const ExtractCallMetaResponse = zod.object({
+  title: zod.string().nullish(),
+  agency: zod.string().nullish(),
+  referenceNumber: zod.string().nullish(),
+  category: zod.string().nullish(),
+  deadline: zod.string().nullish(),
+});
+
+/**
+ * @summary Trigger AI analysis of the uploaded call notice edital
+ */
+export const AnalyzeCallEditalParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AnalyzeCallEditalResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string(),
+  noticeStatus: zod.string(),
+  summary: zod.string().nullish(),
+  nextSteps: zod.string().nullish(),
+});
+
+/**
+ * @summary Trigger AI analysis of submitted OSC documents
+ */
+export const AnalyzeCallDocumentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AnalyzeCallDocumentsResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string(),
+  noticeStatus: zod.string(),
+  summary: zod.string().nullish(),
+  nextSteps: zod.string().nullish(),
+});
+
+/**
+ * @summary Update a call validation item status or notes
+ */
+export const UpdateCallValidationItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCallValidationItemBody = zod.object({
+  status: zod
+    .enum([
+      "ok",
+      "pendente",
+      "divergente",
+      "vencido",
+      "incompleto",
+      "revisar_manualmente",
+    ])
+    .optional(),
+  notes: zod.string().nullish(),
+  submittedDocumentId: zod.number().nullish(),
+});
+
+export const UpdateCallValidationItemResponse = zod.object({
+  id: zod.number(),
+  callNoticeId: zod.number(),
+  requirementId: zod.number(),
+  submittedDocumentId: zod.number().nullish(),
+  status: zod.enum([
+    "ok",
+    "pendente",
+    "divergente",
+    "vencido",
+    "incompleto",
+    "revisar_manualmente",
+  ]),
+  notes: zod.string().nullish(),
+  requirement: zod.object({
+    id: zod.number(),
+    callNoticeId: zod.number(),
+    title: zod.string(),
+    description: zod.string().nullish(),
+    requirementType: zod.string().nullish(),
+    mandatory: zod.boolean(),
+    sourceExcerpt: zod.string().nullish(),
+    sourcePage: zod.number().nullish(),
+    confidence: zod.number(),
+    needsReview: zod.boolean(),
+    createdAt: zod.string(),
+  }),
+  submittedDocument: zod
+    .union([
+      zod.object({
+        id: zod.number(),
+        callNoticeId: zod.number(),
+        fileId: zod.number(),
+        detectedType: zod.string().nullish(),
+        detectedDate: zod.string().nullish(),
+        detectedValidity: zod.string().nullish(),
+        confidence: zod.number(),
+        needsReview: zod.boolean(),
+        createdAt: zod.string(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete an uploaded notice file
+ */
+export const DeleteNoticeFileParams = zod.object({
+  id: zod.coerce.number(),
+});
