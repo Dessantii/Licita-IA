@@ -1,0 +1,343 @@
+Quero criar um novo módulo no sistema chamado **Empresas**.
+
+Você deve atuar como arquiteto de produto, UX designer de SaaS B2B e engenheiro full stack sênior.
+
+## Contexto do produto
+Meu sistema atualmente possui processos de:
+- Licitações
+- Chamamentos
+
+Esses processos envolvem:
+- upload de edital ou documento principal
+- extração de exigências
+- checklist documental
+- upload de documentos
+- conferência entre exigido e enviado
+- preparação para protocolo
+
+Até agora, o sistema estava sendo pensado como se cada conta usasse o sistema para apenas uma empresa.
+Mas agora preciso evoluir o produto para um cenário mais real de mercado, principalmente para:
+- escritórios de contabilidade
+- consultorias
+- assessorias
+- operadores que gerenciam várias empresas clientes
+
+## Problema que esse novo módulo resolve
+Esses usuários trabalham com várias empresas ao mesmo tempo.
+Cada empresa possui:
+- seus próprios dados cadastrais
+- seus próprios documentos recorrentes
+- seus próprios processos
+- seu próprio histórico
+- seus próprios vencimentos documentais
+
+Sem esse módulo, o sistema fica confuso, mistura dados entre empresas e obriga o usuário a começar tudo do zero em cada processo.
+
+## Objetivo do novo módulo
+Criar um módulo de **Empresas** onde uma única conta/workspace pode cadastrar e gerenciar múltiplas empresas clientes, e cada empresa passa a ter seu próprio contexto operacional dentro do sistema.
+
+## Regra central
+O sistema deve funcionar com a seguinte hierarquia:
+
+1. Conta / Workspace
+2. Empresas cadastradas dentro da conta
+3. Processos vinculados a uma empresa específica
+4. Documentos e histórico vinculados àquela empresa
+
+## O que o módulo de Empresas deve permitir
+
+### 1. Cadastro de empresa
+O sistema deve permitir cadastrar empresas com dados como:
+- razão social
+- nome fantasia
+- CNPJ
+- endereço
+- inscrição estadual
+- inscrição municipal
+- telefone
+- e-mail
+- representante legal
+- observações internas
+
+### 2. Cadastro por upload
+Se possível no MVP, o sistema deve permitir:
+- upload do cartão CNPJ
+- leitura dos dados básicos
+- pré-preenchimento do cadastro da empresa
+
+### 3. Ambiente separado por empresa
+Cada empresa deve ter seu próprio contexto lógico dentro do sistema.
+Ao selecionar uma empresa, o usuário deve ver apenas:
+- processos daquela empresa
+- documentos daquela empresa
+- histórico daquela empresa
+- vencimentos daquela empresa
+- responsáveis daquela empresa
+
+Não precisa mudar o design inteiro, mas o conteúdo e contexto devem mudar claramente.
+
+### 4. Biblioteca documental por empresa
+Cada empresa deve ter uma área para armazenar documentos recorrentes, como por exemplo:
+- cartão CNPJ
+- contrato social
+- estatuto
+- certidões
+- licenças
+- registros
+- alvarás
+- documentos de responsáveis técnicos
+- documentos bancários
+- declarações recorrentes
+
+### 5. Reaproveitamento de documentos
+Quando um novo processo for criado para uma empresa, o sistema deve ser capaz de:
+- sugerir documentos já existentes daquela empresa
+- vincular documentos recorrentes ao novo processo
+- alertar se algum documento da empresa estiver vencido
+- reduzir retrabalho no envio de arquivos
+
+### 6. Histórico por empresa
+Cada empresa deve manter:
+- processos anteriores
+- chamamentos anteriores
+- documentos já enviados
+- documentos vencidos
+- relatórios gerados
+- observações importantes
+
+### 7. Troca de empresa
+O sistema deve permitir trocar rapidamente entre empresas da carteira do usuário.
+Essa troca deve mudar o contexto do ambiente, sem misturar dados.
+
+## Público-alvo do módulo
+Este módulo é especialmente importante para:
+- escritórios contábeis
+- consultorias de licitação/chamamento
+- assessorias administrativas
+- operadores que trabalham com vários CNPJs
+
+## O que o módulo NÃO deve ser
+Não quero:
+- um CRM genérico
+- um ERP completo
+- um cadastro superficial sem valor operacional
+- algo apenas visual
+
+Quero um módulo que seja a base da organização multiempresa do produto.
+
+## Valor de negócio do módulo
+Esse módulo deve aumentar o valor do sistema porque:
+- organiza a carteira de clientes
+- separa dados por empresa
+- evita confusão operacional
+- cria biblioteca documental reutilizável
+- acelera novos processos
+- melhora retenção
+- torna o produto mais vendável para escritórios e consultorias
+
+## Estrutura funcional esperada
+
+### Tela 1 — Lista de empresas
+Deve mostrar:
+- razão social
+- nome fantasia
+- CNPJ
+- status documental
+- quantidade de processos ativos
+- quantidade de alertas ou vencimentos
+- ação para abrir a empresa
+
+Também deve permitir:
+- cadastrar nova empresa
+- pesquisar
+- filtrar
+- ordenar
+
+### Tela 2 — Cadastro / edição da empresa
+Deve permitir:
+- cadastro manual
+- upload do cartão CNPJ
+- edição dos dados
+- observações internas
+- definição de responsáveis ou contatos
+
+### Tela 3 — Visão geral da empresa
+Ao abrir uma empresa, o usuário deve ver:
+- dados principais
+- documentos da empresa
+- processos vinculados
+- status documental
+- próximos vencimentos
+- processos recentes
+- alertas importantes
+
+### Tela 4 — Biblioteca documental da empresa
+Deve mostrar:
+- nome do documento
+- tipo do documento
+- data de emissão
+- data de validade
+- status
+- arquivo
+- observações
+- ação para reutilizar em processos
+
+### Tela 5 — Processos da empresa
+Dentro da empresa, deve haver uma visão dos processos daquela empresa, tanto:
+- licitações
+- chamamentos
+
+## Relação com os módulos já existentes
+Esse módulo deve se integrar aos módulos de:
+- Licitações
+- Chamamentos
+
+Todo novo processo deve obrigatoriamente estar vinculado a uma empresa.
+
+Ao criar um novo processo, o fluxo ideal é:
+1. selecionar a empresa
+2. abrir novo processo
+3. subir edital/documento principal
+4. extrair exigências
+5. cruzar com documentos já existentes da empresa
+6. apontar o que já atende e o que ainda falta
+
+## Fluxo principal do usuário
+1. Usuário entra na conta/workspace
+2. Usuário vê sua carteira de empresas
+3. Seleciona uma empresa
+4. Visualiza os documentos e processos daquela empresa
+5. Cria um novo processo para aquela empresa
+6. O sistema sugere documentos recorrentes já cadastrados
+7. O usuário complementa apenas o que faltar
+8. O processo segue para checklist, conferência e protocolo
+
+## Entidades principais sugeridas
+
+### Workspace
+- id
+- name
+- ownerId
+- createdAt
+- updatedAt
+
+### Company
+- id
+- workspaceId
+- legalName
+- tradeName
+- cnpj
+- stateRegistration
+- municipalRegistration
+- email
+- phone
+- address
+- legalRepresentative
+- notes
+- createdAt
+- updatedAt
+
+### CompanyDocument
+- id
+- companyId
+- title
+- documentType
+- filePath
+- issueDate
+- expiryDate
+- status
+- notes
+- createdAt
+- updatedAt
+
+### CompanyContact
+- id
+- companyId
+- name
+- role
+- email
+- phone
+
+### Process
+- id
+- companyId
+- processType
+- title
+- referenceNumber
+- deadline
+- status
+- createdAt
+- updatedAt
+
+## Status sugeridos para documentos da empresa
+- válido
+- vencendo
+- vencido
+- incompleto
+- revisar
+- sem validade identificada
+
+## Status sugeridos para empresa
+- ativa
+- com pendências documentais
+- com documentos vencidos
+- sem documentação base
+- pronta para novos processos
+
+## UX / experiência desejada
+Quero uma experiência:
+- limpa
+- profissional
+- operacional
+- orientada por empresa
+- sem excesso de informação inútil
+- sem cara de CRM genérico
+- sem dashboard técnica
+
+O usuário deve entender rapidamente:
+- quais empresas ele gerencia
+- qual empresa está selecionada
+- quais documentos essa empresa já possui
+- quais documentos estão vencidos
+- quais processos estão em andamento para essa empresa
+
+## Navegação sugerida
+A navegação principal do sistema deve considerar:
+- Empresas
+- Processos
+- Relatórios
+- Configurações
+
+Ou, se fizer mais sentido:
+- Empresas
+- Licitações
+- Chamamentos
+- Relatórios
+- Configurações
+
+Mas, em qualquer caso, o módulo Empresas deve se tornar a base do contexto.
+
+## Regras importantes
+1. Processos nunca devem ficar soltos; sempre vinculados a uma empresa.
+2. Documentos recorrentes devem ser reaproveitáveis.
+3. O sistema deve evitar duplicação desnecessária de uploads.
+4. O sistema deve alertar vencimentos importantes.
+5. A troca de empresa deve mudar completamente o contexto exibido.
+6. Não misturar processos de empresas diferentes.
+7. O módulo precisa ser útil para escritórios e consultorias que operam vários CNPJs.
+
+## O que eu quero que você entregue primeiro
+Não gere código imediatamente.
+
+Primeiro me entregue:
+1. entendimento do módulo
+2. arquitetura funcional
+3. arquitetura de informação
+4. estrutura das telas
+5. fluxo do usuário
+6. entidades e relacionamentos
+7. status e regras principais
+8. recomendações de UX
+9. proposta de MVP do módulo
+
+Depois disso, entregue a implementação técnica do módulo.
