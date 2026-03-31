@@ -12,3 +12,5 @@ export * from "./notice-files";
 export * from "./call-extracted-requirements";
 export * from "./call-submitted-documents";
 export * from "./call-validation-items";
+export * from "./companies";
+export * from "./company-documents";
