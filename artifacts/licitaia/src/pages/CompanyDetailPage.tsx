@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getToken } from "@/hooks/use-auth";
+import { ProcessStatusBadge } from "@/components/processes/ProcessStatusBadge";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -92,6 +93,17 @@ interface CompanyDetail {
   documents: CompanyDocument[];
   createdAt: string;
   updatedAt: string;
+}
+
+interface CompanyProcess {
+  id: number;
+  title: string;
+  agency: string;
+  modality: string;
+  editalNumber: string | null;
+  deadline: string | null;
+  status: string;
+  createdAt: string;
 }
 
 type Tab = "visao_geral" | "documentos" | "processos";
@@ -151,6 +163,18 @@ export function CompanyDetailPage() {
       return res.json();
     },
     enabled: !isNaN(id),
+  });
+
+  const { data: companyProcesses = [] } = useQuery<CompanyProcess[]>({
+    queryKey: ["company-processes", id],
+    queryFn: async () => {
+      const res = await fetch(`${BASE_URL}/api/processes?companyId=${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+    enabled: !isNaN(id) && activeTab === "processos",
   });
 
   const deleteCompanyMutation = useMutation({
@@ -714,12 +738,67 @@ export function CompanyDetailPage() {
       )}
 
       {activeTab === "processos" && (
-        <div className="text-center py-20">
-          <FolderOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-slate-700 mb-2">Processos da Empresa</h3>
-          <p className="text-slate-500 text-sm max-w-sm mx-auto">
-            A vinculação de processos e chamamentos a empresas será disponibilizada em breve.
-          </p>
+        <div>
+          {companyProcesses.length === 0 ? (
+            <div className="text-center py-20">
+              <FolderOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhum processo vinculado</h3>
+              <p className="text-slate-500 text-sm max-w-sm mx-auto">
+                Crie um processo licitatório em <Link href="/processes" className="text-blue-600 underline">Licitações</Link> e vincule a esta empresa.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {companyProcesses.map((p) => {
+                const now = new Date();
+                const deadline = p.deadline ? new Date(p.deadline) : null;
+                const diffDays = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                let deadlineInfo: { label: string; color: string } | null = null;
+                if (diffDays !== null) {
+                  if (diffDays < 0) deadlineInfo = { label: "Prazo encerrado", color: "bg-slate-100 text-slate-500" };
+                  else if (diffDays === 0) deadlineInfo = { label: "Hoje!", color: "bg-red-100 text-red-700" };
+                  else if (diffDays <= 3) deadlineInfo = { label: `${diffDays}d restantes`, color: "bg-red-100 text-red-700" };
+                  else if (diffDays <= 7) deadlineInfo = { label: `${diffDays}d restantes`, color: "bg-orange-100 text-orange-700" };
+                  else if (diffDays <= 14) deadlineInfo = { label: `${diffDays}d restantes`, color: "bg-yellow-100 text-yellow-700" };
+                  else deadlineInfo = { label: `${diffDays}d restantes`, color: "bg-green-100 text-green-700" };
+                }
+                return (
+                  <Link key={p.id} href={`/processes/${p.id}`}>
+                    <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border border-slate-200">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <ProcessStatusBadge status={p.status} />
+                            {deadlineInfo && (
+                              <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1", deadlineInfo.color)}>
+                                <Calendar className="w-3 h-3" />
+                                {deadlineInfo.label}
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-semibold text-slate-900 text-sm leading-snug mb-1 line-clamp-2">{p.title}</p>
+                          <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <Building2 className="w-3 h-3" />
+                              {p.agency}
+                            </span>
+                            {p.deadline && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {format(new Date(p.deadline), "dd 'de' MMM, yyyy 'às' HH:mm", { locale: ptBR })}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400 uppercase tracking-wide mt-1">{p.modality}</p>
+                        </div>
+                        <ChevronLeft className="w-4 h-4 text-slate-300 shrink-0 rotate-180 mt-1" />
+                      </div>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

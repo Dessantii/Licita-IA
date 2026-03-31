@@ -46,8 +46,13 @@ const updateProcessSchema = z.object({
   ]).optional(),
 });
 
-router.get("/", async (_req, res) => {
-  const processes = await db.select().from(processesTable).orderBy(processesTable.createdAt);
+router.get("/", async (req, res) => {
+  const companyIdParam = req.query.companyId ? parseInt(req.query.companyId as string) : null;
+  const query = db.select().from(processesTable).$dynamic();
+  const processes = await (companyIdParam && !isNaN(companyIdParam)
+    ? query.where(eq(processesTable.companyId, companyIdParam))
+    : query
+  ).orderBy(processesTable.createdAt);
   const companies = await db.select({ id: companiesTable.id, razaoSocial: companiesTable.razaoSocial }).from(companiesTable);
   const companyMap = new Map(companies.map(c => [c.id, c.razaoSocial]));
   res.json(processes.map(p => ({
