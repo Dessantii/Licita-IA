@@ -6,6 +6,7 @@ import {
   callExtractedRequirementsTable,
   callValidationItemsTable,
   callSubmittedDocumentsTable,
+  companiesTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -19,6 +20,7 @@ const createCallNoticeSchema = z.object({
   category: z.string().nullish(),
   deadline: z.string().nullish(),
   notes: z.string().nullish(),
+  companyId: z.number().nullable().optional(),
 });
 
 const updateCallNoticeSchema = z.object({
@@ -28,6 +30,7 @@ const updateCallNoticeSchema = z.object({
   category: z.string().nullable().optional(),
   deadline: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  companyId: z.number().nullable().optional(),
   status: z.enum([
     "criado",
     "edital_enviado",
@@ -44,8 +47,11 @@ const updateCallNoticeSchema = z.object({
 
 router.get("/", async (_req, res) => {
   const notices = await db.select().from(callNoticesTable).orderBy(callNoticesTable.createdAt);
+  const companies = await db.select({ id: companiesTable.id, name: companiesTable.name }).from(companiesTable);
+  const companyMap = new Map(companies.map(c => [c.id, c.name]));
   res.json(notices.map(n => ({
     ...n,
+    companyName: n.companyId ? (companyMap.get(n.companyId) ?? null) : null,
     createdAt: n.createdAt.toISOString(),
     updatedAt: n.updatedAt.toISOString(),
   })));
@@ -78,6 +84,12 @@ router.get("/:id", async (req, res) => {
     return;
   }
 
+  let companyName: string | null = null;
+  if (notice.companyId) {
+    const [company] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, notice.companyId));
+    companyName = company?.name ?? null;
+  }
+
   const files = await db.select().from(noticeFilesTable).where(eq(noticeFilesTable.callNoticeId, id));
   const requirements = await db.select().from(callExtractedRequirementsTable).where(eq(callExtractedRequirementsTable.callNoticeId, id));
 
@@ -103,6 +115,7 @@ router.get("/:id", async (req, res) => {
 
   res.json({
     ...notice,
+    companyName,
     createdAt: notice.createdAt.toISOString(),
     updatedAt: notice.updatedAt.toISOString(),
     editalFile: editalFile ? { ...editalFile, uploadedAt: editalFile.uploadedAt.toISOString() } : null,

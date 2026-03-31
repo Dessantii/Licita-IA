@@ -7,6 +7,7 @@ import {
   validationItemsTable,
   submittedDocumentsTable,
   finalReportsTable,
+  companiesTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
@@ -20,6 +21,7 @@ const createProcessSchema = z.object({
   editalNumber: z.string().nullish(),
   deadline: z.string().nullish(),
   notes: z.string().nullish(),
+  companyId: z.number().nullable().optional(),
 });
 
 const updateProcessSchema = z.object({
@@ -29,6 +31,7 @@ const updateProcessSchema = z.object({
   editalNumber: z.string().nullable().optional(),
   deadline: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  companyId: z.number().nullable().optional(),
   status: z.enum([
     "criado",
     "edital_enviado",
@@ -43,10 +46,13 @@ const updateProcessSchema = z.object({
   ]).optional(),
 });
 
-router.get("/", async (req, res) => {
+router.get("/", async (_req, res) => {
   const processes = await db.select().from(processesTable).orderBy(processesTable.createdAt);
+  const companies = await db.select({ id: companiesTable.id, name: companiesTable.name }).from(companiesTable);
+  const companyMap = new Map(companies.map(c => [c.id, c.name]));
   res.json(processes.map(p => ({
     ...p,
+    companyName: p.companyId ? (companyMap.get(p.companyId) ?? null) : null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   })));
@@ -77,6 +83,12 @@ router.get("/:id", async (req, res) => {
   if (!process) {
     res.status(404).json({ error: "Process not found" });
     return;
+  }
+
+  let companyName: string | null = null;
+  if (process.companyId) {
+    const [company] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, process.companyId));
+    companyName = company?.name ?? null;
   }
 
   const files = await db.select().from(uploadedFilesTable).where(eq(uploadedFilesTable.processId, id));
@@ -112,6 +124,7 @@ router.get("/:id", async (req, res) => {
 
   res.json({
     ...process,
+    companyName,
     createdAt: process.createdAt.toISOString(),
     updatedAt: process.updatedAt.toISOString(),
     editalFile: editalFile ? { ...editalFile, uploadedAt: editalFile.uploadedAt.toISOString() } : null,

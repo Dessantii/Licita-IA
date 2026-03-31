@@ -30,6 +30,10 @@ export const ProcessStatus = {
 
 export interface Process {
   id: number;
+  /** @nullable */
+  companyId?: number | null;
+  /** @nullable */
+  companyName?: string | null;
   title: string;
   agency: string;
   modality: string;
@@ -151,6 +155,8 @@ export interface CreateProcessBody {
   deadline?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  companyId?: number | null;
 }
 
 export type UpdateProcessBodyStatus =
@@ -225,6 +231,10 @@ export const CallNoticeStatus = {
 
 export interface CallNotice {
   id: number;
+  /** @nullable */
+  companyId?: number | null;
+  /** @nullable */
+  companyName?: string | null;
   title: string;
   agency: string;
   /** @nullable */
@@ -343,6 +353,8 @@ export interface CreateCallNoticeBody {
   deadline?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  companyId?: number | null;
 }
 
 export type UpdateCallNoticeBodyStatus =
@@ -438,3 +450,53 @@ export type UploadNoticeDocumentBody = {
 export type ExtractCallMetaBody = {
   file: Blob;
 };
+
+export interface Company {
+  id: number;
+  name: string;
+  /** @nullable */
+  cnpj?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CompanyDetail = Company & {
+  processes: Process[];
+  callNotices: CallNotice[];
+};
+
+export interface CreateCompanyBody {
+  name: string;
+  /** @nullable */
+  cnpj?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface UpdateCompanyBody {
+  name?: string;
+  /** @nullable */
+  cnpj?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}

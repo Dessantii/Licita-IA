@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   useCreateProcess,
   useUploadEdital,
+  useListCompanies,
   getListProcessesQueryKey,
   getGetProcessQueryKey,
 } from "@workspace/api-client-react";
@@ -42,6 +43,7 @@ const formSchema = z.object({
   editalNumber: z.string().optional(),
   deadline: z.string().optional(),
   notes: z.string().optional(),
+  companyId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -69,6 +71,7 @@ export function CreateProcessDialog({ prefill, defaultOpen }: { prefill?: Prefil
 
   const createProcessMutation = useCreateProcess();
   const uploadEditalMutation = useUploadEdital();
+  const { data: companies } = useListCompanies();
 
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -140,7 +143,13 @@ export function CreateProcessDialog({ prefill, defaultOpen }: { prefill?: Prefil
 
   const onSubmit = async (data: FormValues) => {
     try {
-      const newProcess = await createProcessMutation.mutateAsync({ data });
+      const companyId = data.companyId ? parseInt(data.companyId) : null;
+      const newProcess = await createProcessMutation.mutateAsync({
+        data: {
+          ...data,
+          companyId: companyId || null,
+        },
+      });
 
       if (mode === "import" && pendingFile) {
         await uploadEditalMutation.mutateAsync({
@@ -358,6 +367,20 @@ export function CreateProcessDialog({ prefill, defaultOpen }: { prefill?: Prefil
                   <Label htmlFor="deadline">Data/Hora Abertura</Label>
                   <Input id="deadline" type="datetime-local" {...register("deadline")} />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyId">Empresa</Label>
+                <select
+                  id="companyId"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                  {...register("companyId")}
+                >
+                  <option value="">Sem empresa vinculada</option>
+                  {(companies ?? []).map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">

@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import {
   useListCallNotices,
   useCreateCallNotice,
+  useListCompanies,
   CallNotice,
   CallNoticeStatus,
   getListCallNoticesQueryKey,
@@ -94,6 +95,7 @@ interface CreateCallNoticeForm {
   referenceNumber: string;
   category: string;
   deadline: string;
+  companyId: string;
 }
 
 function CreateCallNoticeDialog({
@@ -106,12 +108,14 @@ function CreateCallNoticeDialog({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const createMutation = useCreateCallNotice();
+  const { data: companies } = useListCompanies();
   const [form, setForm] = useState<CreateCallNoticeForm>({
     title: "",
     agency: "",
     referenceNumber: "",
     category: "",
     deadline: "",
+    companyId: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,12 +129,13 @@ function CreateCallNoticeDialog({
           referenceNumber: form.referenceNumber.trim() || null,
           category: form.category || null,
           deadline: form.deadline || null,
+          companyId: form.companyId ? parseInt(form.companyId) : null,
         },
       });
       queryClient.invalidateQueries({ queryKey: getListCallNoticesQueryKey() });
       toast({ title: "Chamamento criado com sucesso" });
       onClose();
-      setForm({ title: "", agency: "", referenceNumber: "", category: "", deadline: "" });
+      setForm({ title: "", agency: "", referenceNumber: "", category: "", deadline: "", companyId: "" });
     } catch {
       toast({ title: "Erro ao criar chamamento", variant: "destructive" });
     }
@@ -193,6 +198,19 @@ function CreateCallNoticeDialog({
               <option value="">Selecione...</option>
               {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
+            <select
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+              value={form.companyId}
+              onChange={e => setForm(f => ({ ...f, companyId: e.target.value }))}
+            >
+              <option value="">Sem empresa vinculada</option>
+              {(companies ?? []).map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>
@@ -413,6 +431,12 @@ export function ChamamentosPage() {
                       <h3 className="font-semibold text-slate-900 text-sm leading-snug mb-1 line-clamp-2 flex-1">
                         {notice.title}
                       </h3>
+
+                      {notice.companyName && (
+                        <p className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full inline-block mb-1">
+                          {notice.companyName}
+                        </p>
+                      )}
 
                       <div className="space-y-1.5 mt-2">
                         <div className="flex items-center gap-1.5 text-xs text-slate-500">

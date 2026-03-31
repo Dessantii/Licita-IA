@@ -20,6 +20,8 @@ import { ChamamentoDetailPage } from "@/pages/ChamamentoDetailPage";
 import { ChamamentoChecklistPage } from "@/pages/ChamamentoChecklistPage";
 import { CompaniesPage } from "@/pages/CompaniesPage";
 import { CompanyDetailPage } from "@/pages/CompanyDetailPage";
+import { EmpresasPage } from "@/pages/EmpresasPage";
+import { EmpresaDetailPage } from "@/pages/EmpresaDetailPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -62,6 +64,12 @@ function Router() {
       </Route>
       <Route path="/chamamentos/:id">
         {() => <ProtectedRoute component={ChamamentoDetailPage} />}
+      </Route>
+      <Route path="/empresas">
+        {() => <ProtectedRoute component={EmpresasPage} />}
+      </Route>
+      <Route path="/empresas/:id">
+        {() => <ProtectedRoute component={EmpresaDetailPage} />}
       </Route>
       <Route path="/monitors">
         {() => <ProtectedRoute component={MonitoramentosPage} />}

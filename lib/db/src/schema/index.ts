@@ -1,3 +1,4 @@
+export * from "./companies";
 export * from "./processes";
 export * from "./uploaded-files";
 export * from "./extracted-requirements";

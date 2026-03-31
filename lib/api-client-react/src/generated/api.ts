@@ -23,7 +23,10 @@ import type {
   CallNotice,
   CallNoticeDetail,
   CallValidationItem,
+  Company,
+  CompanyDetail,
   CreateCallNoticeBody,
+  CreateCompanyBody,
   CreateProcessBody,
   ErrorResponse,
   ExtractCallMetaBody,
@@ -36,6 +39,7 @@ import type {
   ProcessDetail,
   UpdateCallNoticeBody,
   UpdateCallValidationItemBody,
+  UpdateCompanyBody,
   UpdateProcessBody,
   UpdateValidationItemBody,
   UploadDocumentBody,
@@ -2706,4 +2710,149 @@ export const useDeleteNoticeFile = <
   TContext
 > => {
   return useMutation(getDeleteNoticeFileMutationOptions(options));
+};
+
+// ── Companies ──────────────────────────────────────────────────────────────
+
+export const getListCompaniesUrl = () => `/api/companies`;
+
+export const listCompanies = async (options?: RequestInit): Promise<Company[]> => {
+  return customFetch<Company[]>(getListCompaniesUrl(), { ...options, method: "GET" });
+};
+
+export const getListCompaniesQueryKey = () => [`/api/companies`] as const;
+
+export const getListCompaniesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCompanies>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listCompanies>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getListCompaniesQueryKey();
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCompanies>>> = ({ signal }) =>
+    listCompanies({ signal, ...requestOptions });
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCompanies>>, TError, TData
+  >;
+};
+
+export const useListCompanies = <
+  TData = Awaited<ReturnType<typeof listCompanies>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listCompanies>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions = getListCompaniesQueryOptions(options);
+  const query = useQuery(queryOptions);
+  return { ...query, queryKey: queryOptions.queryKey };
+};
+
+export const getGetCompanyUrl = (id: number) => `/api/companies/${id}`;
+
+export const getCompany = async (id: number, options?: RequestInit): Promise<CompanyDetail> => {
+  return customFetch<CompanyDetail>(getGetCompanyUrl(id), { ...options, method: "GET" });
+};
+
+export const getGetCompanyQueryKey = (id: number) => [`/api/companies/${id}`] as const;
+
+export const getGetCompanyQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCompany>>,
+  TError = ErrorType<ErrorResponse>,
+>(id: number, options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getCompany>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetCompanyQueryKey(id);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompany>>> = ({ signal }) =>
+    getCompany(id, { signal, ...requestOptions });
+  return { queryKey, queryFn, enabled: !!id, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCompany>>, TError, TData
+  >;
+};
+
+export const useGetCompany = <
+  TData = Awaited<ReturnType<typeof getCompany>>,
+  TError = ErrorType<ErrorResponse>,
+>(id: number, options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getCompany>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions = getGetCompanyQueryOptions(id, options);
+  const query = useQuery(queryOptions);
+  return { ...query, queryKey: queryOptions.queryKey };
+};
+
+export const createCompany = async (body: CreateCompanyBody, options?: RequestInit): Promise<Company> => {
+  return customFetch<Company>(`/api/companies`, {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(body),
+  });
+};
+
+export const getCreateCompanyMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<Awaited<ReturnType<typeof createCompany>>, TError, { data: CreateCompanyBody }, TContext>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<Awaited<ReturnType<typeof createCompany>>, TError, { data: CreateCompanyBody }, TContext> => {
+  const { mutation: mutationOptions, request: requestOptions } = options ?? {};
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCompany>>, { data: CreateCompanyBody }> = ({ data }) =>
+    createCompany(data, requestOptions);
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useCreateCompany = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<Awaited<ReturnType<typeof createCompany>>, TError, { data: CreateCompanyBody }, TContext>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<Awaited<ReturnType<typeof createCompany>>, TError, { data: CreateCompanyBody }, TContext> => {
+  return useMutation(getCreateCompanyMutationOptions(options));
+};
+
+export const updateCompany = async (id: number, body: UpdateCompanyBody, options?: RequestInit): Promise<Company> => {
+  return customFetch<Company>(`/api/companies/${id}`, {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(body),
+  });
+};
+
+export const useUpdateCompany = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<Awaited<ReturnType<typeof updateCompany>>, TError, { id: number; data: UpdateCompanyBody }, TContext>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<Awaited<ReturnType<typeof updateCompany>>, TError, { id: number; data: UpdateCompanyBody }, TContext> => {
+  const { mutation: mutationOptions, request: requestOptions } = options ?? {};
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCompany>>, { id: number; data: UpdateCompanyBody }> = ({ id, data }) =>
+    updateCompany(id, data, requestOptions);
+  return useMutation({ mutationFn, ...mutationOptions });
+};
+
+export const deleteCompany = async (id: number, options?: RequestInit): Promise<void> => {
+  return customFetch<void>(`/api/companies/${id}`, { ...options, method: "DELETE" });
+};
+
+export const useDeleteCompany = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteCompany>>, TError, { id: number }, TContext>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<Awaited<ReturnType<typeof deleteCompany>>, TError, { id: number }, TContext> => {
+  const { mutation: mutationOptions, request: requestOptions } = options ?? {};
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompany>>, { id: number }> = ({ id }) =>
+    deleteCompany(id, requestOptions);
+  return useMutation({ mutationFn, ...mutationOptions });
 };

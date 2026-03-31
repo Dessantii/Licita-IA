@@ -3,6 +3,8 @@ import { db } from "@workspace/db";
 import {
   companiesTable,
   companyDocumentsTable,
+  processesTable,
+  callNoticesTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -104,11 +106,23 @@ router.get("/:id", async (req, res) => {
   }
 
   const documents = await db.select().from(companyDocumentsTable).where(eq(companyDocumentsTable.companyId, id));
+  const processes = await db.select().from(processesTable).where(eq(processesTable.companyId, id));
+  const callNotices = await db.select().from(callNoticesTable).where(eq(callNoticesTable.companyId, id));
 
   res.json({
     ...formatCompany(company),
     documents: documents.map(formatDocument),
     documentStatus: getDocumentStatus(documents),
+    processes: processes.map(p => ({
+      ...p,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    })),
+    callNotices: callNotices.map(n => ({
+      ...n,
+      createdAt: n.createdAt.toISOString(),
+      updatedAt: n.updatedAt.toISOString(),
+    })),
   });
 });
 

@@ -233,11 +233,17 @@ export function ProcessesPage() {
                         </div>
 
                         <h3
-                          className="font-bold text-lg text-slate-900 leading-tight mb-2 line-clamp-2"
+                          className="font-bold text-lg text-slate-900 leading-tight mb-1 line-clamp-2"
                           title={process.title}
                         >
                           {process.title}
                         </h3>
+
+                        {process.companyName && (
+                          <p className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full inline-block mb-2">
+                            {process.companyName}
+                          </p>
+                        )}
 
                         <div className="mt-auto space-y-2.5">
                           <div className="flex items-center text-sm text-slate-600">

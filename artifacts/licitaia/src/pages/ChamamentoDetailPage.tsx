@@ -344,6 +344,11 @@ export function ChamamentoDetailPage() {
                 <Building2 className="w-4 h-4" />
                 {notice.agency}
               </span>
+              {notice.companyName && (
+                <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-xs font-semibold">
+                  {notice.companyName}
+                </span>
+              )}
               {notice.referenceNumber && (
                 <span className="flex items-center gap-1.5">
                   <Hash className="w-4 h-4" />

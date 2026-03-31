@@ -258,6 +258,14 @@ export function ProcessDetailPage() {
             </h1>
             <div className="flex flex-wrap items-center gap-3 text-slate-500 text-sm">
               <span className="font-medium">{process.agency}</span>
+              {process.companyName && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-xs font-semibold">
+                    {process.companyName}
+                  </span>
+                </>
+              )}
               {process.deadline && (
                 <>
                   <span className="text-slate-300">•</span>

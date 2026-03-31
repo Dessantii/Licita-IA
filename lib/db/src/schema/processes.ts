@@ -1,6 +1,7 @@
 import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { companiesTable } from "./companies";
 
 export const processStatusEnum = [
   "criado",
@@ -17,6 +18,7 @@ export const processStatusEnum = [
 
 export const processesTable = pgTable("processes", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").references(() => companiesTable.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   agency: text("agency").notNull(),
   modality: text("modality").notNull(),

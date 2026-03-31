@@ -35,6 +35,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/companies", icon: Building2, label: "Empresas" },
     { href: "/processes", icon: FolderKanban, label: "Licitações" },
     { href: "/chamamentos", icon: BookOpen, label: "Chamamentos" },
+    { href: "/empresas", icon: Building2, label: "Empresas" },
     { href: "/monitors", icon: Activity, label: "Monitoramentos" },
     { href: "/reports", icon: BarChart3, label: "Relatórios" },
     ...(user?.role === "admin" ? [{ href: "/admin/users", icon: Users, label: "Usuários" }] : []),
