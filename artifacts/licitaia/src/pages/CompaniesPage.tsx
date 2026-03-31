@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,10 @@ import {
   AlertTriangle,
   FileX,
   FileCheck,
+  Upload,
+  Sparkles,
+  PencilLine,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -79,6 +83,8 @@ const emptyForm: CreateCompanyForm = {
   observacoes: "",
 };
 
+type DialogMode = "choose" | "manual" | "cnpj-upload" | "extracting" | "review";
+
 function CreateCompanyDialog({
   open,
   onClose,
@@ -89,16 +95,24 @@ function CreateCompanyDialog({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const token = getToken();
+  const [mode, setMode] = useState<DialogMode>("choose");
   const [form, setForm] = useState<CreateCompanyForm>(emptyForm);
+  const [aiFields, setAiFields] = useState<Set<keyof CreateCompanyForm>>(new Set());
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleClose = () => {
+    setMode("choose");
+    setForm(emptyForm);
+    setAiFields(new Set());
+    onClose();
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateCompanyForm) => {
       const res = await fetch(`${BASE_URL}/api/companies`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           razaoSocial: data.razaoSocial.trim(),
           nomeFantasia: data.nomeFantasia.trim() || null,
@@ -118,13 +132,53 @@ function CreateCompanyDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       toast({ title: "Empresa criada com sucesso" });
-      setForm(emptyForm);
-      onClose();
+      handleClose();
     },
     onError: () => {
       toast({ title: "Erro ao criar empresa", variant: "destructive" });
     },
   });
+
+  const extractCnpj = useCallback(async (file: File) => {
+    setMode("extracting");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE_URL}/api/companies/extract-cnpj`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!res.ok) throw new Error();
+      const { extracted } = await res.json();
+      const filled = new Set<keyof CreateCompanyForm>();
+      const newForm = { ...emptyForm };
+      (Object.keys(extracted) as (keyof CreateCompanyForm)[]).forEach(k => {
+        if (extracted[k] && k in emptyForm) {
+          (newForm as Record<string, string>)[k] = extracted[k];
+          filled.add(k);
+        }
+      });
+      setForm(newForm);
+      setAiFields(filled);
+      setMode("review");
+    } catch {
+      toast({ title: "Não foi possível extrair os dados. Tente novamente ou preencha manualmente.", variant: "destructive" });
+      setMode("cnpj-upload");
+    }
+  }, [token, toast]);
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) extractCnpj(file);
+  }, [extractCnpj]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) extractCnpj(file);
+  }, [extractCnpj]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,61 +189,184 @@ function CreateCompanyDialog({
   const field = (
     label: string,
     key: keyof CreateCompanyForm,
-    opts?: { required?: boolean; placeholder?: string; type?: string }
-  ) => (
-    <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">
-        {label}{opts?.required && " *"}
-      </label>
-      <input
-        type={opts?.type ?? "text"}
-        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-        placeholder={opts?.placeholder ?? ""}
-        value={form[key]}
-        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-        required={opts?.required}
-      />
-    </div>
-  );
+    opts?: { required?: boolean; placeholder?: string; colSpan?: boolean }
+  ) => {
+    const isAi = aiFields.has(key);
+    return (
+      <div className={opts?.colSpan ? "col-span-2" : ""}>
+        <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1">
+          {label}{opts?.required && " *"}
+          {isAi && (
+            <span className="inline-flex items-center gap-0.5 text-xs text-teal-600 font-normal">
+              <Sparkles className="w-3 h-3" /> preenchido pela IA
+            </span>
+          )}
+        </label>
+        <input
+          type="text"
+          className={cn(
+            "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-colors",
+            isAi
+              ? "border-teal-300 bg-teal-50/50 focus:ring-teal-400"
+              : "border-slate-200"
+          )}
+          placeholder={opts?.placeholder ?? ""}
+          value={form[key]}
+          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+          required={opts?.required}
+        />
+      </div>
+    );
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova Empresa</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {field("Razão Social", "razaoSocial", { required: true, placeholder: "Nome Ltda." })}
-          {field("Nome Fantasia", "nomeFantasia", { placeholder: "Nome comercial" })}
-          {field("CNPJ", "cnpj", { required: true, placeholder: "00.000.000/0000-00" })}
-          <div className="grid grid-cols-2 gap-3">
-            {field("E-mail", "email", { placeholder: "contato@empresa.com.br" })}
-            {field("Telefone", "telefone", { placeholder: "(11) 99999-9999" })}
+
+        {/* ── Mode chooser ── */}
+        {mode === "choose" && (
+          <div className="py-2 space-y-3">
+            <p className="text-sm text-slate-500">Como deseja cadastrar a empresa?</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setMode("cnpj-upload")}
+                className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/40 hover:bg-teal-50 hover:border-teal-400 transition-all text-center group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center group-hover:bg-teal-200 transition-colors">
+                  <Sparkles className="w-6 h-6 text-teal-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-slate-800">Extrair do Cartão CNPJ</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Envie o PDF ou imagem e a IA preenche automaticamente</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode("manual")}
+                className="flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all text-center group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                  <PencilLine className="w-6 h-6 text-slate-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-slate-800">Preencher manualmente</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Digite os dados da empresa no formulário</p>
+                </div>
+              </button>
+            </div>
           </div>
-          {field("Endereço", "endereco", { placeholder: "Rua, número, bairro, cidade - UF" })}
-          <div className="grid grid-cols-2 gap-3">
-            {field("Inscrição Estadual", "inscricaoEstadual", { placeholder: "IE" })}
-            {field("Inscrição Municipal", "inscricaoMunicipal", { placeholder: "IM" })}
+        )}
+
+        {/* ── CNPJ upload drop zone ── */}
+        {mode === "cnpj-upload" && (
+          <div className="py-2 space-y-4">
+            <p className="text-sm text-slate-500">
+              Envie o <strong>Cartão CNPJ</strong> (PDF do site da Receita Federal ou uma foto/scan).
+              A IA irá extrair os dados e preencher o formulário automaticamente.
+            </p>
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleFileDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "border-2 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-all",
+                dragOver
+                  ? "border-teal-400 bg-teal-50"
+                  : "border-slate-200 hover:border-teal-300 hover:bg-teal-50/30"
+              )}
+            >
+              <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center">
+                <FileText className="w-7 h-7 text-slate-400" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-slate-700">Clique ou arraste o Cartão CNPJ aqui</p>
+                <p className="text-xs text-slate-400 mt-1">PDF ou imagem (JPG, PNG) — máx. 20 MB</p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </div>
+            <div className="flex justify-between">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setMode("choose")}>
+                ← Voltar
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setMode("manual")}>
+                Preencher manualmente
+              </Button>
+            </div>
           </div>
-          {field("Representante Legal", "representanteLegal", { placeholder: "Nome completo" })}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-            <textarea
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-              rows={3}
-              placeholder="Notas internas..."
-              value={form.observacoes}
-              onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
-            />
+        )}
+
+        {/* ── Extracting state ── */}
+        {mode === "extracting" && (
+          <div className="py-12 flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-teal-50 flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-teal-500 animate-pulse" />
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-slate-800">Extraindo dados do cartão…</p>
+              <p className="text-sm text-slate-400 mt-1">A IA está lendo as informações da empresa</p>
+            </div>
+            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Criar Empresa
-            </Button>
-          </DialogFooter>
-        </form>
+        )}
+
+        {/* ── Form (manual or post-review) ── */}
+        {(mode === "manual" || mode === "review") && (
+          <>
+            {mode === "review" && aiFields.size > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-sm text-teal-700">
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                <span>{aiFields.size} campos preenchidos automaticamente. Revise antes de salvar.</span>
+              </div>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                {field("Razão Social", "razaoSocial", { required: true, placeholder: "Nome Ltda.", colSpan: true })}
+                {field("Nome Fantasia", "nomeFantasia", { placeholder: "Nome comercial", colSpan: true })}
+                {field("CNPJ", "cnpj", { required: true, placeholder: "00.000.000/0000-00" })}
+                {field("Telefone", "telefone", { placeholder: "(11) 99999-9999" })}
+                {field("E-mail", "email", { placeholder: "contato@empresa.com.br", colSpan: true })}
+                {field("Endereço", "endereco", { placeholder: "Rua, número, bairro, cidade - UF", colSpan: true })}
+                {field("Inscrição Estadual", "inscricaoEstadual", { placeholder: "IE" })}
+                {field("Inscrição Municipal", "inscricaoMunicipal", { placeholder: "IM" })}
+                {field("Representante Legal", "representanteLegal", { placeholder: "Nome completo", colSpan: true })}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>
+                <textarea
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  rows={2}
+                  placeholder="Notas internas..."
+                  value={form.observacoes}
+                  onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
+                />
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={() => { setMode("choose"); setForm(emptyForm); setAiFields(new Set()); }}>
+                  ← Voltar
+                </Button>
+                <div className="flex gap-2 ml-auto">
+                  <Button type="button" variant="outline" onClick={handleClose}>Cancelar</Button>
+                  <Button type="submit" disabled={createMutation.isPending}>
+                    {createMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Criar Empresa
+                  </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
