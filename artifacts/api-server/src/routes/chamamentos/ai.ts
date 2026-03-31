@@ -84,7 +84,7 @@ Retorne um JSON com a seguinte estrutura exata (sem markdown, sem texto extra):
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: "gpt-4o-mini",
       max_completion_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     });
@@ -199,7 +199,7 @@ Responda APENAS com o JSON, sem texto adicional.`;
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: "gpt-4o-mini",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
     });
@@ -346,7 +346,7 @@ Responda APENAS com o JSON, sem texto adicional.`;
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: "gpt-4o-mini",
       max_completion_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
     });

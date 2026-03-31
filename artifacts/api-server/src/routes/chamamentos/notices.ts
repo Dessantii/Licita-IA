@@ -47,8 +47,8 @@ const updateCallNoticeSchema = z.object({
 
 router.get("/", async (_req, res) => {
   const notices = await db.select().from(callNoticesTable).orderBy(callNoticesTable.createdAt);
-  const companies = await db.select({ id: companiesTable.id, name: companiesTable.name }).from(companiesTable);
-  const companyMap = new Map(companies.map(c => [c.id, c.name]));
+  const companies = await db.select({ id: companiesTable.id, razaoSocial: companiesTable.razaoSocial }).from(companiesTable);
+  const companyMap = new Map(companies.map(c => [c.id, c.razaoSocial]));
   res.json(notices.map(n => ({
     ...n,
     companyName: n.companyId ? (companyMap.get(n.companyId) ?? null) : null,
@@ -86,8 +86,8 @@ router.get("/:id", async (req, res) => {
 
   let companyName: string | null = null;
   if (notice.companyId) {
-    const [company] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, notice.companyId));
-    companyName = company?.name ?? null;
+    const [company] = await db.select({ razaoSocial: companiesTable.razaoSocial }).from(companiesTable).where(eq(companiesTable.id, notice.companyId));
+    companyName = company?.razaoSocial ?? null;
   }
 
   const files = await db.select().from(noticeFilesTable).where(eq(noticeFilesTable.callNoticeId, id));
