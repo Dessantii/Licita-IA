@@ -35,6 +35,8 @@ import {
   FileCheck,
   Calendar,
   FolderOpen,
+  Sparkles,
+  ScanLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -135,6 +137,9 @@ export function CompanyDetailPage() {
     file: null,
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<keyof UploadDocForm>>(new Set());
+  const [aiUsed, setAiUsed] = useState(false);
 
   const { data: company, isLoading } = useQuery<CompanyDetail>({
     queryKey: ["company", id],
@@ -183,6 +188,39 @@ export function CompanyDetailPage() {
     },
   });
 
+  async function analyzeFile(file: File) {
+    setIsAnalyzing(true);
+    setAutoFilledFields(new Set());
+    setAiUsed(false);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE_URL}/api/companies/analyze-doc`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const filled = new Set<keyof UploadDocForm>();
+      setUploadForm(f => {
+        const next = { ...f, file };
+        if (data.titulo) { next.titulo = data.titulo; filled.add("titulo"); }
+        if (data.tipo && data.tipo !== "outros") { next.tipo = data.tipo; filled.add("tipo"); }
+        if (data.dataEmissao) { next.dataEmissao = data.dataEmissao; filled.add("dataEmissao"); }
+        if (data.dataValidade) { next.dataValidade = data.dataValidade; filled.add("dataValidade"); }
+        return next;
+      });
+      setAutoFilledFields(filled);
+      setAiUsed(!!data.aiUsed);
+    } catch {
+      // Analysis failed — just set the file, let user fill manually
+      setUploadForm(f => ({ ...f, file, titulo: f.titulo || file.name.replace(/\.[^.]+$/, "") }));
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (!uploadForm.file || !uploadForm.titulo.trim()) return;
@@ -207,6 +245,8 @@ export function CompanyDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["company", id] });
       toast({ title: "Documento enviado com sucesso" });
       setUploadForm({ titulo: "", tipo: "outros", dataEmissao: "", dataValidade: "", file: null });
+      setAutoFilledFields(new Set());
+      setAiUsed(false);
     } catch {
       toast({ title: "Erro ao enviar documento", variant: "destructive" });
     } finally {
@@ -411,114 +451,200 @@ export function CompanyDetailPage() {
               <Upload className="w-5 h-5 text-slate-400" />
               Enviar Documento
             </h2>
-            <form onSubmit={handleUpload} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Título *</label>
-                  <input
-                    type="text"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Ex: Certidão Negativa de Débitos Federais"
-                    value={uploadForm.titulo}
-                    onChange={e => setUploadForm(f => ({ ...f, titulo: e.target.value }))}
-                    required
-                  />
+
+            {/* Step 1: file drop zone (shown when no file selected) */}
+            {!uploadForm.file && !isAnalyzing && (
+              <div
+                className="border-2 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-all border-slate-200 hover:border-primary/50 hover:bg-primary/5"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="w-10 h-10 text-slate-300" />
+                <div className="text-center">
+                  <p className="text-sm font-medium text-slate-700">Clique ou arraste o documento aqui</p>
+                  <p className="text-xs text-slate-400 mt-1">PDF, imagens ou outros (máx. 50MB)</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
-                  <select
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={uploadForm.tipo}
-                    onChange={e => setUploadForm(f => ({ ...f, tipo: e.target.value }))}
+                <p className="text-xs text-teal-600 flex items-center gap-1">
+                  <ScanLine className="w-3.5 h-3.5" />
+                  Metadados extraídos automaticamente para PDFs
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) analyzeFile(file);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Analyzing state */}
+            {isAnalyzing && (
+              <div className="border-2 border-dashed border-teal-200 rounded-xl p-10 flex flex-col items-center gap-3 bg-teal-50/30">
+                <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center">
+                  <ScanLine className="w-6 h-6 text-teal-500 animate-pulse" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-slate-700">Lendo documento…</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Extraindo título, tipo e datas automaticamente</p>
+                </div>
+                <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
+              </div>
+            )}
+
+            {/* Step 2: review form (shown after file selected and analysis done) */}
+            {uploadForm.file && !isAnalyzing && (
+              <form onSubmit={handleUpload} className="space-y-4">
+                {/* Selected file indicator */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200">
+                  <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="text-sm text-slate-700 truncate flex-1">{uploadForm.file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadForm({ titulo: "", tipo: "outros", dataEmissao: "", dataValidade: "", file: null });
+                      setAutoFilledFields(new Set());
+                      setAiUsed(false);
+                    }}
+                    className="text-slate-400 hover:text-red-500 shrink-0"
                   >
-                    {DOC_TYPES.map(({ value, label }) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Data de Emissão</label>
-                  <input
-                    type="date"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={uploadForm.dataEmissao}
-                    onChange={e => setUploadForm(f => ({ ...f, dataEmissao: e.target.value }))}
-                  />
+
+                {/* Auto-fill notice */}
+                {autoFilledFields.size > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      {autoFilledFields.size} campo{autoFilledFields.size > 1 ? "s" : ""} preenchido{autoFilledFields.size > 1 ? "s" : ""} automaticamente
+                      {aiUsed ? " (IA usada para imagem)" : " (leitura direta do PDF)"}
+                      . Revise antes de enviar.
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Título */}
+                  <div className="md:col-span-2">
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1">
+                      Título *
+                      {autoFilledFields.has("titulo") && (
+                        <span className="text-xs text-teal-600 font-normal flex items-center gap-0.5">
+                          <Sparkles className="w-3 h-3" /> auto
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      className={cn(
+                        "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-colors",
+                        autoFilledFields.has("titulo") ? "border-teal-300 bg-teal-50/40" : "border-slate-200"
+                      )}
+                      placeholder="Ex: Certidão Negativa de Débitos Federais"
+                      value={uploadForm.titulo}
+                      onChange={e => setUploadForm(f => ({ ...f, titulo: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  {/* Tipo */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1">
+                      Tipo
+                      {autoFilledFields.has("tipo") && (
+                        <span className="text-xs text-teal-600 font-normal flex items-center gap-0.5">
+                          <Sparkles className="w-3 h-3" /> auto
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      className={cn(
+                        "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-colors",
+                        autoFilledFields.has("tipo") ? "border-teal-300 bg-teal-50/40" : "border-slate-200"
+                      )}
+                      value={uploadForm.tipo}
+                      onChange={e => setUploadForm(f => ({ ...f, tipo: e.target.value }))}
+                    >
+                      {DOC_TYPES.map(({ value, label }) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Data Emissão */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1">
+                      Data de Emissão
+                      {autoFilledFields.has("dataEmissao") && (
+                        <span className="text-xs text-teal-600 font-normal flex items-center gap-0.5">
+                          <Sparkles className="w-3 h-3" /> auto
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="date"
+                      className={cn(
+                        "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-colors",
+                        autoFilledFields.has("dataEmissao") ? "border-teal-300 bg-teal-50/40" : "border-slate-200"
+                      )}
+                      value={uploadForm.dataEmissao}
+                      onChange={e => setUploadForm(f => ({ ...f, dataEmissao: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Data Validade */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1">
+                      Data de Validade
+                      {autoFilledFields.has("dataValidade") && (
+                        <span className="text-xs text-teal-600 font-normal flex items-center gap-0.5">
+                          <Sparkles className="w-3 h-3" /> auto
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="date"
+                      className={cn(
+                        "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-colors",
+                        autoFilledFields.has("dataValidade") ? "border-teal-300 bg-teal-50/40" : "border-slate-200"
+                      )}
+                      value={uploadForm.dataValidade}
+                      onChange={e => setUploadForm(f => ({ ...f, dataValidade: e.target.value }))}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Data de Validade</label>
-                  <input
-                    type="date"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={uploadForm.dataValidade}
-                    onChange={e => setUploadForm(f => ({ ...f, dataValidade: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Arquivo *</label>
-                <div
-                  className={cn(
-                    "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all",
-                    uploadForm.file
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-slate-200 hover:border-primary/50 hover:bg-primary/5"
-                  )}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {uploadForm.file ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <FileText className="w-5 h-5 text-primary" />
-                      <span className="text-sm font-medium text-slate-700">{uploadForm.file.name}</span>
-                      <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); setUploadForm(f => ({ ...f, file: null })); }}
-                        className="text-slate-400 hover:text-red-500"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <Upload className="w-8 h-8 text-slate-400" />
-                      <p className="text-sm font-medium text-slate-700">Clique para selecionar arquivo</p>
-                      <p className="text-xs text-slate-400">PDF, imagens ou outros documentos (máx. 50MB)</p>
-                    </div>
-                  )}
+
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    className="text-sm text-slate-400 hover:text-slate-600 underline underline-offset-2"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Trocar arquivo
+                  </button>
                   <input
                     ref={fileInputRef}
                     type="file"
                     className="hidden"
                     onChange={e => {
-                      const file = e.target.files?.[0] ?? null;
-                      setUploadForm(f => ({
-                        ...f,
-                        file,
-                        titulo: f.titulo || (file?.name.replace(/\.[^.]+$/, "") ?? ""),
-                      }));
+                      const file = e.target.files?.[0];
+                      if (file) analyzeFile(file);
                       e.target.value = "";
                     }}
                   />
+                  <Button type="submit" disabled={isUploading || !uploadForm.titulo.trim()}>
+                    {isUploading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin mr-2" />Enviando...</>
+                    ) : (
+                      <><Upload className="w-4 h-4 mr-2" />Enviar Documento</>
+                    )}
+                  </Button>
                 </div>
-              </div>
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isUploading || !uploadForm.file || !uploadForm.titulo.trim()}>
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4 mr-2" />
-                      Enviar Documento
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
+              </form>
+            )}
           </Card>
 
           {company.documents.length === 0 ? (
