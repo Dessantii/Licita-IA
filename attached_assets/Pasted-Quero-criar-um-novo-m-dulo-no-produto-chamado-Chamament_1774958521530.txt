@@ -1,0 +1,283 @@
+Quero criar um novo módulo no produto chamado **Chamamentos**.
+
+Você deve atuar como arquiteto de produto, UX designer de SaaS B2B/B2G e engenheiro full stack sênior.
+
+## Contexto do produto
+O sistema já possui uma lógica voltada para análise documental e acompanhamento de processos.
+Agora preciso de um módulo específico para **Chamamentos Públicos**.
+
+## O que são Chamamentos Públicos
+Chamamentos públicos são procedimentos administrativos de convocação em que o poder público convida interessados — frequentemente Organizações da Sociedade Civil (OSCs) — a apresentar documentação, propostas, planos de trabalho ou manifestações de interesse para prestação de serviços, fornecimento de bens ou formalização de parcerias.
+
+## Objetivo do módulo
+O módulo deve ajudar o usuário a:
+
+1. cadastrar um chamamento público
+2. enviar o edital ou documento principal do chamamento
+3. extrair informações importantes do documento
+4. identificar requisitos de participação
+5. identificar documentação exigida
+6. identificar critérios de elegibilidade
+7. identificar exigências de proposta/plano de trabalho
+8. organizar tudo isso em checklist acionável
+9. permitir upload dos documentos da instituição interessada
+10. comparar o que foi exigido com o que foi enviado
+11. apontar pendências, divergências, vencimentos e itens que exigem revisão
+12. orientar o próximo passo até a submissão final
+
+## Diferença em relação ao módulo de licitações
+Este módulo não deve ser tratado como uma cópia do módulo de licitações.
+
+Ele deve considerar que um chamamento pode envolver:
+- habilitação institucional
+- comprovação de experiência
+- regularidade documental
+- plano de trabalho
+- proposta técnica
+- cronograma
+- documentação da OSC / entidade
+- anexos obrigatórios
+- critérios de avaliação ou seleção
+- requisitos formais específicos do chamamento
+
+## O que o usuário quer resolver
+O usuário quer entender rapidamente:
+- se sua organização é elegível
+- quais documentos precisa reunir
+- quais anexos são obrigatórios
+- o que precisa constar na proposta
+- o que está faltando
+- o que está vencido ou inconsistente
+- qual é o próximo passo para submeter com mais segurança
+
+## Princípios do módulo
+1. foco em clareza operacional
+2. foco em checklist executável
+3. foco em conferência documental
+4. foco em elegibilidade e submissão
+5. humano no loop para casos ambíguos
+6. rastreabilidade do que foi extraído do edital
+7. nada de dashboard institucional ou técnica desnecessária
+
+## Estrutura funcional desejada
+
+### Tela 1 — Lista de chamamentos
+A tela deve mostrar:
+- nome do chamamento
+- órgão responsável
+- prazo final
+- etapa atual
+- status
+- pendência principal
+- ação principal ("Abrir" ou "Continuar")
+
+Também deve permitir:
+- criar novo chamamento
+- filtrar por status
+- filtrar por prazo
+- pesquisar chamamentos
+
+### Tela 2 — Detalhe do chamamento
+A tela deve mostrar:
+- dados principais do chamamento
+- órgão
+- número / referência
+- prazo final
+- categoria / tipo
+- status geral
+- etapa atual
+- documento principal enviado
+- resumo do que foi extraído
+- checklist inicial
+- pendências
+- próximo passo
+
+### Tela 3 — Checklist / conferência
+A tela deve mostrar:
+- item exigido
+- tipo do item (documento, proposta, plano, elegibilidade, anexo)
+- obrigatório ou não
+- status do item
+- arquivo vinculado
+- observação
+- trecho-fonte do edital
+- confiança da extração
+- marcador de revisão manual
+
+### Tela 4 — Proposta / plano de trabalho
+Se fizer sentido para o MVP, criar uma área para:
+- listar exigências ligadas à proposta
+- mostrar anexos/modelos esperados
+- orientar quais partes ainda faltam
+
+## Fluxo principal do usuário
+1. Criar chamamento
+2. Upload do edital/chamamento principal
+3. Leitura e extração automática
+4. Geração de checklist
+5. Visualização de elegibilidade e exigências
+6. Upload de documentos da organização
+7. Upload de proposta / plano / anexos
+8. Conferência do material enviado
+9. Identificação de pendências
+10. Orientação para submissão
+
+## O que a IA deve fazer neste módulo
+A IA deve ajudar a:
+- ler o edital/chamamento
+- extrair informações principais
+- identificar documentos exigidos
+- identificar critérios de elegibilidade
+- identificar exigências da proposta ou plano de trabalho
+- estruturar checklist
+- classificar arquivos enviados
+- comparar exigido x enviado
+- sinalizar inconsistências e pontos de atenção
+
+## O que a IA NÃO deve fazer
+A IA não deve:
+- dar parecer jurídico definitivo
+- afirmar elegibilidade legal absoluta
+- substituir análise humana especializada
+- esconder ambiguidade
+- assumir certeza em documentos ou regras pouco claras
+
+Sempre usar abordagem de:
+**conferência assistida + revisão humana quando necessário**
+
+## Tipos de itens que o sistema deve reconhecer
+O sistema deve ser capaz de estruturar itens como:
+- documentos institucionais
+- certidões e regularidade
+- comprovação de experiência/capacidade
+- declarações
+- anexos obrigatórios
+- plano de trabalho
+- proposta técnica
+- cronograma
+- comprovação de atendimento a requisitos específicos
+- requisitos de elegibilidade
+- documentos para assinatura/parceria
+
+## Status possíveis dos itens
+- não iniciado
+- pendente
+- enviado
+- em análise
+- ok
+- divergente
+- vencido
+- incompleto
+- revisar manualmente
+
+## Estados do chamamento
+- criado
+- documento_principal_enviado
+- extraindo_requisitos
+- checklist_gerada
+- aguardando_documentos
+- aguardando_proposta
+- em_conferencia
+- com_pendencias
+- pronto_para_submissao
+- concluido
+
+## Estrutura de dados sugerida
+
+### CallNotice / Chamamento
+- id
+- title
+- organizationName
+- referenceNumber
+- category
+- deadline
+- notes
+- status
+- createdAt
+- updatedAt
+
+### NoticeFile
+- id
+- callNoticeId
+- fileType
+- name
+- path
+- mimeType
+- uploadedAt
+
+### ExtractedRequirement
+- id
+- callNoticeId
+- title
+- description
+- requirementType
+- mandatory
+- sourceExcerpt
+- sourcePage
+- confidence
+- needsReview
+
+### SubmittedOrganizationDocument
+- id
+- callNoticeId
+- fileId
+- detectedType
+- detectedDate
+- detectedValidity
+- confidence
+- needsReview
+
+### SubmittedProposalFile
+- id
+- callNoticeId
+- fileId
+- detectedSection
+- confidence
+- needsReview
+
+### ValidationItem
+- id
+- callNoticeId
+- requirementId
+- linkedFileId
+- status
+- notes
+
+## UX e Design
+Quero um módulo:
+- simples
+- profissional
+- orientado por ação
+- sem excesso de cards inúteis
+- sem blocos técnicos de infraestrutura
+- com foco em:
+  - o que foi exigido
+  - o que foi enviado
+  - o que falta
+  - o que exige revisão
+  - o que fazer agora
+
+## Navegação
+Na navegação principal, o novo módulo deve aparecer como:
+- Processos
+- Chamamentos
+- Relatórios
+- Configurações
+
+Ou, se a arquitetura do produto permitir, Chamamentos pode ser uma categoria de Processos com filtro próprio.
+
+## O que eu quero de você agora
+Não gere código imediatamente.
+
+Primeiro entregue:
+1. entendimento do módulo
+2. diferenças entre Licitações e Chamamentos
+3. arquitetura de informação
+4. estrutura das telas
+5. fluxo do usuário
+6. entidades principais
+7. estados e status
+8. recomendações de UX
+9. proposta de implementação do MVP
+
+Depois disso, me entregue o código do módulo.
