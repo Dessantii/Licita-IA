@@ -35,6 +35,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getToken } from "@/hooks/use-auth";
 
 const formSchema = z.object({
   title: z.string().min(3, "Título muito curto"),
@@ -104,8 +105,10 @@ export function CreateProcessDialog({ prefill, defaultOpen }: { prefill?: Prefil
     formData.append("file", file);
 
     try {
+      const token = getToken();
       const response = await fetch("/api/processes/extract-meta", {
         method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
