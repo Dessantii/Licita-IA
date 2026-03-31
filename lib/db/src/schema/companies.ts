@@ -1,22 +1,19 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { usersTable } from "./users";
 
 export const companiesTable = pgTable("companies", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => usersTable.id),
-  legalName: text("legal_name").notNull(),
-  tradeName: text("trade_name"),
-  cnpj: text("cnpj"),
+  razaoSocial: text("razao_social").notNull(),
+  nomeFantasia: text("nome_fantasia"),
+  cnpj: text("cnpj").notNull(),
   email: text("email"),
-  phone: text("phone"),
-  address: text("address"),
-  stateRegistration: text("state_registration"),
-  municipalRegistration: text("municipal_registration"),
-  legalRepresentative: text("legal_representative"),
-  notes: text("notes"),
-  status: text("status").notNull().default("ativa"),
+  telefone: text("telefone"),
+  endereco: text("endereco"),
+  inscricaoEstadual: text("inscricao_estadual"),
+  inscricaoMunicipal: text("inscricao_municipal"),
+  representanteLegal: text("representante_legal"),
+  observacoes: text("observacoes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

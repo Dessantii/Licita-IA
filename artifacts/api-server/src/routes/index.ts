@@ -9,7 +9,8 @@ import adminRouter from "./admin";
 import chamamentosRouter from "./chamamentos/notices";
 import chamamentosFilesRouter from "./chamamentos/files";
 import chamamentosAiRouter from "./chamamentos/ai";
-import companiesRouter from "./companies";
+import companiesRouter from "./companies/companies";
+import companyDocumentsRouter from "./companies/documents";
 
 const router: IRouter = Router();
 
@@ -29,5 +30,6 @@ router.use("/chamamentos", chamamentosFilesRouter);
 router.use("/chamamentos/ai", chamamentosAiRouter);
 
 router.use("/companies", companiesRouter);
+router.use("/companies", companyDocumentsRouter);
 
 export default router;

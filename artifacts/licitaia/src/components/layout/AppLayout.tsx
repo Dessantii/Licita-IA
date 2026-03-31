@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus, Users, BookOpen } from "lucide-react";
+import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus, Users, BookOpen, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
 import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
@@ -32,6 +32,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     : "?";
 
   const navItems = [
+    { href: "/companies", icon: Building2, label: "Empresas" },
     { href: "/processes", icon: FolderKanban, label: "Licitações" },
     { href: "/chamamentos", icon: BookOpen, label: "Chamamentos" },
     { href: "/monitors", icon: Activity, label: "Monitoramentos" },

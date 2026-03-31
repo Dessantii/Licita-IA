@@ -3,25 +3,38 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { companiesTable } from "./companies";
 
+export const companyDocumentTypeEnum = [
+  "cnpj",
+  "estatuto_social",
+  "ata_eleicao",
+  "certidao_federal",
+  "certidao_estadual",
+  "certidao_municipal",
+  "certidao_trabalhista",
+  "certidao_fgts",
+  "balanco_patrimonial",
+  "declaracao",
+  "procuracao",
+  "outros",
+] as const;
+
 export const companyDocumentsTable = pgTable("company_documents", {
   id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull().references(() => companiesTable.id),
-  title: text("title").notNull(),
-  documentType: text("document_type").notNull(),
-  originalName: text("original_name").notNull(),
-  filePath: text("file_path").notNull(),
-  issueDate: text("issue_date"),
-  expiryDate: text("expiry_date"),
-  status: text("status").notNull().default("sem_validade"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  titulo: text("titulo").notNull(),
+  tipo: text("tipo").notNull(),
+  dataEmissao: text("data_emissao"),
+  dataValidade: text("data_validade"),
+  name: text("name").notNull(),
+  path: text("path").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull().default(0),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertCompanyDocumentSchema = createInsertSchema(companyDocumentsTable).omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
+  uploadedAt: true,
 });
 
 export type InsertCompanyDocument = z.infer<typeof insertCompanyDocumentSchema>;

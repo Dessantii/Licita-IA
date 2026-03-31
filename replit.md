@@ -67,6 +67,10 @@ artifacts-monorepo/
 - `call_submitted_documents` - OSC documents matched to requirements
 - `call_validation_items` - Checklist items with statuses: ok, pendente, divergente, vencido, incompleto, revisar_manualmente
 
+### Módulo de Empresas
+- `companies` - Company/client portfolio (razaoSocial, nomeFantasia, cnpj, email, telefone, endereco, inscricaoEstadual, inscricaoMunicipal, representanteLegal, observacoes)
+- `company_documents` - Company document library (titulo, tipo, dataEmissao, dataValidade, file metadata)
+
 ## Process States (Licitações)
 
 criado → edital_enviado → edital_processando → exigencias_extraidas → aguardando_documentos → documentos_enviados → em_conferencia → pendencias_encontradas | pronto_para_revisao → concluido
@@ -99,6 +103,10 @@ documento_institucional, certidao_regularidade, comprovacao_experiencia, declara
 - `/chamamentos/:id` → ChamamentoDetailPage (edital upload, OSC docs, proposal section, AI analysis, next-step guidance)
 - `/chamamentos/:id/checklist` → ChamamentoChecklistPage (checklist with filter by type/status, manual edit)
 
+### Empresas
+- `/companies` → CompaniesPage (list with search, filter by doc status, create new company inline dialog)
+- `/companies/:id` → CompanyDetailPage (3 tabs: Visão Geral with data/alerts, Documentos with upload/list/delete, Processos placeholder)
+
 ## API Routes (all under /api)
 
 ### Licitações
@@ -128,6 +136,12 @@ documento_institucional, certidao_regularidade, comprovacao_experiencia, declara
 - GET /chamamentos/:id/validation
 - PATCH /chamamentos/validation/:id
 - GET /chamamentos/:id/files
+
+### Empresas
+- GET/POST /companies
+- GET/PATCH/DELETE /companies/:id
+- POST /companies/:id/documents (multipart, with titulo, tipo, dataEmissao, dataValidade body fields)
+- DELETE /companies/:companyId/documents/:docId
 
 ## TypeScript & Composite Projects
 

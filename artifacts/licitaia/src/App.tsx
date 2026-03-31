@@ -18,6 +18,8 @@ import { UsuáriosPage } from "@/pages/UsuáriosPage";
 import { ChamamentosPage } from "@/pages/ChamamentosPage";
 import { ChamamentoDetailPage } from "@/pages/ChamamentoDetailPage";
 import { ChamamentoChecklistPage } from "@/pages/ChamamentoChecklistPage";
+import { CompaniesPage } from "@/pages/CompaniesPage";
+import { CompanyDetailPage } from "@/pages/CompanyDetailPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -72,6 +74,12 @@ function Router() {
       </Route>
       <Route path="/admin/users">
         {() => <ProtectedRoute component={UsuáriosPage} />}
+      </Route>
+      <Route path="/companies">
+        {() => <ProtectedRoute component={CompaniesPage} />}
+      </Route>
+      <Route path="/companies/:id">
+        {() => <ProtectedRoute component={CompanyDetailPage} />}
       </Route>
       <Route component={NotFound} />
     </Switch>
