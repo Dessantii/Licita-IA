@@ -227,6 +227,19 @@ router.patch("/validation/:id", async (req, res) => {
     return;
   }
 
+  // Auto-update the parent notice status based on all validation items
+  const allItems = await db.select({ status: callValidationItemsTable.status })
+    .from(callValidationItemsTable)
+    .where(eq(callValidationItemsTable.callNoticeId, updated.callNoticeId));
+
+  if (allItems.length > 0) {
+    const allOk = allItems.every(item => item.status === "ok");
+    const newNoticeStatus = allOk ? "pronto_para_submissao" : "pendencias_encontradas";
+    await db.update(callNoticesTable)
+      .set({ status: newNoticeStatus, updatedAt: new Date() })
+      .where(eq(callNoticesTable.id, updated.callNoticeId));
+  }
+
   res.json({
     ...updated,
     createdAt: updated.createdAt.toISOString(),
