@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { monitorsTable, monitorAlertsTable } from "@workspace/db";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, ilike, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { buscarPublicacoesPncp, filtragemPorPalavras, pncpUrl, MODALIDADES } from "../../services/pncp";
 
@@ -104,6 +104,74 @@ router.post("/:id/check", async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? "Erro ao verificar PNCP." });
   }
+});
+
+router.get("/portal", async (req, res) => {
+  const userId = (req as any).userId as number;
+  const { search, uf, municipio, modalidade, dataInicial, dataFinal, page = "1", limit = "20" } = req.query as Record<string, string>;
+
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+  const offset = (pageNum - 1) * limitNum;
+
+  const conditions: ReturnType<typeof eq>[] = [eq(monitorAlertsTable.userId, userId) as any];
+  if (uf) conditions.push(eq(monitorAlertsTable.uf, uf) as any);
+  if (modalidade) conditions.push(eq(monitorAlertsTable.modalidade, modalidade) as any);
+  if (municipio) conditions.push(ilike(monitorAlertsTable.municipio, `%${municipio}%`) as any);
+  if (search) {
+    conditions.push(
+      sql`(${monitorAlertsTable.titulo} ilike ${'%' + search + '%'} OR ${monitorAlertsTable.orgao} ilike ${'%' + search + '%'})` as any
+    );
+  }
+  if (dataInicial) conditions.push(gte(monitorAlertsTable.dataPublicacao, dataInicial) as any);
+  if (dataFinal) conditions.push(lte(monitorAlertsTable.dataPublicacao, dataFinal) as any);
+
+  const where = and(...conditions);
+
+  const [totalRow] = await db.select({ total: count() }).from(monitorAlertsTable).where(where);
+  const total = Number(totalRow?.total ?? 0);
+
+  const alerts = await db
+    .select()
+    .from(monitorAlertsTable)
+    .where(where)
+    .orderBy(desc(monitorAlertsTable.dataPublicacao), desc(monitorAlertsTable.createdAt))
+    .limit(limitNum)
+    .offset(offset);
+
+  const statsToday = await db.select({ total: count() }).from(monitorAlertsTable).where(
+    and(
+      eq(monitorAlertsTable.userId, userId),
+      gte(monitorAlertsTable.createdAt, new Date(new Date().setHours(0, 0, 0, 0))),
+    )
+  );
+  const todayCount = Number(statsToday[0]?.total ?? 0);
+
+  res.json({
+    data: alerts,
+    total,
+    page: pageNum,
+    totalPages: Math.max(1, Math.ceil(total / limitNum)),
+    todayCount,
+  });
+});
+
+router.get("/portal/stats", async (req, res) => {
+  const userId = (req as any).userId as number;
+  const allAlerts = await db.select({
+    uf: monitorAlertsTable.uf,
+    municipio: monitorAlertsTable.municipio,
+    modalidade: monitorAlertsTable.modalidade,
+  }).from(monitorAlertsTable).where(eq(monitorAlertsTable.userId, userId));
+
+  const byUf: Record<string, number> = {};
+  const byModalidade: Record<string, number> = {};
+  for (const a of allAlerts) {
+    if (a.uf) byUf[a.uf] = (byUf[a.uf] ?? 0) + 1;
+    if (a.modalidade) byModalidade[a.modalidade] = (byModalidade[a.modalidade] ?? 0) + 1;
+  }
+
+  res.json({ total: allAlerts.length, byUf, byModalidade });
 });
 
 router.get("/alerts", async (req, res) => {
