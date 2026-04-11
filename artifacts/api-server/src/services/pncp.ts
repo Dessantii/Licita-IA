@@ -14,6 +14,8 @@ export const MODALIDADES: Record<number, string> = {
   13: "Leilão Presencial",
 };
 
+const ALL_MODALIDADE_IDS = [6, 7, 4, 5, 8, 9, 1, 3, 2, 10, 11, 12, 13];
+
 export interface PncpContratacao {
   sequencialCompra: number;
   anoCompra: number;
@@ -40,6 +42,64 @@ function formatDate(date: Date): string {
   return `${y}${m}${d}`;
 }
 
+const PNCP_BASE = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao";
+
+async function buscarPorModalidade(params: {
+  dataInicial: Date;
+  dataFinal: Date;
+  uf?: string;
+  municipio?: string;
+  modalidadeId: number;
+  pagina?: number;
+  tamanhoPagina?: number;
+}): Promise<PncpResponse> {
+  const query = new URLSearchParams({
+    dataInicial: formatDate(params.dataInicial),
+    dataFinal: formatDate(params.dataFinal),
+    pagina: String(params.pagina ?? 1),
+    tamanhoPagina: String(Math.min(50, Math.max(10, params.tamanhoPagina ?? 50))),
+    codigoModalidadeContratacao: String(params.modalidadeId),
+  });
+
+  if (params.uf) query.set("uf", params.uf);
+
+  const url = `${PNCP_BASE}?${query}`;
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "LicitaIA/1.0 (sistema de monitoramento de licitacoes)",
+      "Accept": "application/json",
+    },
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!res.ok) {
+    if (res.status === 404 || res.status === 204 || res.status === 204) {
+      return { data: [], totalRegistros: 0, totalPaginas: 0 };
+    }
+    const body = await res.text().catch(() => "");
+    throw new Error(`PNCP API error ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const raw = await res.text();
+  if (!raw || !raw.trim()) return { data: [], totalRegistros: 0, totalPaginas: 0 };
+
+  let json: any;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return { data: [], totalRegistros: 0, totalPaginas: 0 };
+  }
+
+  if (Array.isArray(json)) {
+    return { data: json as PncpContratacao[], totalRegistros: json.length, totalPaginas: 1 };
+  }
+  if (json.data && Array.isArray(json.data)) {
+    return json as PncpResponse;
+  }
+  return { data: [], totalRegistros: 0, totalPaginas: 0 };
+}
+
 export async function buscarPublicacoesPncp(params: {
   dataInicial: Date;
   dataFinal: Date;
@@ -49,33 +109,23 @@ export async function buscarPublicacoesPncp(params: {
   pagina?: number;
   tamanhoPagina?: number;
 }): Promise<PncpResponse> {
-  const query = new URLSearchParams({
-    dataInicial: formatDate(params.dataInicial),
-    dataFinal: formatDate(params.dataFinal),
-    pagina: String(params.pagina ?? 1),
-    tamanhoPagina: String(params.tamanhoPagina ?? 100),
-  });
-
-  if (params.uf) query.set("uf", params.uf);
-  if (params.modalidadeId) query.set("modalidadeId", String(params.modalidadeId));
-  if (params.municipio) query.set("municipio", params.municipio);
-
-  const url = `https://pncp.gov.br/api/pncp/v1/contratacoes/publicacoes?${query}`;
-
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "LicitaIA/1.0 (sistema de monitoramento de licitacoes)",
-      "Accept": "application/json",
-    },
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!res.ok) {
-    if (res.status === 404) return { data: [], totalRegistros: 0, totalPaginas: 0 };
-    throw new Error(`PNCP API error ${res.status}`);
+  if (params.modalidadeId) {
+    return buscarPorModalidade({ ...params, modalidadeId: params.modalidadeId });
   }
 
-  return res.json() as Promise<PncpResponse>;
+  const ids = ALL_MODALIDADE_IDS;
+  const allData: PncpContratacao[] = [];
+  let totalRegistros = 0;
+
+  for (const id of ids) {
+    try {
+      const result = await buscarPorModalidade({ ...params, modalidadeId: id, tamanhoPagina: 50 });
+      allData.push(...result.data);
+      totalRegistros += result.totalRegistros;
+    } catch {}
+  }
+
+  return { data: allData, totalRegistros, totalPaginas: 1 };
 }
 
 export function filtragemPorPalavras(

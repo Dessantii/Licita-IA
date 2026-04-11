@@ -215,51 +215,77 @@ router.post("/alerts/read-all", async (req, res) => {
 
 export async function checkMonitor(monitor: typeof monitorsTable.$inferSelect, userId: number): Promise<number> {
   const dataFinal = new Date();
-  const dataInicial = monitor.lastCheckedAt
-    ? new Date(monitor.lastCheckedAt)
-    : new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const result = await buscarPublicacoesPncp({
-    dataInicial,
-    dataFinal,
-    uf: monitor.uf ?? undefined,
-    municipio: monitor.municipio ?? undefined,
-    modalidadeId: monitor.modalidadeId ?? undefined,
-  });
+  const MAX_LOOKBACK_DAYS = 7;
+  const maxDataInicial = new Date(Date.now() - MAX_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  const rawDataInicial = monitor.lastCheckedAt
+    ? new Date(monitor.lastCheckedAt)
+    : maxDataInicial;
+  const dataInicial = rawDataInicial < maxDataInicial ? maxDataInicial : rawDataInicial;
 
   const municipioFiltro = monitor.municipio?.toLowerCase().trim();
-  const filtrados = result.data.filter((c) => {
-    const municipioOk = !municipioFiltro ||
-      c.unidadeOrgao.municipioNome?.toLowerCase().includes(municipioFiltro);
-    return municipioOk && filtragemPorPalavras(c, monitor.palavrasChave ?? []);
-  });
 
-  const existingIds = filtrados.length > 0
-    ? (await db.select({ pncpId: monitorAlertsTable.pncpId })
-        .from(monitorAlertsTable)
-        .where(eq(monitorAlertsTable.monitorId, monitor.id))).map((r) => r.pncpId)
-    : [];
+  const existingIds = new Set(
+    (await db.select({ pncpId: monitorAlertsTable.pncpId })
+      .from(monitorAlertsTable)
+      .where(eq(monitorAlertsTable.monitorId, monitor.id))).map((r) => r.pncpId)
+  );
 
-  const novos = filtrados.filter((c) => {
-    const id = `${c.orgaoEntidade.cnpj}-${c.anoCompra}-${c.sequencialCompra}`;
-    return !existingIds.includes(id);
-  });
+  const allNovos: typeof monitorAlertsTable.$inferInsert[] = [];
 
-  if (novos.length > 0) {
-    await db.insert(monitorAlertsTable).values(
-      novos.map((c) => ({
-        monitorId: monitor.id,
-        userId,
-        titulo: c.objetoCompra,
-        modalidade: MODALIDADES[c.modalidadeId] ?? c.modalidadeNome,
-        orgao: c.orgaoEntidade.razaoSocial,
-        municipio: c.unidadeOrgao.municipioNome,
-        uf: c.unidadeOrgao.ufSigla,
-        dataPublicacao: c.dataPublicacaoPncp,
-        urlPncp: pncpUrl(c.orgaoEntidade.cnpj, c.anoCompra, c.sequencialCompra),
-        pncpId: `${c.orgaoEntidade.cnpj}-${c.anoCompra}-${c.sequencialCompra}`,
-      })),
-    );
+  const MAX_PAGES = municipioFiltro ? 20 : 5;
+
+  let pagina = 1;
+  while (pagina <= MAX_PAGES) {
+    let result;
+    try {
+      result = await buscarPublicacoesPncp({
+        dataInicial,
+        dataFinal,
+        uf: monitor.uf ?? undefined,
+        modalidadeId: monitor.modalidadeId ?? undefined,
+        pagina,
+        tamanhoPagina: 50,
+      });
+    } catch {
+      break;
+    }
+
+    if (!result.data.length) break;
+
+    const filtrados = result.data.filter((c) => {
+      const municipioOk = !municipioFiltro ||
+        c.unidadeOrgao.municipioNome?.toLowerCase().includes(municipioFiltro);
+      return municipioOk && filtragemPorPalavras(c, monitor.palavrasChave ?? []);
+    });
+
+    for (const c of filtrados) {
+      const pncpId = `${c.orgaoEntidade.cnpj}-${c.anoCompra}-${c.sequencialCompra}`;
+      if (!existingIds.has(pncpId)) {
+        existingIds.add(pncpId);
+        allNovos.push({
+          monitorId: monitor.id,
+          userId,
+          titulo: c.objetoCompra,
+          modalidade: MODALIDADES[c.modalidadeId] ?? c.modalidadeNome,
+          orgao: c.orgaoEntidade.razaoSocial,
+          municipio: c.unidadeOrgao.municipioNome,
+          uf: c.unidadeOrgao.ufSigla,
+          dataPublicacao: c.dataPublicacaoPncp,
+          urlPncp: pncpUrl(c.orgaoEntidade.cnpj, c.anoCompra, c.sequencialCompra),
+          pncpId,
+        });
+      }
+    }
+
+    if (pagina >= result.totalPaginas) break;
+    pagina++;
+  }
+
+  if (allNovos.length > 0) {
+    for (let i = 0; i < allNovos.length; i += 100) {
+      await db.insert(monitorAlertsTable).values(allNovos.slice(i, i + 100));
+    }
   }
 
   await db
@@ -267,7 +293,7 @@ export async function checkMonitor(monitor: typeof monitorsTable.$inferSelect, u
     .set({ lastCheckedAt: dataFinal })
     .where(eq(monitorsTable.id, monitor.id));
 
-  return novos.length;
+  return allNovos.length;
 }
 
 export default router;
