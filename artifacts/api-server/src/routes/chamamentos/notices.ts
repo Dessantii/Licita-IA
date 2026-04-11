@@ -6,7 +6,6 @@ import {
   callExtractedRequirementsTable,
   callValidationItemsTable,
   callSubmittedDocumentsTable,
-  callExtractedRequirementsTable as reqTable,
   companiesTable,
 } from "@workspace/db";
 import { eq, and, isNotNull } from "drizzle-orm";
@@ -266,6 +265,110 @@ router.patch("/validation/:id", async (req, res) => {
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
   });
+});
+
+router.get("/:id/generate-kit", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const [notice] = await db.select({ id: callNoticesTable.id, title: callNoticesTable.title })
+    .from(callNoticesTable).where(eq(callNoticesTable.id, id));
+  if (!notice) { res.status(404).json({ error: "Chamamento não encontrado" }); return; }
+
+  // Get all ok validation items that have a submitted document
+  const okItems = await db.select({
+    validationId: callValidationItemsTable.id,
+    submittedDocumentId: callValidationItemsTable.submittedDocumentId,
+    requirementId: callValidationItemsTable.requirementId,
+  })
+    .from(callValidationItemsTable)
+    .where(and(
+      eq(callValidationItemsTable.callNoticeId, id),
+      eq(callValidationItemsTable.status, "ok"),
+      isNotNull(callValidationItemsTable.submittedDocumentId),
+    ));
+
+  if (okItems.length === 0) {
+    res.status(400).json({ error: "Nenhum documento conforme encontrado para gerar o kit." });
+    return;
+  }
+
+  // Get submitted documents → notice files
+  const submittedDocIds = okItems.map(i => i.submittedDocumentId!);
+  const submittedDocs = await db.select({
+    id: callSubmittedDocumentsTable.id,
+    fileId: callSubmittedDocumentsTable.fileId,
+  }).from(callSubmittedDocumentsTable)
+    .where(eq(callSubmittedDocumentsTable.callNoticeId, id));
+
+  const fileIds = submittedDocs
+    .filter(d => submittedDocIds.includes(d.id))
+    .map(d => d.fileId);
+
+  if (fileIds.length === 0) {
+    res.status(400).json({ error: "Arquivos não encontrados para os itens conformes." });
+    return;
+  }
+
+  const noticeFiles = await db.select({
+    id: noticeFilesTable.id,
+    name: noticeFilesTable.name,
+    path: noticeFilesTable.path,
+  }).from(noticeFilesTable).where(eq(noticeFilesTable.callNoticeId, id));
+
+  const kitFiles = noticeFiles.filter(f => fileIds.includes(f.id));
+
+  // Get requirement types for folder organization
+  const requirements = await db.select({
+    id: callExtractedRequirementsTable.id,
+    requirementType: callExtractedRequirementsTable.requirementType,
+    title: callExtractedRequirementsTable.title,
+  }).from(callExtractedRequirementsTable).where(eq(callExtractedRequirementsTable.callNoticeId, id));
+
+  const reqMap = new Map(requirements.map(r => [r.id, r]));
+
+  // Build file → folder mapping
+  type FileEntry = { filePath: string; archiveName: string };
+  const entries: FileEntry[] = [];
+
+  for (const okItem of okItems) {
+    const doc = submittedDocs.find(d => d.id === okItem.submittedDocumentId);
+    if (!doc) continue;
+    const nf = kitFiles.find(f => f.id === doc.fileId);
+    if (!nf) continue;
+
+    const fullPath = path.join(UPLOADS_DIR, nf.path);
+    if (!fs.existsSync(fullPath)) continue;
+
+    const req = reqMap.get(okItem.requirementId);
+    const folder = req?.requirementType
+      ? req.requirementType.replace(/_/g, "-")
+      : "documentos";
+
+    // Clean original filename, avoid duplicates with index
+    const ext = path.extname(nf.name) || ".pdf";
+    const baseName = path.basename(nf.name, ext).replace(/[^a-zA-Z0-9_\-. ]/g, "_").slice(0, 60);
+    entries.push({ filePath: fullPath, archiveName: `${folder}/${baseName}${ext}` });
+  }
+
+  if (entries.length === 0) {
+    res.status(400).json({ error: "Nenhum arquivo físico encontrado no servidor para gerar o kit." });
+    return;
+  }
+
+  const safeTitle = notice.title.replace(/[^a-zA-Z0-9_\- ]/g, "_").slice(0, 40);
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="kit_${safeTitle}.zip"`);
+
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  archive.on("error", (err) => { if (!res.headersSent) res.status(500).json({ error: err.message }); });
+  archive.pipe(res);
+
+  for (const entry of entries) {
+    archive.file(entry.filePath, { name: entry.archiveName });
+  }
+
+  await archive.finalize();
 });
 
 export default router;

@@ -32,9 +32,12 @@ import {
   ChevronUp,
   AlertTriangle,
   Loader2,
+  Download,
+  Package,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { getToken } from "@/hooks/use-auth";
 
 const STATUS_CONFIG: Record<string, {
   label: string;
@@ -342,6 +345,36 @@ export function ChamamentoChecklistPage() {
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
   const [editingItem, setEditingItem] = useState<CallValidationItem | null>(null);
+  const [isGeneratingKit, setIsGeneratingKit] = useState(false);
+
+  async function handleGenerateKit() {
+    setIsGeneratingKit(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/chamamentos/${id}/generate-kit`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Erro ao gerar kit");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeTitle = notice.title.replace(/[^a-zA-Z0-9_\- ]/g, "_").slice(0, 40);
+      a.href = url;
+      a.download = `kit_${safeTitle}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Kit gerado com sucesso!", description: `${stats.ok} documento(s) incluído(s).` });
+    } catch (e: any) {
+      toast({ title: "Erro ao gerar kit", description: e.message, variant: "destructive" });
+    } finally {
+      setIsGeneratingKit(false);
+    }
+  }
 
   if (isLoading || !notice) {
     return (
@@ -408,6 +441,20 @@ export function ChamamentoChecklistPage() {
             <h1 className="text-3xl font-display font-bold text-slate-900">Checklist de Conferência</h1>
             <p className="text-slate-600 mt-1 font-medium">{notice.title}</p>
           </div>
+          <Button
+            onClick={handleGenerateKit}
+            disabled={isGeneratingKit || stats.ok === 0}
+            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+            title={stats.ok === 0 ? "Nenhum item conforme ainda" : `Baixar ZIP com ${stats.ok} documento(s) conforme(s)`}
+          >
+            {isGeneratingKit ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Package className="w-4 h-4" />
+            )}
+            {isGeneratingKit ? "Gerando..." : `Gerar Kit${stats.ok > 0 ? ` (${stats.ok})` : ""}`}
+            {!isGeneratingKit && stats.ok > 0 && <Download className="w-3.5 h-3.5 opacity-70" />}
+          </Button>
         </div>
       </div>
 
