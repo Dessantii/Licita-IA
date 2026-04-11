@@ -17,6 +17,7 @@ import {
   User,
   X,
   ChevronDown,
+  KeyRound,
 } from "lucide-react";
 
 interface UserData {
@@ -54,6 +55,9 @@ export function UsuáriosPage() {
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "user" as "user" | "admin" });
+  const [resetTarget, setResetTarget] = useState<UserData | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -114,6 +118,25 @@ export function UsuáriosPage() {
       toast({ title: `Função de ${user.name} alterada para ${newRole === "admin" ? "Administrador" : "Usuário"}.` });
     } catch (e: any) {
       toast({ title: "Erro ao alterar função", description: e.message, variant: "destructive" });
+    }
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetTarget) return;
+    setResetting(true);
+    try {
+      await apiFetch(`/api/admin/users/${resetTarget.id}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ password: resetPassword }),
+      });
+      toast({ title: `Senha de ${resetTarget.name} redefinida com sucesso!` });
+      setResetTarget(null);
+      setResetPassword("");
+    } catch (e: any) {
+      toast({ title: "Erro ao redefinir senha", description: e.message, variant: "destructive" });
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -207,6 +230,49 @@ export function UsuáriosPage() {
         </Card>
       )}
 
+      {resetTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-sm p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-amber-600" />
+                <h3 className="font-bold text-slate-900">Redefinir Senha</h3>
+              </div>
+              <button onClick={() => setResetTarget(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">
+              Definir nova senha para <span className="font-semibold text-slate-700">{resetTarget.name}</span>.
+            </p>
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="resetPw">Nova senha</Label>
+                <Input
+                  id="resetPw"
+                  type="password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  required
+                  minLength={6}
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="ghost" onClick={() => setResetTarget(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={resetting} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">
+                  {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                  {resetting ? "Redefinindo..." : "Redefinir"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
       <Card className="overflow-hidden">
         <div className="p-4 border-b flex items-center gap-2">
           <Users className="w-5 h-5 text-slate-500" />
@@ -257,6 +323,15 @@ export function UsuáriosPage() {
                     )}
                     {user.role === "admin" ? "Admin" : "Usuário"}
                   </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => { setResetTarget(user); setResetPassword(""); }}
+                    title="Redefinir senha"
+                    className="text-slate-400 hover:text-amber-600 h-8 w-8"
+                  >
+                    <KeyRound className="w-4 h-4" />
+                  </Button>
                   {user.id !== me?.id && (
                     <Button
                       variant="ghost"

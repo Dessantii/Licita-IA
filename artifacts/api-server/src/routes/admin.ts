@@ -67,6 +67,24 @@ router.patch("/users/:id/role", async (req, res) => {
   res.json({ ...user, createdAt: user.createdAt.toISOString() });
 });
 
+router.patch("/users/:id/password", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const schema = z.object({ password: z.string().min(6, "Senha mínima de 6 caracteres") });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  const [user] = await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, id)).returning({ id: usersTable.id, name: usersTable.name, email: usersTable.email });
+  if (!user) { res.status(404).json({ error: "Usuário não encontrado." }); return; }
+  res.json({ message: "Senha redefinida com sucesso.", user });
+});
+
 router.delete("/users/:id", async (req, res) => {
   const id = parseInt(req.params.id!);
   const selfId = (req as any).userId as number;
