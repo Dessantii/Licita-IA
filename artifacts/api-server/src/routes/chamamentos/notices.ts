@@ -6,10 +6,18 @@ import {
   callExtractedRequirementsTable,
   callValidationItemsTable,
   callSubmittedDocumentsTable,
+  callExtractedRequirementsTable as reqTable,
   companiesTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 import { z } from "zod";
+import path from "path";
+import fs from "fs";
+import { createRequire } from "node:module";
+const requireCJS = createRequire(import.meta.url);
+const archiver = requireCJS("archiver") as typeof import("archiver").default;
+
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
 const router: IRouter = Router();
 
