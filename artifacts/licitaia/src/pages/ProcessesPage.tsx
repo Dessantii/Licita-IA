@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useListProcesses } from "@workspace/api-client-react";
+import { useActiveCompany } from "@/contexts/CompanyContext";
 import { ProcessStatusBadge } from "@/components/processes/ProcessStatusBadge";
 import { CreateProcessDialog } from "@/components/processes/CreateProcessDialog";
 import { Card } from "@/components/ui/card";
@@ -49,6 +50,7 @@ function getDeadlineInfo(deadline: string | null | undefined) {
 
 export function ProcessesPage() {
   const { data: processes, isLoading } = useListProcesses();
+  const { activeCompany } = useActiveCompany();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [alertPrefill, setAlertPrefill] = useState<AlertPrefill | undefined>(undefined);
@@ -65,34 +67,38 @@ export function ProcessesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, activeCompany]);
 
   const filtered = useMemo(() => {
     if (!processes) return [];
+    let result = processes;
+    if (activeCompany) {
+      result = result.filter(p => (p as any).companyId === activeCompany.id);
+    }
     const q = search.toLowerCase().trim();
-    if (!q) return processes;
-    return processes.filter(
+    if (!q) return result;
+    return result.filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
         p.agency.toLowerCase().includes(q) ||
         p.modality.toLowerCase().includes(q) ||
         (p.editalNumber?.toLowerCase().includes(q) ?? false)
     );
-  }, [processes, search]);
+  }, [processes, search, activeCompany]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const stats = useMemo(() => {
-    if (!processes) return null;
-    const total = processes.length;
-    const concluidos = processes.filter((p) => p.status === "concluido").length;
-    const comPendencias = processes.filter((p) => p.status === "pendencias_encontradas").length;
-    const emAndamento = processes.filter(
+    const base = filtered;
+    const total = base.length;
+    const concluidos = base.filter((p) => p.status === "concluido").length;
+    const comPendencias = base.filter((p) => p.status === "pendencias_encontradas").length;
+    const emAndamento = base.filter(
       (p) => !["concluido", "criado"].includes(p.status)
     ).length;
     return { total, concluidos, comPendencias, emAndamento };
-  }, [processes]);
+  }, [filtered]);
 
   return (
     <AppLayout>

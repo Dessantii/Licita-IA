@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useActiveCompany } from "@/contexts/CompanyContext";
 import {
   useListCallNotices,
   useCreateCallNotice,
@@ -232,15 +233,23 @@ type PrazoFilter = "all" | "vencidos" | "urgente" | "proximos" | "sem_prazo";
 
 export function ChamamentosPage() {
   const { data: notices, isLoading } = useListCallNotices();
+  const { activeCompany } = useActiveCompany();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [prazoFilter, setPrazoFilter] = useState<PrazoFilter>("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    setPage(1);
+  }, [activeCompany]);
+
   const filtered = useMemo(() => {
     if (!notices) return [];
     let result = notices;
+    if (activeCompany) {
+      result = result.filter(n => n.companyId === activeCompany.id);
+    }
 
     if (statusFilter === "com_pendencias") {
       result = result.filter(n => n.status === "pendencias_encontradas");
@@ -276,20 +285,25 @@ export function ChamamentosPage() {
     }
 
     return result;
-  }, [notices, search, statusFilter, prazoFilter]);
+  }, [notices, search, statusFilter, prazoFilter, activeCompany]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const companyNotices = useMemo(() => {
+    if (!notices) return [];
+    if (activeCompany) return notices.filter(n => n.companyId === activeCompany.id);
+    return notices;
+  }, [notices, activeCompany]);
+
   const stats = useMemo(() => {
-    if (!notices) return null;
     return {
-      total: notices.length,
-      comPendencias: notices.filter(n => n.status === "pendencias_encontradas").length,
-      prontos: notices.filter(n => n.status === "pronto_para_submissao").length,
-      concluidos: notices.filter(n => n.status === "concluido").length,
+      total: companyNotices.length,
+      comPendencias: companyNotices.filter(n => n.status === "pendencias_encontradas").length,
+      prontos: companyNotices.filter(n => n.status === "pronto_para_submissao").length,
+      concluidos: companyNotices.filter(n => n.status === "concluido").length,
     };
-  }, [notices]);
+  }, [companyNotices]);
 
   return (
     <AppLayout>

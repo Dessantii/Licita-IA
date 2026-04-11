@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { getToken, isAuthenticated } from "@/hooks/use-auth";
 
+import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LoginPage } from "@/pages/LoginPage";
 import { ProcessesPage } from "@/pages/ProcessesPage";
 import { ProcessDetailPage } from "@/pages/ProcessDetailPage";
@@ -96,7 +97,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <CompanyProvider>
+            <Router />
+          </CompanyProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

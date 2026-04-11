@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus, Users, BookOpen, Building2 } from "lucide-react";
+import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus, Users, BookOpen, Building2, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
 import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
+import { useActiveCompany } from "@/contexts/CompanyContext";
 
 interface Alert {
   id: number;
@@ -21,6 +22,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const user = getUser();
   const token = getToken();
+  const { companies, activeCompany, setActiveCompanyId } = useActiveCompany();
+  const [companySwitcherOpen, setCompanySwitcherOpen] = useState(false);
+  const companySwitcherRef = useRef<HTMLDivElement>(null);
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -64,6 +68,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     function handleClick(e: MouseEvent) {
       if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
         setBellOpen(false);
+      }
+      if (companySwitcherRef.current && !companySwitcherRef.current.contains(e.target as Node)) {
+        setCompanySwitcherOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -150,6 +157,69 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <header className="h-16 bg-white border-b flex items-center justify-between px-8 flex-shrink-0">
           <div className="flex-1" />
           <div className="flex items-center gap-4">
+            {/* Company switcher */}
+            {companies.length > 0 && (
+              <div className="relative" ref={companySwitcherRef}>
+                <button
+                  onClick={() => setCompanySwitcherOpen(v => !v)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700 max-w-[200px]"
+                >
+                  <Building2 className="w-4 h-4 text-primary flex-shrink-0" />
+                  <span className="truncate">
+                    {activeCompany
+                      ? (activeCompany.nomeFantasia ?? activeCompany.razaoSocial ?? "Empresa")
+                      : "Selecione uma empresa"}
+                  </span>
+                  <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 flex-shrink-0 transition-transform", companySwitcherOpen && "rotate-180")} />
+                </button>
+
+                {companySwitcherOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="px-4 py-2.5 border-b border-border">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Trocar empresa</p>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {companies.map(company => {
+                        const isActive = company.id === activeCompany?.id;
+                        const name = company.nomeFantasia ?? company.razaoSocial ?? "Sem nome";
+                        const sub = company.nomeFantasia && company.razaoSocial ? company.razaoSocial : company.cnpj;
+                        return (
+                          <button
+                            key={company.id}
+                            onClick={() => {
+                              setActiveCompanyId(company.id);
+                              setCompanySwitcherOpen(false);
+                            }}
+                            className={cn(
+                              "w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 transition-colors",
+                              isActive && "bg-primary/5",
+                            )}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Building2 className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={cn("text-sm font-medium truncate", isActive ? "text-primary" : "text-slate-800")}>{name}</p>
+                              {sub && <p className="text-xs text-slate-400 truncate">{sub}</p>}
+                            </div>
+                            {isActive && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="border-t border-border px-4 py-2">
+                      <Link
+                        href="/companies"
+                        onClick={() => setCompanySwitcherOpen(false)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Gerenciar empresas →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Bell notification */}
             <div className="relative" ref={bellRef}>
               <button
