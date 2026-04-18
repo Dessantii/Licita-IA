@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Folder,
   Lightbulb,
+  Trash2,
 } from "lucide-react";
 
 interface FundingNotice {
@@ -65,6 +66,28 @@ export function FundingNoticesPage() {
   const [ideasNoticeId, setIdeasNoticeId] = useState<number | null>(null);
   const [ideas, setIdeas] = useState<ProjectIdea[]>([]);
   const [loadingIdeas, setLoadingIdeas] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/funding-notices/${deleteId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao excluir");
+      toast({ title: "Edital excluído" });
+      setDeleteId(null);
+      setNotices((prev) => prev.filter((n) => n.id !== deleteId));
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleLoadIdeas(noticeId: number) {
     setIdeasNoticeId(noticeId);
@@ -216,6 +239,14 @@ export function FundingNoticesPage() {
                         <ChevronRight className="w-3 h-3" />
                       </Button>
                     </Link>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
+                      onClick={() => setDeleteId(n.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -223,6 +254,27 @@ export function FundingNoticesPage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir edital?</DialogTitle>
+            <DialogDescription>
+              Esta ação é irreversível. O edital e todos os projetos vinculados serão excluídos permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Ideas dialog */}
       <Dialog open={ideasNoticeId !== null} onOpenChange={(open) => { if (!open) setIdeasNoticeId(null); }}>

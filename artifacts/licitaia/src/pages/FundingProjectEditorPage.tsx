@@ -127,6 +127,14 @@ export function FundingProjectEditorPage() {
         setSections(map);
         setEditContent(editMap);
       }
+
+      // Load stored validation result
+      const vRes = await fetch(`/api/projects/${projectId}/validation`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (vRes.ok) {
+        setValidation(await vRes.json());
+      }
     } catch {
       toast({ title: "Erro ao carregar projeto", variant: "destructive" });
     } finally {

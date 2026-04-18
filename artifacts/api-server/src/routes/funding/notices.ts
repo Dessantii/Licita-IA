@@ -253,6 +253,22 @@ router.get("/", async (_req, res) => {
   );
 });
 
+// DELETE /api/funding-notices/:id — excluir edital
+router.delete("/:id", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const [notice] = await db
+    .select({ id: fundingNoticesTable.id })
+    .from(fundingNoticesTable)
+    .where(eq(fundingNoticesTable.id, id));
+
+  if (!notice) { res.status(404).json({ error: "Edital não encontrado" }); return; }
+
+  await db.delete(fundingNoticesTable).where(eq(fundingNoticesTable.id, id));
+  res.json({ success: true });
+});
+
 // POST /api/funding-notices/:id/project-ideas — sugestões de ideias de projeto para o edital
 router.post("/:id/project-ideas", async (req, res) => {
   const id = parseInt(req.params.id!);

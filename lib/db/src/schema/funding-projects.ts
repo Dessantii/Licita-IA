@@ -6,6 +6,7 @@ import {
   integer,
   pgEnum,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -31,6 +32,8 @@ export const fundingProjectsTable = pgTable(
     ),
     title: text("title").notNull(),
     status: fundingProjectStatusEnum("status").notNull().default("draft"),
+    validationResult: jsonb("validation_result"),
+    validatedAt: timestamp("validated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   },

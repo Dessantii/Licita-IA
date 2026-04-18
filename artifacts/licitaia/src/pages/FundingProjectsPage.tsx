@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -21,6 +22,8 @@ import {
   FileText,
   ChevronRight,
   BookOpen,
+  Trash2,
+  ShieldCheck,
 } from "lucide-react";
 
 interface Project {
@@ -30,6 +33,7 @@ interface Project {
   fundingNoticeId: number | null;
   noticeTitle: string | null;
   noticeSource: string | null;
+  validatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +61,8 @@ export function FundingProjectsPage() {
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [noticeId, setNoticeId] = useState<string>("");
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const preselectedNoticeId = new URLSearchParams(location.split("?")[1] ?? "").get("noticeId");
 
@@ -105,6 +111,26 @@ export function FundingProjectsPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${deleteId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao excluir");
+      toast({ title: "Projeto excluído" });
+      setDeleteId(null);
+      setProjects((prev) => prev.filter((p) => p.id !== deleteId));
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AppLayout>
       <div className="p-6 max-w-5xl mx-auto">
@@ -147,7 +173,15 @@ export function FundingProjectsPage() {
                 <Card key={p.id} className="p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900">{p.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-slate-900">{p.title}</p>
+                        {p.validatedAt && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" />
+                            Validado
+                          </span>
+                        )}
+                      </div>
                       {p.noticeTitle && (
                         <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                           <FileText className="w-3 h-3" />
@@ -169,6 +203,14 @@ export function FundingProjectsPage() {
                           <ChevronRight className="w-3 h-3" />
                         </Button>
                       </Link>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
+                        onClick={() => setDeleteId(p.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -178,6 +220,28 @@ export function FundingProjectsPage() {
         )}
       </div>
 
+      {/* Delete confirmation */}
+      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir projeto?</DialogTitle>
+            <DialogDescription>
+              Esta ação é irreversível. O projeto e todas as suas seções serão excluídos permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>

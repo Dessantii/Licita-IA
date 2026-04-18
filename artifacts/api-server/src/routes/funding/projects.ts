@@ -30,6 +30,7 @@ router.get("/", async (req, res) => {
       title: fundingProjectsTable.title,
       status: fundingProjectsTable.status,
       fundingNoticeId: fundingProjectsTable.fundingNoticeId,
+      validatedAt: fundingProjectsTable.validatedAt,
       createdAt: fundingProjectsTable.createdAt,
       updatedAt: fundingProjectsTable.updatedAt,
       noticeTitle: fundingNoticesTable.title,
@@ -42,6 +43,7 @@ router.get("/", async (req, res) => {
   res.json(
     projects.map((p) => ({
       ...p,
+      validatedAt: p.validatedAt?.toISOString() ?? null,
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
     }))
@@ -425,20 +427,22 @@ Regras:
     return;
   }
 
-  // 6. Salvar resultado no banco (upsert na seção especial "validacao")
-  // Salvo diretamente na tabela de projetos via update de um campo jsonb dedicado
-  await db
-    .update(fundingProjectsTable)
-    .set({ status: project.status }) // força updatedAt via $onUpdate
-    .where(eq(fundingProjectsTable.id, projectId));
-
-  res.json({
+  // 6. Salvar resultado no banco
+  const now = new Date();
+  const resultToSave = {
     projectId,
     projectTitle: project.title,
     sectionsAnalyzed: sections.length,
     ...validation,
-    validatedAt: new Date().toISOString(),
-  });
+    validatedAt: now.toISOString(),
+  };
+
+  await db
+    .update(fundingProjectsTable)
+    .set({ validationResult: resultToSave, validatedAt: now })
+    .where(eq(fundingProjectsTable.id, projectId));
+
+  res.json(resultToSave);
 });
 
 // POST /api/projects/:id/rewrite-section — melhorar texto escrito pelo usuário
@@ -593,11 +597,12 @@ router.get("/:id/export", async (req, res) => {
   // 4. Gerar PDF
   const doc = new PDFDocument({
     size: "A4",
+    bufferPages: true,
     margins: { top: 72, bottom: 72, left: 72, right: 72 },
     info: {
       Title: project.title,
       Author: "LicitaIA",
-      Subject: "Projeto de Captação de Recursos",
+      Subject: "Projeto de Captacao de Recursos",
     },
   });
 
@@ -624,7 +629,7 @@ router.get("/:id/export", async (req, res) => {
   doc.moveDown(0.5)
     .fontSize(13)
     .font("Helvetica")
-    .text("LicitaIA · Elaboração assistida por IA", { width: WIDTH, align: "center" });
+    .text("LicitaIA - Elaboracao assistida por IA", { width: WIDTH, align: "center" });
 
   // Caixa de informações do projeto
   doc.fill(TEXT);
@@ -702,7 +707,7 @@ router.get("/:id/export", async (req, res) => {
     if (section.data!.aiGenerated) {
       const footY = doc.page.height - 60;
       doc.fill(MUTED).font("Helvetica").fontSize(8)
-        .text("✦ Conteúdo gerado com auxílio de IA (LicitaIA) · sujeito à revisão humana", 72, footY, {
+        .text("* Conteudo gerado com auxilio de IA (LicitaIA) - sujeito a revisao humana", 72, footY, {
           width: WIDTH,
           align: "right",
         });
@@ -724,6 +729,44 @@ router.get("/:id/export", async (req, res) => {
   }
 
   doc.end();
+});
+
+// GET /api/projects/:id/validation — retornar resultado de validação salvo
+router.get("/:id/validation", async (req, res) => {
+  const projectId = parseInt(req.params.id!);
+  if (isNaN(projectId)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const userId = (req as any).userId as number | undefined;
+  if (!userId) { res.status(401).json({ error: "Não autenticado" }); return; }
+
+  const [project] = await db
+    .select({ validationResult: fundingProjectsTable.validationResult, userId: fundingProjectsTable.userId })
+    .from(fundingProjectsTable)
+    .where(eq(fundingProjectsTable.id, projectId));
+
+  if (!project) { res.status(404).json({ error: "Projeto não encontrado" }); return; }
+  if (project.userId !== userId) { res.status(403).json({ error: "Sem permissão" }); return; }
+  if (!project.validationResult) { res.status(404).json({ error: "Validação não encontrada" }); return; }
+
+  res.json(project.validationResult);
+});
+
+// DELETE /api/projects/:id — excluir projeto
+router.delete("/:id", async (req, res) => {
+  const projectId = parseInt(req.params.id!);
+  if (isNaN(projectId)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const userId = (req as any).userId as number | undefined;
+  if (!userId) { res.status(401).json({ error: "Não autenticado" }); return; }
+
+  const [project] = await db
+    .select({ id: fundingProjectsTable.id, userId: fundingProjectsTable.userId })
+    .from(fundingProjectsTable)
+    .where(eq(fundingProjectsTable.id, projectId));
+
+  if (!project) { res.status(404).json({ error: "Projeto não encontrado" }); return; }
+  if (project.userId !== userId) { res.status(403).json({ error: "Sem permissão" }); return; }
+
+  await db.delete(fundingProjectsTable).where(eq(fundingProjectsTable.id, projectId));
+  res.json({ success: true });
 });
 
 // GET /api/projects/:id/sections — listar todas as seções de um projeto
