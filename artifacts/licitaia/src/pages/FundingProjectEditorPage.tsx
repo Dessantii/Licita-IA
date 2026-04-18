@@ -18,6 +18,8 @@ import {
   ThumbsDown,
   ListX,
   Download,
+  Wand2,
+  Lightbulb,
 } from "lucide-react";
 
 interface Section {
@@ -43,6 +45,7 @@ interface ValidationResult {
   pontos_fortes: string[];
   pontos_fracos: string[];
   itens_faltantes: string[];
+  recomendacoes: string[];
   resumo: string;
   validatedAt: string;
 }
@@ -96,6 +99,9 @@ export function FundingProjectEditorPage() {
 
   // Export
   const [exporting, setExporting] = useState(false);
+
+  // Rewrite
+  const [rewriting, setRewriting] = useState<string | null>(null);
 
   async function loadProject() {
     try {
@@ -179,6 +185,30 @@ export function FundingProjectEditorPage() {
       toast({ title: e.message, variant: "destructive" });
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleRewrite(sectionType: string) {
+    const currentText = editContent[sectionType] ?? "";
+    if (currentText.trim().length < 10) {
+      toast({ title: "Escreva pelo menos um parágrafo antes de melhorar", variant: "destructive" });
+      return;
+    }
+    setRewriting(sectionType);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/rewrite-section`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ section_type: sectionType, texto: currentText }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao melhorar texto");
+      setEditContent((prev) => ({ ...prev, [sectionType]: data.improved }));
+      toast({ title: "Texto melhorado com sucesso!" });
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setRewriting(null);
     }
   }
 
@@ -329,13 +359,27 @@ export function FundingProjectEditorPage() {
             <Card className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-slate-900 text-lg">{currentSection.label}</h2>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {currentSectionData?.aiGenerated && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex items-center gap-1">
                       <Sparkles className="w-3 h-3" />
                       Gerado por IA
                     </span>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleRewrite(activeSection)}
+                    disabled={rewriting === activeSection || !(editContent[activeSection] ?? "").trim()}
+                    className="gap-1.5"
+                  >
+                    {rewriting === activeSection ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="w-3.5 h-3.5" />
+                    )}
+                    {rewriting === activeSection ? "Melhorando..." : "Melhorar"}
+                  </Button>
                   <Button
                     size="sm"
                     onClick={() => handleGenerate(activeSection)}
@@ -396,7 +440,7 @@ export function FundingProjectEditorPage() {
                   {validation.resumo}
                 </p>
 
-                <div className="grid sm:grid-cols-3 gap-4">
+                <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center gap-1.5 mb-2">
                       <ThumbsUp className="w-4 h-4 text-green-600" />
@@ -405,8 +449,7 @@ export function FundingProjectEditorPage() {
                     <ul className="space-y-1">
                       {validation.pontos_fortes.map((p, i) => (
                         <li key={i} className="text-xs text-slate-600 flex gap-1.5">
-                          <span className="text-green-500 mt-0.5">•</span>
-                          {p}
+                          <span className="text-green-500 mt-0.5">•</span>{p}
                         </li>
                       ))}
                     </ul>
@@ -419,8 +462,7 @@ export function FundingProjectEditorPage() {
                     <ul className="space-y-1">
                       {validation.pontos_fracos.map((p, i) => (
                         <li key={i} className="text-xs text-slate-600 flex gap-1.5">
-                          <span className="text-yellow-500 mt-0.5">•</span>
-                          {p}
+                          <span className="text-yellow-500 mt-0.5">•</span>{p}
                         </li>
                       ))}
                     </ul>
@@ -433,12 +475,26 @@ export function FundingProjectEditorPage() {
                     <ul className="space-y-1">
                       {validation.itens_faltantes.map((p, i) => (
                         <li key={i} className="text-xs text-slate-600 flex gap-1.5">
-                          <span className="text-red-500 mt-0.5">•</span>
-                          {p}
+                          <span className="text-red-500 mt-0.5">•</span>{p}
                         </li>
                       ))}
                     </ul>
                   </div>
+                  {(validation.recomendacoes ?? []).length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Lightbulb className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-semibold text-blue-700">Recomendações</span>
+                      </div>
+                      <ul className="space-y-1">
+                        {validation.recomendacoes.map((p, i) => (
+                          <li key={i} className="text-xs text-slate-600 flex gap-1.5">
+                            <span className="text-blue-500 mt-0.5">•</span>{p}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </Card>
             )}

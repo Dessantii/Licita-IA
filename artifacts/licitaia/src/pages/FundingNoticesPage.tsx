@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -24,6 +25,7 @@ import {
   CircleDollarSign,
   ChevronRight,
   Folder,
+  Lightbulb,
 } from "lucide-react";
 
 interface FundingNotice {
@@ -34,6 +36,12 @@ interface FundingNotice {
   maxValue: string | null;
   aiParsingSuccess: boolean;
   createdAt: string;
+}
+
+interface ProjectIdea {
+  titulo: string;
+  descricao: string;
+  impacto: string;
 }
 
 function formatBRL(value: string | null) {
@@ -54,6 +62,29 @@ export function FundingNoticesPage() {
   const [source, setSource] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+  const [ideasNoticeId, setIdeasNoticeId] = useState<number | null>(null);
+  const [ideas, setIdeas] = useState<ProjectIdea[]>([]);
+  const [loadingIdeas, setLoadingIdeas] = useState(false);
+
+  async function handleLoadIdeas(noticeId: number) {
+    setIdeasNoticeId(noticeId);
+    setIdeas([]);
+    setLoadingIdeas(true);
+    try {
+      const res = await fetch(`/api/funding-notices/${noticeId}/project-ideas`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao gerar ideias");
+      setIdeas(data.ideias ?? []);
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+      setIdeasNoticeId(null);
+    } finally {
+      setLoadingIdeas(false);
+    }
+  }
 
   async function loadNotices() {
     try {
@@ -169,6 +200,15 @@ export function FundingNoticesPage() {
                     >
                       {n.aiParsingSuccess ? "IA extraiu dados" : "Sem dados IA"}
                     </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => handleLoadIdeas(n.id)}
+                    >
+                      <Lightbulb className="w-3 h-3" />
+                      Ideias
+                    </Button>
                     <Link href={`/funding-projects?noticeId=${n.id}`}>
                       <Button size="sm" variant="outline" className="gap-1">
                         <Folder className="w-3 h-3" />
@@ -183,6 +223,39 @@ export function FundingNoticesPage() {
           </div>
         )}
       </div>
+
+      {/* Ideas dialog */}
+      <Dialog open={ideasNoticeId !== null} onOpenChange={(open) => { if (!open) setIdeasNoticeId(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-amber-500" />
+              Sugestões de Ideias de Projeto
+            </DialogTitle>
+            <DialogDescription>
+              Ideias geradas com IA com base no edital selecionado.
+            </DialogDescription>
+          </DialogHeader>
+          {loadingIdeas ? (
+            <div className="py-10 flex flex-col items-center gap-3 text-slate-500">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <span className="text-sm">Gerando ideias com IA...</span>
+            </div>
+          ) : ideas.length === 0 ? (
+            <p className="text-sm text-slate-500 py-6 text-center">Nenhuma ideia disponível.</p>
+          ) : (
+            <div className="space-y-4 mt-1">
+              {ideas.map((idea, i) => (
+                <div key={i} className="rounded-lg border p-4 space-y-1.5">
+                  <p className="font-semibold text-sm text-slate-900">{i + 1}. {idea.titulo}</p>
+                  <p className="text-xs text-slate-600">{idea.descricao}</p>
+                  <p className="text-xs text-emerald-700 font-medium">Impacto: {idea.impacto}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
         <DialogContent className="max-w-md">

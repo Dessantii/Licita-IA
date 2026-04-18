@@ -164,26 +164,34 @@ router.post("/:id/generate-section", async (req, res) => {
     }
   }
 
-  // 3. Montar prompt exato conforme especificado
+  // 3. Montar prompt com system/user separados
   const sectionLabel = SECTION_LABELS[section_type] ?? section_type;
 
-  const prompt = `Você é especialista em elaboração de projetos para captação de recursos.
+  const systemMsg = `Você é um especialista em elaboração de projetos para editais de captação de recursos.
+Seu trabalho é escrever conteúdos que aumentem a chance de aprovação.
+REGRAS CRÍTICAS:
+* Evite frases genéricas
+* Use linguagem clara e objetiva
+* Seja específico e contextualizado
+* Alinhe SEMPRE com os critérios do edital
+* Não repita informações desnecessárias
+* Escreva como se fosse avaliado por um comitê`;
 
-Baseado no edital abaixo:
+  const userMsg = `Gere a seção "${sectionLabel}" para o projeto abaixo.
+
+EDITAL:
 ${editalContext}
 
-E no contexto do projeto:
+PROJETO:
 ${contexto}
 
-Gere o conteúdo para a seção: ${sectionLabel}
+REGRAS:
+* Deve estar alinhado ao edital
+* Deve ser convincente
+* Deve demonstrar impacto
+* Evitar clichês
 
-Regras:
-* seja específico
-* evite texto genérico
-* escreva de forma convincente
-* alinhe com critérios do edital
-
-Retorne apenas o texto final.`;
+Retorne apenas o texto final da seção.`;
 
   // 4. Chamar OpenAI
   let generatedContent: string;
@@ -191,8 +199,13 @@ Retorne apenas o texto final.`;
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
+      max_completion_tokens: 1000,
+      temperature: 0.6,
+      top_p: 1,
+      messages: [
+        { role: "system", content: systemMsg },
+        { role: "user", content: userMsg },
+      ],
     });
 
     generatedContent = completion.choices[0]?.message?.content?.trim() ?? "";
@@ -330,8 +343,13 @@ router.post("/:id/validate", async (req, res) => {
     }
   }
 
-  // 4. Prompt de validação
-  const prompt = `Compare o projeto com o edital.
+  // 4. Prompt com system/user separados
+  const validateSystemMsg = `Você é um avaliador de editais de captação de recursos.
+Seu trabalho é avaliar criticamente projetos.
+Seja direto, objetivo e honesto. Aponte problemas sem suavizar.
+Retorne APENAS JSON.`;
+
+  const validateUserMsg = `Compare o projeto com o edital.
 
 EDITAL:
 ${editalText}
@@ -340,27 +358,26 @@ PROJETO (título: ${project.title}):
 ${projectText}
 
 Retorne:
-* pontos fortes
-* pontos fracos
-* itens faltantes
-* nível de aderência (0 a 100)
-
-Seja objetivo e crítico.
-
-Responda APENAS com JSON válido nesta estrutura exata:
 {
-  "pontos_fortes": ["string", ...],
-  "pontos_fracos": ["string", ...],
-  "itens_faltantes": ["string", ...],
-  "nivel_aderencia": número inteiro de 0 a 100,
-  "resumo": "parágrafo resumindo a avaliação geral"
-}`;
+  "aderencia_score": 0-100,
+  "pontos_fortes": [],
+  "pontos_fracos": [],
+  "itens_faltantes": [],
+  "recomendacoes": [],
+  "resumo": "parágrafo objetivo da avaliação"
+}
+
+Regras:
+* Score baseado em aderência real
+* Não inventar
+* Seja crítico`;
 
   // 5. Chamar OpenAI forçando resposta JSON
   let validation: {
     pontos_fortes: string[];
     pontos_fracos: string[];
     itens_faltantes: string[];
+    recomendacoes: string[];
     nivel_aderencia: number;
     resumo: string;
   };
@@ -368,9 +385,13 @@ Responda APENAS com JSON válido nesta estrutura exata:
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 2048,
+      max_completion_tokens: 800,
+      temperature: 0.3,
       response_format: { type: "json_object" },
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: validateSystemMsg },
+        { role: "user", content: validateUserMsg },
+      ],
     });
 
     const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -384,16 +405,17 @@ Responda APENAS com JSON válido nesta estrutura exata:
       return;
     }
 
-    // Normalizar e validar campos obrigatórios
+    // Normalizar — aceita tanto aderencia_score (novo) quanto nivel_aderencia (legado)
     const toStringArray = (v: unknown): string[] =>
       Array.isArray(v) ? v.map(String) : typeof v === "string" ? [v] : [];
 
-    const nivel = Number(parsed.nivel_aderencia ?? parsed.nivel ?? 0);
+    const nivel = Number(parsed.aderencia_score ?? parsed.nivel_aderencia ?? parsed.nivel ?? 0);
 
     validation = {
       pontos_fortes: toStringArray(parsed.pontos_fortes),
       pontos_fracos: toStringArray(parsed.pontos_fracos),
       itens_faltantes: toStringArray(parsed.itens_faltantes),
+      recomendacoes: toStringArray(parsed.recomendacoes),
       nivel_aderencia: Math.min(100, Math.max(0, Math.round(nivel))),
       resumo: String(parsed.resumo ?? ""),
     };
@@ -417,6 +439,93 @@ Responda APENAS com JSON válido nesta estrutura exata:
     ...validation,
     validatedAt: new Date().toISOString(),
   });
+});
+
+// POST /api/projects/:id/rewrite-section — melhorar texto escrito pelo usuário
+router.post("/:id/rewrite-section", async (req, res) => {
+  const projectId = parseInt(req.params.id!);
+  if (isNaN(projectId)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const schema = z.object({
+    section_type: z.enum(VALID_SECTION_TYPES as [string, ...string[]]),
+    texto: z.string().min(10, "Texto muito curto para reescrita"),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Dados inválidos", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const { section_type, texto } = parsed.data;
+
+  // Buscar projeto e edital
+  const [project] = await db.select().from(fundingProjectsTable).where(eq(fundingProjectsTable.id, projectId));
+  if (!project) { res.status(404).json({ error: "Projeto não encontrado" }); return; }
+
+  let editalContext = "Nenhum edital vinculado.";
+  if (project.fundingNoticeId) {
+    const [notice] = await db.select().from(fundingNoticesTable).where(eq(fundingNoticesTable.id, project.fundingNoticeId));
+    if (notice) {
+      const structured = notice.structuredData as Record<string, unknown> | null;
+      const parts: string[] = [];
+      if (notice.title) parts.push(`Título: ${notice.title}`);
+      if (structured) {
+        for (const [k, v] of Object.entries(structured)) {
+          if (v && typeof v !== "object") parts.push(`${k}: ${String(v)}`);
+          else if (Array.isArray(v)) parts.push(`${k}:\n${(v as string[]).map(i => `- ${i}`).join("\n")}`);
+        }
+      }
+      editalContext = parts.join("\n");
+    }
+  }
+
+  const SECTION_LABELS: Record<string, string> = {
+    problema: "Problema", justificativa: "Justificativa", objetivo_geral: "Objetivo Geral",
+    objetivos_especificos: "Objetivos Específicos", metodologia: "Metodologia",
+    impacto: "Impacto Esperado", cronograma: "Cronograma", orcamento: "Orçamento",
+  };
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_completion_tokens: 800,
+      temperature: 0.5,
+      messages: [
+        {
+          role: "system",
+          content: `Você é um especialista em escrita estratégica para aprovação em editais.
+Seu papel é melhorar textos mantendo o sentido original.
+REGRAS:
+* Não mudar o significado
+* Melhorar clareza e impacto
+* Tornar mais profissional
+* Evitar linguagem genérica
+* Alinhar com critérios de avaliação`,
+        },
+        {
+          role: "user",
+          content: `Melhore o texto abaixo para a seção "${SECTION_LABELS[section_type] ?? section_type}":
+
+TEXTO:
+${texto}
+
+EDITAL:
+${editalContext}
+
+Retorne apenas a versão melhorada.`,
+        },
+      ],
+    });
+
+    const improved = completion.choices[0]?.message?.content?.trim() ?? "";
+    if (!improved) { res.status(502).json({ error: "IA retornou conteúdo vazio" }); return; }
+
+    res.json({ improved, section_type });
+  } catch (err) {
+    req.log.error({ err }, "Falha ao reescrever seção com OpenAI");
+    res.status(502).json({ error: "Falha ao melhorar o texto com IA" });
+  }
 });
 
 // GET /api/projects/:id/export — exportar projeto como PDF

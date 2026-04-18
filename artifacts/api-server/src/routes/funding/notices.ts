@@ -34,17 +34,36 @@ const tempUpload = multer({
   },
 });
 
-const AI_PROMPT = `Analise o edital abaixo e extraia as seguintes informações em JSON:
-
-* objetivo do edital
-* público alvo
-* critérios de avaliação
-* valor máximo
-* prazo final
-* requisitos obrigatórios
-* tipo de projeto esperado
-
+const AI_SYSTEM = `Você é um especialista em análise de editais de captação de recursos (inovação, social, cultural e empresarial).
+Sua tarefa é extrair informações estruturadas de forma precisa e objetiva. NUNCA invente informações. Se algo não estiver explícito, retorne null.
 Retorne APENAS JSON válido.`;
+
+const AI_USER_TEMPLATE = `Analise o edital abaixo e extraia os seguintes campos:
+* objetivo
+* publico_alvo
+* criterios_avaliacao (lista)
+* valor_maximo
+* prazo_final
+* requisitos_obrigatorios (lista)
+* tipo_projeto
+* formato_submissao
+* documentos_exigidos (lista)
+
+EDITAL:
+{texto}
+
+Formato de resposta:
+{
+  "objetivo": "",
+  "publico_alvo": "",
+  "criterios_avaliacao": [],
+  "valor_maximo": "",
+  "prazo_final": "",
+  "requisitos_obrigatorios": [],
+  "tipo_projeto": "",
+  "formato_submissao": "",
+  "documentos_exigidos": []
+}`;
 
 // POST /api/funding-notices/upload
 router.post("/upload", tempUpload.single("file"), async (req, res) => {
@@ -84,12 +103,13 @@ router.post("/upload", tempUpload.single("file"), async (req, res) => {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 2048,
+      max_completion_tokens: 1200,
+      temperature: 0.2,
+      top_p: 1,
+      response_format: { type: "json_object" },
       messages: [
-        {
-          role: "user",
-          content: `${AI_PROMPT}\n\nEDITAL:\n${textSample}`,
-        },
+        { role: "system", content: AI_SYSTEM },
+        { role: "user", content: AI_USER_TEMPLATE.replace("{texto}", textSample) },
       ],
     });
 
@@ -231,6 +251,81 @@ router.get("/", async (_req, res) => {
       createdAt: n.createdAt.toISOString(),
     }))
   );
+});
+
+// POST /api/funding-notices/:id/project-ideas — sugestões de ideias de projeto para o edital
+router.post("/:id/project-ideas", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const [notice] = await db.select().from(fundingNoticesTable).where(eq(fundingNoticesTable.id, id));
+  if (!notice) { res.status(404).json({ error: "Edital não encontrado" }); return; }
+
+  const structured = notice.structuredData as Record<string, unknown> | null;
+  const parts: string[] = [];
+  if (notice.title) parts.push(`Título: ${notice.title}`);
+  if (notice.source) parts.push(`Fonte: ${notice.source}`);
+  if (structured) {
+    for (const [k, v] of Object.entries(structured)) {
+      if (v == null) continue;
+      if (typeof v !== "object") parts.push(`${k}: ${String(v)}`);
+      else if (Array.isArray(v)) parts.push(`${k}:\n${(v as string[]).map(i => `- ${i}`).join("\n")}`);
+    }
+  }
+  if (parts.length <= 2 && notice.rawText) {
+    parts.push(`Conteúdo:\n${notice.rawText.slice(0, 5000)}`);
+  }
+  const editalContext = parts.join("\n");
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_completion_tokens: 900,
+      temperature: 0.7,
+      top_p: 1,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `Você é um especialista em criação de projetos para editais.
+Seu trabalho é propor ideias viáveis e alinhadas ao edital.`,
+        },
+        {
+          role: "user",
+          content: `Com base no edital abaixo, sugira 3 ideias de projetos viáveis.
+
+EDITAL:
+${editalContext}
+
+Formato de resposta:
+{
+  "ideias": [
+    { "titulo": "", "descricao": "", "impacto": "" }
+  ]
+}
+
+Regras:
+* ideias realistas
+* alinhadas ao edital
+* com potencial de aprovação`,
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    let result: { ideias: { titulo: string; descricao: string; impacto: string }[] };
+    try {
+      const parsed = JSON.parse(raw);
+      result = { ideias: Array.isArray(parsed.ideias) ? parsed.ideias : [] };
+    } catch {
+      res.status(502).json({ error: "IA retornou resposta inválida" });
+      return;
+    }
+
+    res.json(result);
+  } catch (err: unknown) {
+    res.status(502).json({ error: "Falha ao gerar ideias com IA" });
+  }
 });
 
 // GET /api/funding-notices/:id
