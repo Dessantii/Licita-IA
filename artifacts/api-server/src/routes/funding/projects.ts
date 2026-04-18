@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { createRequire } from "node:module";
 import { z } from "zod";
 import { db } from "@workspace/db";
 import {
@@ -9,6 +10,10 @@ import {
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
+
+const _require = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const PDFDocument = _require("pdfkit") as typeof import("pdfkit");
 
 const router: IRouter = Router();
 
@@ -412,6 +417,204 @@ Responda APENAS com JSON válido nesta estrutura exata:
     ...validation,
     validatedAt: new Date().toISOString(),
   });
+});
+
+// GET /api/projects/:id/export — exportar projeto como PDF
+router.get("/:id/export", async (req, res) => {
+  const projectId = parseInt(req.params.id!);
+  if (isNaN(projectId)) {
+    res.status(400).json({ error: "ID de projeto inválido" });
+    return;
+  }
+
+  // 1. Buscar projeto
+  const [project] = await db
+    .select()
+    .from(fundingProjectsTable)
+    .where(eq(fundingProjectsTable.id, projectId));
+
+  if (!project) {
+    res.status(404).json({ error: "Projeto não encontrado" });
+    return;
+  }
+
+  // 2. Buscar edital vinculado (se houver)
+  let notice: { title: string | null; source: string | null; deadline: Date | null; maxValue: string | null } | null = null;
+  if (project.fundingNoticeId) {
+    const [n] = await db
+      .select({
+        title: fundingNoticesTable.title,
+        source: fundingNoticesTable.source,
+        deadline: fundingNoticesTable.deadline,
+        maxValue: fundingNoticesTable.maxValue,
+      })
+      .from(fundingNoticesTable)
+      .where(eq(fundingNoticesTable.id, project.fundingNoticeId));
+    notice = n ?? null;
+  }
+
+  // 3. Buscar seções na ordem canônica
+  const SECTION_ORDER = [
+    "problema", "justificativa", "objetivo_geral", "objetivos_especificos",
+    "metodologia", "impacto", "cronograma", "orcamento",
+  ] as const;
+
+  const SECTION_LABELS: Record<string, string> = {
+    problema: "1. Problema",
+    justificativa: "2. Justificativa",
+    objetivo_geral: "3. Objetivo Geral",
+    objetivos_especificos: "4. Objetivos Específicos",
+    metodologia: "5. Metodologia",
+    impacto: "6. Impacto Esperado",
+    cronograma: "7. Cronograma",
+    orcamento: "8. Orçamento",
+  };
+
+  const allSections = await db
+    .select()
+    .from(projectSectionsTable)
+    .where(eq(projectSectionsTable.projectId, projectId));
+
+  const sectionMap = new Map(allSections.map((s) => [s.type, s]));
+
+  const sections = SECTION_ORDER
+    .map((type) => ({ type, label: SECTION_LABELS[type]!, data: sectionMap.get(type) ?? null }))
+    .filter((s) => s.data?.content);
+
+  // 4. Gerar PDF
+  const doc = new PDFDocument({
+    size: "A4",
+    margins: { top: 72, bottom: 72, left: 72, right: 72 },
+    info: {
+      Title: project.title,
+      Author: "LicitaIA",
+      Subject: "Projeto de Captação de Recursos",
+    },
+  });
+
+  // Headers de download
+  const safeTitle = project.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim().replace(/\s+/g, "_").slice(0, 60);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="projeto_${safeTitle}.pdf"`);
+
+  doc.pipe(res);
+
+  const PRIMARY = "#1e40af";
+  const TEXT = "#1e293b";
+  const MUTED = "#64748b";
+  const WIDTH = doc.page.width - 144;
+
+  // --- Capa ---
+  doc.rect(0, 0, doc.page.width, 200).fill(PRIMARY);
+
+  doc.fill("#ffffff")
+    .font("Helvetica-Bold")
+    .fontSize(22)
+    .text("PROJETO DE CAPTAÇÃO DE RECURSOS", 72, 72, { width: WIDTH, align: "center" });
+
+  doc.moveDown(0.5)
+    .fontSize(13)
+    .font("Helvetica")
+    .text("LicitaIA · Elaboração assistida por IA", { width: WIDTH, align: "center" });
+
+  // Caixa de informações do projeto
+  doc.fill(TEXT);
+  const infoY = 230;
+  doc.rect(72, infoY, WIDTH, 1).fill("#e2e8f0");
+  doc.moveDown(1);
+
+  doc.fill(TEXT).font("Helvetica-Bold").fontSize(18).text(project.title, 72, infoY + 16, { width: WIDTH });
+
+  let metaY = infoY + 50;
+  if (notice?.source) {
+    doc.fill(MUTED).font("Helvetica").fontSize(10).text(`Fonte: ${notice.source}`, 72, metaY);
+    metaY += 16;
+  }
+  if (notice?.deadline) {
+    const dl = new Date(notice.deadline);
+    const fmt = dl.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+    doc.fill(MUTED).fontSize(10).text(`Prazo: ${fmt}`, 72, metaY);
+    metaY += 16;
+  }
+  if (notice?.maxValue) {
+    const val = parseFloat(notice.maxValue);
+    if (!isNaN(val)) {
+      doc.fill(MUTED).fontSize(10).text(
+        `Valor máximo: ${val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+        72, metaY
+      );
+      metaY += 16;
+    }
+  }
+
+  const exportDate = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  doc.fill(MUTED).fontSize(10).text(`Gerado em: ${exportDate}`, 72, metaY);
+
+  doc.rect(72, metaY + 20, WIDTH, 1).fill("#e2e8f0");
+
+  if (sections.length === 0) {
+    doc.addPage();
+    doc.fill(MUTED).font("Helvetica").fontSize(12)
+      .text("Nenhuma seção foi preenchida ainda.", { align: "center" });
+  }
+
+  // --- Seções ---
+  for (const section of sections) {
+    doc.addPage();
+
+    // Cabeçalho da seção
+    doc.rect(72, 72, WIDTH, 36).fill(PRIMARY);
+    doc.fill("#ffffff")
+      .font("Helvetica-Bold")
+      .fontSize(14)
+      .text(section.label.toUpperCase(), 84, 82, { width: WIDTH - 24 });
+
+    doc.moveDown(2);
+
+    // Conteúdo
+    const content = section.data!.content!;
+    const paragraphs = content.split(/\n\n+/);
+
+    doc.fill(TEXT).font("Helvetica").fontSize(11);
+    let first = true;
+    for (const para of paragraphs) {
+      if (!first) doc.moveDown(0.8);
+      first = false;
+      const trimmed = para.trim();
+      if (!trimmed) continue;
+      doc.text(trimmed, 72, undefined, {
+        width: WIDTH,
+        align: "justify",
+        lineGap: 4,
+      });
+    }
+
+    // Rodapé com badge IA
+    if (section.data!.aiGenerated) {
+      const footY = doc.page.height - 60;
+      doc.fill(MUTED).font("Helvetica").fontSize(8)
+        .text("✦ Conteúdo gerado com auxílio de IA (LicitaIA) · sujeito à revisão humana", 72, footY, {
+          width: WIDTH,
+          align: "right",
+        });
+    }
+  }
+
+  // --- Numeração de páginas ---
+  const pageCount = (doc as any).bufferedPageRange?.()?.count ?? 0;
+  if (pageCount > 0) {
+    for (let i = 0; i < pageCount; i++) {
+      (doc as any).switchToPage?.(i);
+      if (i === 0) continue; // pula capa
+      doc.fill(MUTED).font("Helvetica").fontSize(8)
+        .text(`Página ${i} de ${pageCount - 1}`, 72, doc.page.height - 40, {
+          width: WIDTH,
+          align: "center",
+        });
+    }
+  }
+
+  doc.end();
 });
 
 // GET /api/projects/:id/sections — listar todas as seções de um projeto

@@ -17,6 +17,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   ListX,
+  Download,
 } from "lucide-react";
 
 interface Section {
@@ -93,6 +94,9 @@ export function FundingProjectEditorPage() {
   const [validating, setValidating] = useState(false);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
 
+  // Export
+  const [exporting, setExporting] = useState(false);
+
   async function loadProject() {
     try {
       const [pRes, sRes] = await Promise.all([
@@ -147,6 +151,34 @@ export function FundingProjectEditorPage() {
       toast({ title: e.message, variant: "destructive" });
     } finally {
       setGenerating(null);
+    }
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Erro ao exportar PDF");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      a.download = match?.[1] ?? "projeto.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -213,6 +245,19 @@ export function FundingProjectEditorPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500">{filledCount}/{SECTION_TYPES.length} seções</span>
+            <Button
+              onClick={handleExport}
+              disabled={exporting || filledCount === 0}
+              variant="outline"
+              className="gap-2"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {exporting ? "Gerando PDF..." : "Exportar PDF"}
+            </Button>
             <Button
               onClick={handleValidate}
               disabled={validating || filledCount === 0}
