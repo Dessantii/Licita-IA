@@ -32,6 +32,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const bellRef = useRef<HTMLDivElement>(null);
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [notifKeywords, setNotifKeywords] = useState<string[]>([]);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const initials = user?.name
     ? user.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
@@ -95,6 +97,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       }
       if (companySwitcherRef.current && !companySwitcherRef.current.contains(e.target as Node)) {
         setCompanySwitcherOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -381,8 +386,35 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               })()}
             </div>
 
-            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm">
-              {initials}
+            <div className="relative" ref={userMenuRef}>
+              <button
+                onClick={() => setUserMenuOpen((v) => !v)}
+                className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm hover:bg-primary/20 transition-colors"
+                title="Menu do usuário"
+              >
+                {initials}
+              </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{user?.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                  </div>
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4 text-slate-400" />
+                      Sair
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
