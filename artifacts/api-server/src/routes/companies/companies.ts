@@ -32,17 +32,57 @@ const tempUpload = multer({
 
 const router: IRouter = Router();
 
+const certidaoSchema = z.object({
+  validade: z.string().nullish(),
+  url: z.string().nullish(),
+}).nullish();
+
+const certidoesSchema = z.object({
+  federal: certidaoSchema,
+  estadual: certidaoSchema,
+  municipal: certidaoSchema,
+  fgts: certidaoSchema,
+  trabalhista: certidaoSchema,
+  falencia: certidaoSchema,
+}).nullish();
+
 const createCompanySchema = z.object({
   razaoSocial: z.string().min(1),
   nomeFantasia: z.string().nullish(),
   cnpj: z.string().min(1),
+  naturezaJuridica: z.string().nullish(),
+  porte: z.string().nullish(),
+  dataAbertura: z.string().nullish(),
+  situacaoCadastralReceita: z.string().nullish(),
+  cep: z.string().nullish(),
+  logradouro: z.string().nullish(),
+  numero: z.string().nullish(),
+  complemento: z.string().nullish(),
+  bairro: z.string().nullish(),
+  municipio: z.string().nullish(),
+  uf: z.string().nullish(),
   email: z.string().nullish(),
   telefone: z.string().nullish(),
+  site: z.string().nullish(),
   endereco: z.string().nullish(),
+  nomeResponsavel: z.string().nullish(),
+  cpfResponsavel: z.string().nullish(),
+  emailResponsavel: z.string().nullish(),
   inscricaoEstadual: z.string().nullish(),
   inscricaoMunicipal: z.string().nullish(),
   representanteLegal: z.string().nullish(),
   observacoes: z.string().nullish(),
+  nivelSicaf: z.number().int().nullish(),
+  dataValidadeSicaf: z.string().nullish(),
+  certidoes: certidoesSchema,
+  certificadoValidade: z.string().nullish(),
+  certificadoTipo: z.string().nullish(),
+  usarCertificadoParaSubmissao: z.boolean().nullish(),
+  capitalSocial: z.string().nullish(),
+  balancoPatrimonialAno: z.number().int().nullish(),
+  indicesLiquidezCorrente: z.string().nullish(),
+  indicesLiquidezGeral: z.string().nullish(),
+  indicesSolvenciaGeral: z.string().nullish(),
 });
 
 const updateCompanySchema = createCompanySchema.partial();
@@ -190,6 +230,80 @@ function getDocumentStatus(docs: typeof companyDocumentsTable.$inferSelect[]) {
   if (hasExpiringSoon) return "vencendo";
   return "regular";
 }
+
+router.get("/cnpj-lookup/:cnpj", async (req, res) => {
+  const cnpj = req.params.cnpj!.replace(/\D/g, "");
+  if (cnpj.length !== 14) {
+    res.status(400).json({ error: "CNPJ inválido" });
+    return;
+  }
+  try {
+    const r = await fetch(`https://publica.cnpj.ws/cnpj/${cnpj}`, {
+      headers: { "Accept": "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) {
+      res.status(r.status).json({ error: "CNPJ não encontrado na Receita Federal" });
+      return;
+    }
+    const data = await r.json() as any;
+    res.json({
+      razaoSocial: data.razao_social ?? null,
+      nomeFantasia: data.nome_fantasia || data.razao_social || null,
+      naturezaJuridica: data.natureza_juridica?.descricao ?? null,
+      porte: data.porte?.descricao ?? null,
+      dataAbertura: data.data_inicio_atividade ?? null,
+      situacaoCadastralReceita: data.descricao_situacao_cadastral ?? null,
+      email: data.email ?? null,
+      telefone: data.ddd_telefone_1 ? `(${data.ddd_telefone_1}) ${data.telefone_1}` : null,
+      cep: data.cep?.replace(/\D/g, "") ?? null,
+      logradouro: data.logradouro ?? null,
+      numero: data.numero ?? null,
+      complemento: data.complemento ?? null,
+      bairro: data.bairro ?? null,
+      municipio: data.municipio ?? null,
+      uf: data.uf ?? null,
+    });
+  } catch (err: any) {
+    res.status(502).json({ error: "Não foi possível consultar a Receita Federal" });
+  }
+});
+
+router.post("/:id/verificar-sicaf", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
+  if (!company) { res.status(404).json({ error: "Empresa não encontrada" }); return; }
+  const cnpj = company.cnpj.replace(/\D/g, "");
+  try {
+    const r = await fetch(
+      `https://compras.dados.gov.br/fornecedores/v1/fornecedores.json?cnpj=${cnpj}`,
+      { signal: AbortSignal.timeout(15000) }
+    );
+    if (!r.ok) {
+      res.status(502).json({ error: "SICAF indisponível no momento" });
+      return;
+    }
+    const data = await r.json() as any;
+    const fornecedor = Array.isArray(data) ? data[0] : data?.fornecedores?.[0];
+    if (!fornecedor) {
+      res.json({ encontrado: false, mensagem: "CNPJ não localizado no SICAF" });
+      return;
+    }
+    const [updated] = await db
+      .update(companiesTable)
+      .set({ ultimaVerificacaoSicaf: new Date() })
+      .where(eq(companiesTable.id, id))
+      .returning();
+    res.json({
+      encontrado: true,
+      fornecedor,
+      ultimaVerificacao: updated?.ultimaVerificacaoSicaf,
+    });
+  } catch {
+    res.status(502).json({ error: "Erro ao consultar SICAF" });
+  }
+});
 
 router.get("/", async (_req, res) => {
   const companies = await db.select().from(companiesTable).orderBy(companiesTable.razaoSocial);

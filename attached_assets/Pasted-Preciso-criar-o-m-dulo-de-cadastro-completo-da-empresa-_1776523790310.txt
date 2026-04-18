@@ -1,0 +1,87 @@
+Preciso criar o módulo de cadastro completo da empresa para 
+habilitar a participação em licitações no Compras.gov.br.
+Este módulo será a "identidade da empresa" dentro da plataforma.
+
+CONTEXTO:
+Minha plataforma já tem cadastro básico de empresa. Preciso 
+expandir para armazenar todos os dados necessários para 
+participar de pregões eletrônicos federais.
+
+O QUE PRECISA SER CRIADO:
+
+1. Modelo de dados expandido para a empresa (tabela/collection):
+   Dados jurídicos:
+   - cnpj, razao_social, nome_fantasia
+   - natureza_juridica, porte (ME/EPP/Médio/Grande)
+   - data_abertura, situacao_cadastral_receita
+   - inscricao_estadual, inscricao_municipal
+
+   Endereço:
+   - cep, logradouro, numero, complemento
+   - bairro, municipio, uf
+
+   Dados de contato:
+   - email_empresa, telefone, site
+   - nome_responsavel, cpf_responsavel, email_responsavel
+
+   SICAF e regularidade:
+   - nivel_sicaf (1 a 5)
+   - data_validade_sicaf
+   - certidoes: {
+       federal: { validade, url },
+       estadual: { validade, url },
+       municipal: { validade, url },
+       fgts: { validade, url },
+       trabalhista: { validade, url },
+       falencia: { validade, url }
+     }
+   - ultima_verificacao_sicaf (timestamp)
+
+   Certificado digital:
+   - certificado_path (caminho seguro do arquivo .pfx)
+   - certificado_validade
+   - certificado_tipo (e-CNPJ A1 ou A3)
+   - certificado_senha_hash (nunca salvar em texto plano)
+   - usar_certificado_para_submissao (boolean)
+
+   Dados financeiros para habilitação:
+   - capital_social
+   - balanco_patrimonial_ano
+   - indices_liquidez_corrente
+   - indices_liquidez_geral
+   - indices_solvencia_geral
+
+2. Tela de cadastro da empresa (UI):
+   - Formulário em abas:
+     Aba 1: "Dados da empresa" — campos jurídicos e endereço
+     Aba 2: "Regularidade" — upload e controle de validade das certidões
+     Aba 3: "Certificado digital" — upload do .pfx, campo de senha, data de validade
+     Aba 4: "Dados financeiros" — índices do balanço para habilitação
+   
+   - Ao preencher o CNPJ, chamar a API da Receita Federal:
+     URL: https://publica.cnpj.ws/cnpj/{cnpj_sem_pontuacao}
+     Preencher automaticamente: razão social, endereço, natureza jurídica, situação
+   
+   - Barra de "completude do cadastro" mostrando % preenchido
+   - Alerta visual quando certidão estiver vencendo em menos de 30 dias
+
+3. API de verificação de SICAF:
+   - Endpoint interno: POST /api/empresa/:id/verificar-sicaf
+   - Fazer scraping ou consulta na API do Compras.gov.br:
+     GET https://compras.dados.gov.br/fornecedores/v1/fornecedores.json?cnpj={cnpj}
+   - Salvar resultado e atualizar o status de habilitação
+
+4. Segurança do certificado digital:
+   - O arquivo .pfx deve ser criptografado antes de salvar (AES-256)
+   - A senha deve ser hasheada (bcrypt) e nunca retornada via API
+   - Criar endpoint seguro: POST /api/empresa/:id/testar-certificado
+     → tenta carregar o certificado com a senha e retorna sucesso/erro
+
+5. Alertas automáticos:
+   - Verificar diariamente quais certidões vencem em até 30 dias
+   - Enviar notificação (email + in-app) para o responsável
+   - Mostrar badge de alerta no painel da empresa
+
+O armazenamento do .pfx deve seguir boas práticas de 
+segurança: nunca expor o arquivo diretamente via URL pública, 
+armazenar fora do diretório público, com permissão restrita.

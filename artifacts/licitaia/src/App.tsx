@@ -89,7 +89,7 @@ function Router() {
         {() => <ProtectedRoute component={CompaniesPage} />}
       </Route>
       <Route path="/companies/:id">
-        {() => <ProtectedRoute component={CompanyDetailPage} />}
+        {() => <ProtectedRoute component={EmpresaDetailPage} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

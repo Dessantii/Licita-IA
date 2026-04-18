@@ -105,7 +105,14 @@ documento_institucional, certidao_regularidade, comprovacao_experiencia, declara
 
 ### Empresas
 - `/companies` → CompaniesPage (list with search, filter by doc status, create new company inline dialog)
-- `/companies/:id` → CompanyDetailPage (3 tabs: Visão Geral with data/alerts, Documentos with upload/list/delete, Processos placeholder)
+- `/companies/:id` → EmpresaDetailPage (6 tabs: Dados | Regularidade | Certificado Digital | Financeiro | Licitações | Chamamentos)
+  - Dados: razão social, nome fantasia, CNPJ + auto-fill via Receita Federal, natureza jurídica, porte, data de abertura, endereço estruturado (cep/logradouro/numero/etc), contato, responsável legal, observações
+  - Regularidade: SICAF (nível 1-5, validade, botão verificar via compras.dados.gov.br), certidões (federal/estadual/municipal/fgts/trabalhista/falência) com validade e status badge (válida/vencendo/vencida)
+  - Certificado Digital: tipo (A1/A3), validade, flag submissão automática
+  - Financeiro: capital social, ano do balanço, índices de liquidez corrente/geral e solvência geral
+  - Licitações/Chamamentos: lista dos processos vinculados com link direto
+  - Completion bar: calcula % de preenchimento de ~19 campos chave
+  - Edit mode: toggle Editar/Salvar em linha
 
 ## API Routes (all under /api)
 
@@ -140,6 +147,8 @@ documento_institucional, certidao_regularidade, comprovacao_experiencia, declara
 ### Empresas
 - GET/POST /companies
 - GET/PATCH/DELETE /companies/:id
+- GET /companies/cnpj-lookup/:cnpj (consulta publica.cnpj.ws — auto-fill do cadastro)
+- POST /companies/:id/verificar-sicaf (consulta compras.dados.gov.br)
 - POST /companies/:id/documents (multipart, with titulo, tipo, dataEmissao, dataValidade body fields)
 - DELETE /companies/:companyId/documents/:docId
 
