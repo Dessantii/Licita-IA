@@ -14,6 +14,64 @@ const router: IRouter = Router();
 
 const VALID_SECTION_TYPES = projectSectionTypeEnum.enumValues;
 
+// GET /api/projects — listar projetos do usuário autenticado
+router.get("/", async (req, res) => {
+  const userId = (req as any).userId as number | undefined;
+  if (!userId) { res.status(401).json({ error: "Não autenticado" }); return; }
+
+  const projects = await db
+    .select({
+      id: fundingProjectsTable.id,
+      title: fundingProjectsTable.title,
+      status: fundingProjectsTable.status,
+      fundingNoticeId: fundingProjectsTable.fundingNoticeId,
+      createdAt: fundingProjectsTable.createdAt,
+      updatedAt: fundingProjectsTable.updatedAt,
+      noticeTitle: fundingNoticesTable.title,
+      noticeSource: fundingNoticesTable.source,
+    })
+    .from(fundingProjectsTable)
+    .leftJoin(fundingNoticesTable, eq(fundingProjectsTable.fundingNoticeId, fundingNoticesTable.id))
+    .where(eq(fundingProjectsTable.userId, userId));
+
+  res.json(
+    projects.map((p) => ({
+      ...p,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    }))
+  );
+});
+
+// POST /api/projects — criar novo projeto
+router.post("/", async (req, res) => {
+  const userId = (req as any).userId as number | undefined;
+  if (!userId) { res.status(401).json({ error: "Não autenticado" }); return; }
+
+  const schema = z.object({
+    title: z.string().min(1, "Título obrigatório"),
+    fundingNoticeId: z.number().int().positive().optional(),
+    description: z.string().optional(),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Dados inválidos", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const [project] = await db
+    .insert(fundingProjectsTable)
+    .values({ userId, ...parsed.data })
+    .returning();
+
+  res.status(201).json({
+    ...project!,
+    createdAt: project!.createdAt.toISOString(),
+    updatedAt: project!.updatedAt.toISOString(),
+  });
+});
+
 const SECTION_LABELS: Record<string, string> = {
   problema: "Problema",
   justificativa: "Justificativa",
