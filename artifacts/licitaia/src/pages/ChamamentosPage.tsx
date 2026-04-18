@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { getToken } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Upload,
+  FileText,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -99,6 +103,8 @@ interface CreateCallNoticeForm {
   companyId: string;
 }
 
+type CreateMode = "manual" | "edital";
+
 function CreateCallNoticeDialog({
   open,
   onClose,
@@ -110,6 +116,15 @@ function CreateCallNoticeDialog({
   const { toast } = useToast();
   const createMutation = useCreateCallNotice();
   const { data: companies } = useListCompanies();
+  const token = getToken();
+
+  const [mode, setMode] = useState<CreateMode>("manual");
+  const [editalFile, setEditalFile] = useState<File | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [extracted, setExtracted] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
   const [form, setForm] = useState<CreateCallNoticeForm>({
     title: "",
     agency: "",
@@ -119,11 +134,74 @@ function CreateCallNoticeDialog({
     companyId: "",
   });
 
+  const resetAll = () => {
+    setMode("manual");
+    setEditalFile(null);
+    setExtracting(false);
+    setExtracted(false);
+    setDragOver(false);
+    setSubmitting(false);
+    setForm({ title: "", agency: "", referenceNumber: "", category: "", deadline: "", companyId: "" });
+  };
+
+  const handleClose = () => {
+    resetAll();
+    onClose();
+  };
+
+  const handleFileSelect = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      toast({ title: "Apenas arquivos PDF são aceitos", variant: "destructive" });
+      return;
+    }
+    setEditalFile(file);
+    setExtracting(true);
+    setExtracted(false);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/chamamentos/ai/extract-meta", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Falha na extração");
+      const data = await res.json();
+      setForm(f => ({
+        ...f,
+        title: data.title ?? f.title,
+        agency: data.agency ?? f.agency,
+        referenceNumber: data.referenceNumber ?? f.referenceNumber,
+        category: data.category ?? f.category,
+        deadline: data.deadline ?? f.deadline,
+      }));
+      setExtracted(true);
+    } catch {
+      toast({ title: "Não foi possível extrair dados do edital", description: "Preencha os campos manualmente", variant: "destructive" });
+      setExtracted(false);
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelect(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim() || !form.agency.trim()) return;
+    setSubmitting(true);
     try {
-      await createMutation.mutateAsync({
+      const notice = await createMutation.mutateAsync({
         data: {
           title: form.title.trim(),
           agency: form.agency.trim(),
@@ -133,96 +211,206 @@ function CreateCallNoticeDialog({
           companyId: form.companyId ? parseInt(form.companyId) : null,
         },
       });
+
+      if (editalFile && notice?.id) {
+        const fd = new FormData();
+        fd.append("file", editalFile);
+        await fetch(`/api/chamamentos/${notice.id}/upload-edital`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: getListCallNoticesQueryKey() });
       toast({ title: "Chamamento criado com sucesso" });
-      onClose();
-      setForm({ title: "", agency: "", referenceNumber: "", category: "", deadline: "", companyId: "" });
+      handleClose();
     } catch {
       toast({ title: "Erro ao criar chamamento", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const isLoading = submitting || createMutation.isPending;
+  const showForm = mode === "manual" || (mode === "edital" && (extracted || (editalFile && !extracting)));
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo Chamamento Público</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Objeto/Título *</label>
-            <input
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Ex: Fomento a projetos culturais - 2026"
-              value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              required
-            />
+
+        <div className="flex gap-2 p-1 bg-slate-100 rounded-lg mb-2">
+          <button
+            type="button"
+            onClick={() => { setMode("manual"); setEditalFile(null); setExtracted(false); }}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all",
+              mode === "manual" ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            Preencher manualmente
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("edital")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all",
+              mode === "edital" ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            <Sparkles className="w-4 h-4" />
+            Importar do Edital
+          </button>
+        </div>
+
+        {mode === "edital" && (
+          <div className="mb-3">
+            {!editalFile ? (
+              <label
+                className={cn(
+                  "flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl p-8 cursor-pointer transition-all",
+                  dragOver ? "border-primary bg-primary/5" : "border-slate-200 hover:border-primary/50 hover:bg-slate-50"
+                )}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+              >
+                <input type="file" accept=".pdf" className="hidden" onChange={handleInputChange} />
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-primary" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-slate-700">Arraste o edital aqui ou clique para selecionar</p>
+                  <p className="text-xs text-slate-400 mt-1">Somente arquivos PDF (máx. 50 MB)</p>
+                </div>
+              </label>
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                {extracting ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">Analisando edital com IA...</p>
+                      <p className="text-xs text-slate-400">{editalFile.name}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0", extracted ? "bg-green-100" : "bg-slate-100")}>
+                      {extracted ? <CheckCircle2 className="w-5 h-5 text-green-600" /> : <FileText className="w-5 h-5 text-slate-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-700 truncate">{editalFile.name}</p>
+                      {extracted && <p className="text-xs text-green-600 font-medium">Dados extraídos com sucesso — revise abaixo</p>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setEditalFile(null); setExtracted(false); }}
+                      className="text-slate-400 hover:text-slate-600 shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Órgão Promotor *</label>
-            <input
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Ex: Secretaria Municipal de Cultura"
-              value={form.agency}
-              onChange={e => setForm(f => ({ ...f, agency: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+        )}
+
+        {(mode === "manual" || showForm) && !extracting && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {extracted && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                Campos pré-preenchidos pela IA — confira e corrija se necessário
+              </div>
+            )}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Número de Referência</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Objeto/Título *</label>
               <input
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Ex: Chamamento 001/2026"
-                value={form.referenceNumber}
-                onChange={e => setForm(f => ({ ...f, referenceNumber: e.target.value }))}
+                placeholder="Ex: Fomento a projetos culturais - 2026"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Prazo de Inscrição</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Órgão Promotor *</label>
               <input
-                type="datetime-local"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                value={form.deadline}
-                onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))}
+                placeholder="Ex: Secretaria Municipal de Cultura"
+                value={form.agency}
+                onChange={e => setForm(f => ({ ...f, agency: e.target.value }))}
+                required
               />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Área Temática</label>
-            <select
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              value={form.category}
-              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-            >
-              <option value="">Selecione...</option>
-              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
-            <select
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-              value={form.companyId}
-              onChange={e => setForm(f => ({ ...f, companyId: e.target.value }))}
-            >
-              <option value="">Sem empresa vinculada</option>
-              {(companies ?? []).map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Número de Referência</label>
+                <input
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Ex: Chamamento 001/2026"
+                  value={form.referenceNumber}
+                  onChange={e => setForm(f => ({ ...f, referenceNumber: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Prazo de Inscrição</label>
+                <input
+                  type="datetime-local"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={form.deadline}
+                  onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Área Temática</label>
+              <select
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+              >
+                <option value="">Selecione...</option>
+                {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
+              <select
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                value={form.companyId}
+                onChange={e => setForm(f => ({ ...f, companyId: e.target.value }))}
+              >
+                <option value="">Sem empresa vinculada</option>
+                {(companies ?? []).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleClose}>Cancelar</Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {editalFile ? "Criar e Anexar Edital" : "Criar Chamamento"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+
+        {mode === "edital" && !editalFile && (
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Criar Chamamento
-            </Button>
+            <Button type="button" variant="outline" onClick={handleClose}>Cancelar</Button>
           </DialogFooter>
-        </form>
+        )}
       </DialogContent>
     </Dialog>
   );

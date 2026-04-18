@@ -26,9 +26,6 @@ export const processesTable = pgTable("processes", {
   deadline: text("deadline"),
   notes: text("notes"),
   status: text("status").notNull().default("criado"),
-  pncpId: text("pncp_id"),
-  protocoloComprasgov: text("protocolo_comprasgov"),
-  rpaStatus: text("rpa_status").default("nao_iniciado"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

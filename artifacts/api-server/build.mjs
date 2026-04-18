@@ -97,8 +97,6 @@ async function buildAll() {
       "zeromq",
       "zeromq-prebuilt",
       "playwright",
-      "bullmq",
-      "ioredis",
       "puppeteer",
       "puppeteer-core",
       "electron",
