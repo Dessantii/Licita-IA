@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus, Users, BookOpen, Building2, ChevronDown, Check } from "lucide-react";
+import { FolderKanban, BarChart3, Settings, LogOut, Bell, Activity, ExternalLink, CheckCheck, FilePlus, Users, BookOpen, Building2, ChevronDown, Check, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
 import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
@@ -25,6 +25,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { companies, activeCompany, setActiveCompanyId } = useActiveCompany();
   const [companySwitcherOpen, setCompanySwitcherOpen] = useState(false);
   const companySwitcherRef = useRef<HTMLDivElement>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -402,6 +404,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                   </div>
                   <div className="py-1">
+                    <Link
+                      href="/profile"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <UserCircle className="w-4 h-4 text-slate-400" />
+                      Meu Perfil
+                    </Link>
                     <button
                       onClick={() => {
                         setUserMenuOpen(false);

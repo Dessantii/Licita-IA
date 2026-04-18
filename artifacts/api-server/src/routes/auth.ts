@@ -140,6 +140,44 @@ router.get("/me", async (req, res) => {
   }
 });
 
+router.patch("/me", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  let userId: number;
+  try {
+    const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as { sub: number };
+    userId = payload.sub;
+  } catch {
+    res.status(401).json({ error: "Token inválido" });
+    return;
+  }
+
+  const schema = z.object({
+    name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Dados inválidos." });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set({ name: parsed.data.name })
+    .where(eq(usersTable.id, userId))
+    .returning();
+
+  if (!updated) {
+    res.status(404).json({ error: "Usuário não encontrado." });
+    return;
+  }
+
+  res.json({ id: updated.id, name: updated.name, email: updated.email, role: updated.role });
+});
+
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {

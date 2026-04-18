@@ -9,6 +9,7 @@ import { getToken, isAuthenticated } from "@/hooks/use-auth";
 
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LoginPage } from "@/pages/LoginPage";
+import { ProfilePage } from "@/pages/ProfilePage";
 import { ProcessesPage } from "@/pages/ProcessesPage";
 import { ProcessDetailPage } from "@/pages/ProcessDetailPage";
 import { ProcessChecklistPage } from "@/pages/ProcessChecklistPage";
@@ -74,6 +75,9 @@ function Router() {
       </Route>
       <Route path="/reports">
         {() => <ProtectedRoute component={RelatóriosPage} />}
+      </Route>
+      <Route path="/profile">
+        {() => <ProtectedRoute component={ProfilePage} />}
       </Route>
       <Route path="/settings">
         {() => <ProtectedRoute component={ConfiguraçõesPage} />}
