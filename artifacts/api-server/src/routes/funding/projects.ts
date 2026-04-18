@@ -597,7 +597,6 @@ router.get("/:id/export", async (req, res) => {
   // 4. Gerar PDF
   const doc = new PDFDocument({
     size: "A4",
-    bufferPages: true,
     margins: { top: 72, bottom: 72, left: 72, right: 72 },
     info: {
       Title: project.title,
@@ -606,7 +605,6 @@ router.get("/:id/export", async (req, res) => {
     },
   });
 
-  // Headers de download
   const safeTitle = project.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim().replace(/\s+/g, "_").slice(0, 60);
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="projeto_${safeTitle}.pdf"`);
@@ -614,118 +612,162 @@ router.get("/:id/export", async (req, res) => {
   doc.pipe(res);
 
   const PRIMARY = "#1e40af";
+  const LIGHT_BG = "#f0f4ff";
   const TEXT = "#1e293b";
   const MUTED = "#64748b";
-  const WIDTH = doc.page.width - 144;
+  const PW = doc.page.width;        // 595.28
+  const PH = doc.page.height;       // 841.89
+  const ML = 56;                    // margin left
+  const MR = 56;                    // margin right
+  const W  = PW - ML - MR;          // usable width
 
-  // --- Capa ---
-  doc.rect(0, 0, doc.page.width, 200).fill(PRIMARY);
+  // ============================================================
+  // CAPA
+  // ============================================================
+  // Faixa azul no topo
+  doc.rect(0, 0, PW, 180).fill(PRIMARY);
 
-  doc.fill("#ffffff")
-    .font("Helvetica-Bold")
-    .fontSize(22)
-    .text("PROJETO DE CAPTAÇÃO DE RECURSOS", 72, 72, { width: WIDTH, align: "center" });
+  // Subtítulo
+  doc.fill("#c7d7ff").font("Helvetica").fontSize(9)
+    .text("CAPTACAO DE RECURSOS", ML, 62, { width: W, align: "center", characterSpacing: 2 });
 
-  doc.moveDown(0.5)
-    .fontSize(13)
-    .font("Helvetica")
-    .text("LicitaIA - Elaboracao assistida por IA", { width: WIDTH, align: "center" });
+  // Título
+  doc.fill("#ffffff").font("Helvetica-Bold").fontSize(20)
+    .text("PROJETO DE CAPTACAO", ML, 80, { width: W, align: "center" });
+  doc.fill("#ffffff").font("Helvetica-Bold").fontSize(20)
+    .text("DE RECURSOS", ML, 104, { width: W, align: "center" });
 
-  // Caixa de informações do projeto
-  doc.fill(TEXT);
-  const infoY = 230;
-  doc.rect(72, infoY, WIDTH, 1).fill("#e2e8f0");
-  doc.moveDown(1);
+  // Badge LicitaIA
+  doc.fill("#3b5fd9").rect(ML + W / 2 - 55, 136, 110, 22).fill("#3b5fd9");
+  doc.fill("#ffffff").font("Helvetica").fontSize(9)
+    .text("LicitaIA", ML, 141, { width: W, align: "center" });
 
-  doc.fill(TEXT).font("Helvetica-Bold").fontSize(18).text(project.title, 72, infoY + 16, { width: WIDTH });
+  // Bloco info do projeto
+  let y = 198;
 
-  let metaY = infoY + 50;
-  if (notice?.source) {
-    doc.fill(MUTED).font("Helvetica").fontSize(10).text(`Fonte: ${notice.source}`, 72, metaY);
-    metaY += 16;
-  }
+  // Título do projeto
+  doc.fill(TEXT).font("Helvetica-Bold").fontSize(17)
+    .text(project.title, ML, y, { width: W });
+  y = doc.y + 10;
+
+  // Linha separadora
+  doc.rect(ML, y, W, 1).fill("#e2e8f0");
+  y += 12;
+
+  // Metadados
+  doc.font("Helvetica").fontSize(10);
+  const metaLine = (label: string, value: string) => {
+    doc.fill(MUTED).text(`${label}  `, ML, y, { continued: true, width: W })
+       .fill(TEXT).text(value, { width: W - 80 });
+    y = doc.y + 4;
+  };
+
+  if (notice?.source)   metaLine("Fonte:", notice.source);
   if (notice?.deadline) {
     const dl = new Date(notice.deadline);
-    const fmt = dl.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-    doc.fill(MUTED).fontSize(10).text(`Prazo: ${fmt}`, 72, metaY);
-    metaY += 16;
+    metaLine("Prazo:", dl.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }));
   }
   if (notice?.maxValue) {
     const val = parseFloat(notice.maxValue);
-    if (!isNaN(val)) {
-      doc.fill(MUTED).fontSize(10).text(
-        `Valor máximo: ${val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
-        72, metaY
-      );
-      metaY += 16;
-    }
+    if (!isNaN(val))
+      metaLine("Valor max.:", val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
   }
 
-  const exportDate = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  doc.fill(MUTED).fontSize(10).text(`Gerado em: ${exportDate}`, 72, metaY);
+  const exportDate = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  metaLine("Gerado em:", exportDate);
 
-  doc.rect(72, metaY + 20, WIDTH, 1).fill("#e2e8f0");
+  y += 8;
+  doc.rect(ML, y, W, 1).fill("#e2e8f0");
+  y += 16;
 
+  // Índice de seções (se houver)
+  if (sections.length > 0) {
+    doc.fill(MUTED).font("Helvetica-Bold").fontSize(9)
+      .text("SECOES DO PROJETO", ML, y, { width: W, characterSpacing: 1 });
+    y = doc.y + 6;
+    sections.forEach((s, idx) => {
+      doc.fill(TEXT).font("Helvetica").fontSize(10)
+        .text(`${idx + 1}.  ${s.label.replace(/^\d+\.\s*/, "")}`, ML + 4, y, { width: W });
+      y = doc.y + 2;
+    });
+  }
+
+  // ============================================================
+  // SEÇÕES — uma por página
+  // ============================================================
+  for (let si = 0; si < sections.length; si++) {
+    const section = sections[si]!;
+    doc.addPage();
+
+    // Número da seção
+    const secNum = `${si + 1}/${sections.length}`;
+
+    // Faixa de cabeçalho
+    doc.rect(0, 0, PW, 52).fill(PRIMARY);
+
+    // Número da página (canto superior direito)
+    doc.fill("#a0b4e8").font("Helvetica").fontSize(8)
+      .text(secNum, PW - MR - 30, 12, { width: 30, align: "right" });
+
+    // Label da seção
+    const sectionName = section.label.replace(/^\d+\.\s*/, "");
+    doc.fill("#c7d7ff").font("Helvetica").fontSize(8)
+      .text(`SECAO ${si + 1}`, ML, 14, { width: W, characterSpacing: 1 });
+    doc.fill("#ffffff").font("Helvetica-Bold").fontSize(15)
+      .text(sectionName.toUpperCase(), ML, 28, { width: W - 40 });
+
+    // Badge IA no cabeçalho
+    if (section.data!.aiGenerated) {
+      doc.fill("#3b5fd9").font("Helvetica").fontSize(7)
+        .text("IA", PW - MR - 20, 32, { width: 20, align: "center" });
+    }
+
+    // Linha horizontal após cabeçalho
+    doc.rect(ML, 58, W, 1).fill(LIGHT_BG);
+
+    // Conteúdo
+    const content = section.data!.content ?? "";
+    // Remover linhas duplas excessivas e normalizar
+    const normalized = content.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    const paragraphs = normalized.split(/\n\n/);
+
+    doc.fill(TEXT).font("Helvetica").fontSize(11);
+    let cy = 72; // cursor inicial após cabeçalho
+
+    for (const para of paragraphs) {
+      const trimmed = para.trim();
+      if (!trimmed) continue;
+
+      // Verificar se é item de lista
+      const isListItem = /^[-*•]\s/.test(trimmed) || /^\d+[.)]\s/.test(trimmed);
+
+      if (isListItem) {
+        // Processar linhas individuais de lista
+        const lines = trimmed.split("\n");
+        for (const line of lines) {
+          const lt = line.trim().replace(/^[-*•]\s*/, "");
+          if (!lt) continue;
+          doc.fill(PRIMARY).font("Helvetica-Bold").fontSize(11)
+            .text("•", ML, cy, { width: 12, lineGap: 2 });
+          doc.fill(TEXT).font("Helvetica").fontSize(11)
+            .text(lt, ML + 14, cy, { width: W - 14, align: "justify", lineGap: 2 });
+          cy = doc.y + 3;
+        }
+      } else {
+        doc.fill(TEXT).font("Helvetica").fontSize(11)
+          .text(trimmed, ML, cy, { width: W, align: "justify", lineGap: 3 });
+        cy = doc.y + 10;
+      }
+    }
+
+    // (sem rodapé absoluto — evita páginas em branco extras)
+  }
+
+  // Página vazia (apenas se não houver seções)
   if (sections.length === 0) {
     doc.addPage();
     doc.fill(MUTED).font("Helvetica").fontSize(12)
-      .text("Nenhuma seção foi preenchida ainda.", { align: "center" });
-  }
-
-  // --- Seções ---
-  for (const section of sections) {
-    doc.addPage();
-
-    // Cabeçalho da seção
-    doc.rect(72, 72, WIDTH, 36).fill(PRIMARY);
-    doc.fill("#ffffff")
-      .font("Helvetica-Bold")
-      .fontSize(14)
-      .text(section.label.toUpperCase(), 84, 82, { width: WIDTH - 24 });
-
-    doc.moveDown(2);
-
-    // Conteúdo
-    const content = section.data!.content!;
-    const paragraphs = content.split(/\n\n+/);
-
-    doc.fill(TEXT).font("Helvetica").fontSize(11);
-    let first = true;
-    for (const para of paragraphs) {
-      if (!first) doc.moveDown(0.8);
-      first = false;
-      const trimmed = para.trim();
-      if (!trimmed) continue;
-      doc.text(trimmed, 72, undefined, {
-        width: WIDTH,
-        align: "justify",
-        lineGap: 4,
-      });
-    }
-
-    // Rodapé com badge IA
-    if (section.data!.aiGenerated) {
-      const footY = doc.page.height - 60;
-      doc.fill(MUTED).font("Helvetica").fontSize(8)
-        .text("* Conteudo gerado com auxilio de IA (LicitaIA) - sujeito a revisao humana", 72, footY, {
-          width: WIDTH,
-          align: "right",
-        });
-    }
-  }
-
-  // --- Numeração de páginas ---
-  const pageCount = (doc as any).bufferedPageRange?.()?.count ?? 0;
-  if (pageCount > 0) {
-    for (let i = 0; i < pageCount; i++) {
-      (doc as any).switchToPage?.(i);
-      if (i === 0) continue; // pula capa
-      doc.fill(MUTED).font("Helvetica").fontSize(8)
-        .text(`Página ${i} de ${pageCount - 1}`, 72, doc.page.height - 40, {
-          width: WIDTH,
-          align: "center",
-        });
-    }
+      .text("Nenhuma secao foi preenchida ainda.", ML, 200, { width: W, align: "center" });
   }
 
   doc.end();
