@@ -1,0 +1,94 @@
+Preciso implementar o fluxo completo de automação que 
+submete a proposta e os documentos de habilitação no 
+portal Compras.gov.br usando o Playwright já configurado.
+
+CONTEXTO:
+A infraestrutura de RPA já está criada (Playwright + fila 
+de jobs). Agora preciso implementar o fluxo específico de 
+submissão de proposta em pregão eletrônico no Compras.gov.br.
+O portal usa o sistema Gov.br para autenticação e o 
+Compras.gov.br/PNCP para o processo em si.
+
+O QUE PRECISA SER CRIADO:
+
+Implementar os seguintes passos como funções do módulo 
+ComprasGovAutomation, em ordem de execução:
+
+PASSO 1 — Login no Gov.br com certificado digital:
+   - Navegar para: https://sso.acesso.gov.br/login
+   - Selecionar opção "Certificado Digital"
+   - Carregar o arquivo .pfx do usuário e informar a senha
+   - Aguardar redirecionamento para o Compras.gov.br
+   - Verificar se o nome/CNPJ do usuário aparece no header (confirmação de login)
+   - Em caso de erro: capturar screenshot, lançar erro "certificado_invalido"
+
+PASSO 2 — Localizar a licitação no portal:
+   - Construir a URL direta da licitação usando os dados do PNCP:
+     https://www.gov.br/compras/pt-br/sistemas/compras/compras/detalhe-do-processo/
+     ?pncpId={numero_controle_pncp}
+   - Navegar para essa URL
+   - Aguardar o carregamento da página (waitForSelector do número da licitação)
+   - Verificar se a licitação está com status "Recebendo propostas"
+   - Se não estiver: lançar erro "licitacao_nao_aberta"
+
+PASSO 3 — Acessar área de envio de proposta:
+   - Clicar no botão "Enviar proposta" ou "Participar"
+   - Aguardar carregamento do formulário de proposta
+   - Tirar screenshot do formulário vazio (para auditoria)
+
+PASSO 4 — Preencher itens da proposta:
+   - Para cada item da proposta (vindos do processo_id):
+     * Localizar o campo de preço unitário pelo número do item
+     * Limpar o campo e preencher com o valor formatado (ex: 1234.56)
+     * Preencher campo de marca/fabricante se existir
+     * Preencher campo de descrição detalhada se existir
+     * Preencher prazo de entrega se existir
+   - Aguardar 500ms entre cada item para evitar erros de formulário
+   - Tirar screenshot após preencher todos os itens
+
+PASSO 5 — Upload dos documentos de habilitação:
+   - Navegar para a aba/seção de "Habilitação" do processo
+   - Para cada documento no processo:
+     * Identificar o campo de upload pelo tipo do documento
+     * Usar page.setInputFiles() para fazer upload do arquivo
+     * Aguardar confirmação de upload (barra de progresso sumir)
+     * Verificar se o nome do arquivo aparece na lista
+   - Tirar screenshot da lista de documentos após todos os uploads
+
+PASSO 6 — Declarações obrigatórias:
+   - Marcar checkbox "Declaro que as informações são verdadeiras"
+   - Marcar checkbox de cumprimento dos requisitos do edital
+   - Marcar, se a empresa for ME/EPP, o checkbox de benefício de ME/EPP
+   - Verificar se todos os campos obrigatórios estão preenchidos
+
+PASSO 7 — Submissão final:
+   - Clicar no botão "Enviar proposta" / "Confirmar"
+   - Aguardar modal de confirmação
+   - Clicar em "Confirmar" no modal
+   - Aguardar redirecionamento ou mensagem de sucesso
+   - Capturar o número do protocolo gerado
+   - Tirar screenshot do comprovante
+
+PASSO 8 — Pós-submissão:
+   - Salvar o número de protocolo no banco: UPDATE processos SET protocolo_comprasgov = ?
+   - Atualizar status do processo para "enviado"
+   - Criar log de auditoria com sucesso e path dos screenshots
+   - Enviar notificação para o usuário: "Proposta enviada com sucesso! Protocolo: XXXXX"
+   - Encerrar o browser
+
+TRATAMENTO DE ERROS POR PASSO:
+   - Criar um try/catch por passo
+   - Em qualquer erro: salvar screenshot, logar o erro com passo e detalhe
+   - Erros recuperáveis: recolocar o job na fila para retentar (máx 3x)
+   - Erros definitivos: marcar o processo como "erro", notificar usuário
+   
+   Erros específicos a tratar:
+   - "Proposta já foi enviada para este processo" → sucesso, não retentar
+   - "Licitação encerrada" → erro definitivo
+   - "Sessão expirada" → repetir login e continuar do passo atual
+   - "Arquivo inválido" → notificar usuário para substituir o documento
+
+IMPORTANTE: O portal do Compras.gov.br pode mudar sua 
+interface. Usar seletores resilientes (data-testid, 
+aria-label, texto do botão) em vez de seletores CSS 
+frágeis. Adicionar fallbacks quando possível.
