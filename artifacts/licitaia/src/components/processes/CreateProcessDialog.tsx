@@ -392,7 +392,7 @@ export function CreateProcessDialog({ prefill, defaultOpen, open: controlledOpen
                   {...register("companyId")}
                 >
                   <option value="">Sem empresa vinculada</option>
-                  {(companies ?? []).map(c => (
+                  {(companies ?? []).map((c: any) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>

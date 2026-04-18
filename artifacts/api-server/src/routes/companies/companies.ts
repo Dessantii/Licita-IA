@@ -153,6 +153,7 @@ Regras:
 function formatCompany(c: typeof companiesTable.$inferSelect) {
   return {
     ...c,
+    name: c.nomeFantasia || c.razaoSocial,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };
