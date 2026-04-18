@@ -1,0 +1,92 @@
+Preciso configurar a infraestrutura de automação que vai 
+controlar o navegador para submeter propostas no portal 
+Compras.gov.br em nome dos clientes.
+
+CONTEXTO:
+Essa é a camada de RPA (Robotic Process Automation) da 
+plataforma. Vai usar Playwright para controlar um navegador 
+e interagir com o portal do governo como se fosse o usuário.
+Nenhuma API oficial de submissão existe — a automação de 
+navegador é a abordagem padrão do mercado (usada por Effecti, 
+Licitei, etc.).
+
+O QUE PRECISA SER CRIADO:
+
+1. Instalação e configuração do Playwright:
+   - Instalar: playwright e @playwright/test (Node) 
+     OU playwright-python (Python)
+   - Configurar para rodar em modo headless (sem interface gráfica)
+   - Usar Chromium como browser padrão
+   - Configurar timeout global de 60 segundos para operações de portal
+
+2. Sistema de filas de tarefas (job queue):
+   - Usar Bull (Node) ou Celery (Python) para gerenciar a fila
+   - Cada tarefa de submissão é um job na fila com:
+     * processo_id (referência ao processo de participação)
+     * empresa_id
+     * tipo: "submeter_proposta" | "verificar_status" | "enviar_habilitacao"
+     * prioridade (1-5)
+     * tentativas_realizadas
+     * max_tentativas: 3
+     * criado_em, iniciado_em, finalizado_em
+   - Worker que processa um job por vez (para evitar conflitos de sessão)
+   - Retry automático em caso de falha com espera de 5 minutos
+
+3. Módulo base de automação (classe/módulo reutilizável):
+   Criar uma classe "ComprasGovAutomation" com os métodos:
+   
+   - async iniciar(empresa_id, certificado_path, certificado_senha)
+     → abre o browser, carrega o certificado digital
+   
+   - async autenticar()
+     → navega para https://www.gov.br/compras
+     → faz login via Gov.br com certificado digital
+     → retorna true/false e salva a sessão
+   
+   - async verificarAutenticacao()
+     → verifica se a sessão ainda está ativa
+     → renova se necessário
+   
+   - async tirarScreenshot(nome_arquivo)
+     → salva print da tela atual para debug e auditoria
+   
+   - async encerrar()
+     → fecha o browser e limpa a sessão
+
+4. Sistema de logs de auditoria:
+   Cada ação do RPA deve ser registrada na tabela "rpa_logs":
+   - job_id, processo_id, empresa_id
+   - acao (ex: "login_iniciado", "proposta_submetida", "erro_upload")
+   - status: "sucesso" | "erro" | "aviso"
+   - detalhe (texto descritivo)
+   - screenshot_path (quando houver)
+   - timestamp
+
+5. Endpoints de monitoramento:
+   GET /api/rpa/jobs → lista jobs na fila (ativos, pendentes, com erro)
+   GET /api/rpa/jobs/:id → status detalhado de um job
+   GET /api/rpa/logs/:processo_id → histórico de ações de um processo
+   POST /api/rpa/jobs/:id/cancelar → cancela um job pendente
+   POST /api/rpa/jobs/:id/retentar → recoloca job com erro na fila
+
+6. Tratamento robusto de erros:
+   - Capturar screenshots automáticos em qualquer erro não tratado
+   - Classificar tipos de erro:
+     * "certificado_invalido" → notificar usuário imediatamente, não retentar
+     * "timeout_portal" → retentar após 5 minutos
+     * "sessao_expirada" → reautenticar e continuar
+     * "portal_fora_do_ar" → retentar após 30 minutos
+     * "proposta_ja_enviada" → marcar como sucesso sem retentar
+   - Enviar notificação (email + in-app) em caso de falha definitiva
+
+7. Variáveis de ambiente necessárias:
+   - PLAYWRIGHT_HEADLESS=true
+   - RPA_SCREENSHOT_DIR=./storage/screenshots
+   - RPA_MAX_CONCURRENT_JOBS=1
+   - RPA_JOB_TIMEOUT_MINUTES=30
+   - REDIS_URL (para a fila de jobs)
+
+Criar um endpoint de teste:
+POST /api/rpa/testar-conexao
+→ abre o browser, navega até compras.gov.br, tira screenshot 
+  e retorna se o portal está acessível.

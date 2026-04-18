@@ -24,6 +24,7 @@ import { CompaniesPage } from "@/pages/CompaniesPage";
 import { CompanyDetailPage } from "@/pages/CompanyDetailPage";
 import { EmpresasPage } from "@/pages/EmpresasPage";
 import { EmpresaDetailPage } from "@/pages/EmpresaDetailPage";
+import { RpaMonitorPage } from "@/pages/RpaMonitorPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -90,6 +91,9 @@ function Router() {
       </Route>
       <Route path="/companies/:id">
         {() => <ProtectedRoute component={EmpresaDetailPage} />}
+      </Route>
+      <Route path="/rpa">
+        {() => <ProtectedRoute component={RpaMonitorPage} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

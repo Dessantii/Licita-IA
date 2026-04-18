@@ -152,6 +152,15 @@ documento_institucional, certidao_regularidade, comprovacao_experiencia, declara
 - POST /companies/:id/documents (multipart, with titulo, tipo, dataEmissao, dataValidade body fields)
 - DELETE /companies/:companyId/documents/:docId
 
+### Automação RPA
+- GET /rpa/jobs → lista todos os jobs (últimos 100)
+- GET /rpa/jobs/:id → job + logs de auditoria
+- POST /rpa/jobs → enfileira novo job (tipo, processoId, empresaId, prioridade)
+- GET /rpa/logs/:processoId → histórico de logs de um processo
+- POST /rpa/jobs/:id/cancelar → cancela job pendente
+- POST /rpa/jobs/:id/retentar → recoloca job erro/cancelado na fila
+- POST /rpa/testar-conexao → abre Chromium, navega até compras.gov.br, retorna status
+
 ## TypeScript & Composite Projects
 
 Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists composite lib packages as project references.

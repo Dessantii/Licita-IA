@@ -11,6 +11,7 @@ import chamamentosFilesRouter from "./chamamentos/files";
 import chamamentosAiRouter from "./chamamentos/ai";
 import companiesRouter from "./companies/companies";
 import companyDocumentsRouter from "./companies/documents";
+import rpaRouter from "./rpa/rpa";
 
 const router: IRouter = Router();
 
@@ -31,5 +32,7 @@ router.use("/chamamentos/ai", chamamentosAiRouter);
 
 router.use("/companies", companiesRouter);
 router.use("/companies", companyDocumentsRouter);
+
+router.use("/rpa", rpaRouter);
 
 export default router;

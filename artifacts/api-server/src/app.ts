@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { startMonitorJob } from "./services/monitor-job";
+import { startRpaWorker } from "./rpa/queue";
 
 const app: Express = express();
 
@@ -33,5 +34,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", router);
 
 startMonitorJob();
+startRpaWorker();
 
 export default app;
