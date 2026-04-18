@@ -16,3 +16,6 @@ export * from "./call-validation-items";
 export * from "./companies";
 export * from "./company-documents";
 export * from "./notification-settings";
+export * from "./funding-notices";
+export * from "./funding-projects";
+export * from "./project-sections";
