@@ -11,6 +11,7 @@ import chamamentosFilesRouter from "./chamamentos/files";
 import chamamentosAiRouter from "./chamamentos/ai";
 import companiesRouter from "./companies/companies";
 import companyDocumentsRouter from "./companies/documents";
+import fundingNoticesRouter from "./funding/notices";
 
 const router: IRouter = Router();
 
@@ -31,6 +32,8 @@ router.use("/chamamentos/ai", chamamentosAiRouter);
 
 router.use("/companies", companiesRouter);
 router.use("/companies", companyDocumentsRouter);
+
+router.use("/funding-notices", fundingNoticesRouter);
 
 
 export default router;
