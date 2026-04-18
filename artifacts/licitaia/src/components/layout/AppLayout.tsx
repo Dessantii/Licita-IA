@@ -34,8 +34,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const bellRef = useRef<HTMLDivElement>(null);
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [notifKeywords, setNotifKeywords] = useState<string[]>([]);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const initials = user?.name
     ? user.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
