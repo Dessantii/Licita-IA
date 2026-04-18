@@ -58,8 +58,18 @@ interface Prefill {
   source?: string;
 }
 
-export function CreateProcessDialog({ prefill, defaultOpen }: { prefill?: Prefill; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen ?? false);
+interface CreateProcessDialogProps {
+  prefill?: Prefill;
+  defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function CreateProcessDialog({ prefill, defaultOpen, open: controlledOpen, onOpenChange }: CreateProcessDialogProps) {
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(defaultOpen ?? false);
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? (onOpenChange ?? (() => {})) : setInternalOpen;
   const [mode, setMode] = useState<Mode>("choose");
   const [importStep, setImportStep] = useState<ImportStep>("upload");
   const [isDragging, setIsDragging] = useState(false);
@@ -181,10 +191,12 @@ export function CreateProcessDialog({ prefill, defaultOpen }: { prefill?: Prefil
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
-        <FolderPlus className="w-4 h-4 mr-2" />
-        Novo Processo
-      </Button>
+      {!isControlled && (
+        <Button onClick={() => setOpen(true)}>
+          <FolderPlus className="w-4 h-4 mr-2" />
+          Novo Processo
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
         <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">

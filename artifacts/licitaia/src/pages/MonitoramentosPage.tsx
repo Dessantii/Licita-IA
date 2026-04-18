@@ -4,12 +4,13 @@ import {
   Plus, Trash2, PlayCircle, PauseCircle, RefreshCw, Activity, MapPin, Tag,
   CheckCircle2, Loader2, AlertTriangle, Search, ExternalLink, Calendar,
   Building2, LayoutGrid, Settings2, ChevronLeft, ChevronRight, X, Filter,
-  Newspaper, TrendingUp, Clock,
+  Newspaper, TrendingUp, Clock, FolderPlus, Bell, BellOff, Save,
 } from "lucide-react";
 import { getToken } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { CreateProcessDialog } from "@/components/processes/CreateProcessDialog";
 
 const UFS = [
   "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
@@ -98,7 +99,10 @@ function ModalidadeBadge({ modalidade }: { modalidade: string | null }) {
   );
 }
 
-function LicitacaoCard({ alert }: { alert: Alert }) {
+function LicitacaoCard({ alert, onCreateProcess }: {
+  alert: Alert;
+  onCreateProcess?: (prefill: { title: string; agency: string; modality: string }) => void;
+}) {
   const date = alert.dataPublicacao
     ? (() => {
         try {
@@ -109,7 +113,7 @@ function LicitacaoCard({ alert }: { alert: Alert }) {
     : null;
 
   return (
-    <div className="bg-white border border-border rounded-xl p-5 hover:border-primary/40 hover:shadow-sm transition-all group">
+    <div className="bg-white border border-border rounded-xl p-5 hover:border-primary/40 hover:shadow-sm transition-all group flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-800 line-clamp-2 leading-snug group-hover:text-primary transition-colors">
@@ -135,7 +139,7 @@ function LicitacaoCard({ alert }: { alert: Alert }) {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mt-3">
+      <div className="flex flex-wrap items-center gap-2">
         <ModalidadeBadge modalidade={alert.modalidade} />
         {(alert.municipio || alert.uf) && (
           <span className="inline-flex items-center gap-1 text-xs text-slate-500">
@@ -150,6 +154,20 @@ function LicitacaoCard({ alert }: { alert: Alert }) {
           </span>
         )}
       </div>
+
+      {onCreateProcess && (
+        <button
+          onClick={() => onCreateProcess({
+            title: alert.titulo,
+            agency: alert.orgao ?? "",
+            modality: alert.modalidade ?? "",
+          })}
+          className="w-full flex items-center justify-center gap-2 mt-1 py-2 px-3 rounded-lg border border-dashed border-primary/30 text-primary text-xs font-medium hover:bg-primary/5 hover:border-primary/50 transition-all"
+        >
+          <FolderPlus className="w-3.5 h-3.5" />
+          Criar processo a partir deste edital
+        </button>
+      )}
     </div>
   );
 }
@@ -163,9 +181,14 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
+interface NotifSettings {
+  enabled: boolean;
+  palavrasChave: string[];
+}
+
 export function MonitoramentosPage() {
   const { headers } = useApi();
-  const [tab, setTab] = useState<"portal" | "monitores">("portal");
+  const [tab, setTab] = useState<"portal" | "monitores" | "notificacoes">("portal");
 
   const [portalData, setPortalData] = useState<PortalResponse | null>(null);
   const [portalLoading, setPortalLoading] = useState(true);
@@ -182,6 +205,15 @@ export function MonitoramentosPage() {
   const [checking, setChecking] = useState<number | null>(null);
   const [checkResult, setCheckResult] = useState<Record<number, number>>({});
   const [form, setForm] = useState({ name: "", uf: "", municipio: "", modalidadeId: "", palavrasChave: "" });
+
+  const [notifSettings, setNotifSettings] = useState<NotifSettings>({ enabled: true, palavrasChave: [] });
+  const [notifLoading, setNotifLoading] = useState(true);
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifSaved, setNotifSaved] = useState(false);
+  const [notifKeywordInput, setNotifKeywordInput] = useState("");
+
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createDialogPrefill, setCreateDialogPrefill] = useState<{ title?: string; agency?: string; modality?: string } | undefined>();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 400);
@@ -215,6 +247,48 @@ export function MonitoramentosPage() {
       setMonitorsLoading(false);
     }).catch(() => setMonitorsLoading(false));
   }, [headers]);
+
+  useEffect(() => {
+    setNotifLoading(true);
+    fetch("/api/monitors/notification-settings", { headers })
+      .then(r => r.json())
+      .then(d => {
+        setNotifSettings({ enabled: d.enabled ?? true, palavrasChave: d.palavrasChave ?? [] });
+        setNotifLoading(false);
+      })
+      .catch(() => setNotifLoading(false));
+  }, [headers]);
+
+  async function handleSaveNotifSettings() {
+    setNotifSaving(true);
+    try {
+      await fetch("/api/monitors/notification-settings", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ enabled: notifSettings.enabled, palavrasChave: notifSettings.palavrasChave }),
+      });
+      setNotifSaved(true);
+      setTimeout(() => setNotifSaved(false), 3000);
+    } finally {
+      setNotifSaving(false);
+    }
+  }
+
+  function addNotifKeyword() {
+    const trimmed = notifKeywordInput.trim();
+    if (!trimmed || notifSettings.palavrasChave.includes(trimmed)) return;
+    setNotifSettings(s => ({ ...s, palavrasChave: [...s.palavrasChave, trimmed] }));
+    setNotifKeywordInput("");
+  }
+
+  function removeNotifKeyword(kw: string) {
+    setNotifSettings(s => ({ ...s, palavrasChave: s.palavrasChave.filter(k => k !== kw) }));
+  }
+
+  function handleCreateProcessFromAlert(prefill: { title: string; agency: string; modality: string }) {
+    setCreateDialogPrefill(prefill);
+    setCreateDialogOpen(true);
+  }
 
   const hasActiveFilters = filters.search || filters.uf || filters.municipio || filters.modalidade || filters.dataInicial || filters.dataFinal;
 
@@ -287,7 +361,7 @@ export function MonitoramentosPage() {
           </div>
         </div>
 
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+        <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
           <button
             onClick={() => setTab("portal")}
             className={cn(
@@ -311,6 +385,16 @@ export function MonitoramentosPage() {
             {monitors.length > 0 && (
               <span className="bg-slate-200 text-slate-600 text-xs font-semibold px-1.5 py-0.5 rounded-full">{monitors.length}</span>
             )}
+          </button>
+          <button
+            onClick={() => setTab("notificacoes")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+              tab === "notificacoes" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700",
+            )}
+          >
+            {notifSettings.enabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+            Notificações
           </button>
         </div>
 
@@ -469,7 +553,7 @@ export function MonitoramentosPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {portalData.data.map(alert => (
-                    <LicitacaoCard key={alert.id} alert={alert} />
+                    <LicitacaoCard key={alert.id} alert={alert} onCreateProcess={handleCreateProcessFromAlert} />
                   ))}
                 </div>
 
@@ -691,6 +775,134 @@ export function MonitoramentosPage() {
             </div>
           </div>
         )}
+
+        {tab === "notificacoes" && (
+          <div className="max-w-2xl space-y-6">
+            {notifLoading ? (
+              <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+            ) : (
+              <>
+                <div className="bg-white border border-border rounded-xl p-6 space-y-5">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Configurações de Notificação</h2>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Configure como você quer receber alertas no sino (🔔) sobre novos editais encontrados pelos monitores.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between py-4 border-t border-b border-border">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">Receber notificações</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Ative para receber alertas de novos editais no sino</p>
+                    </div>
+                    <button
+                      onClick={() => setNotifSettings(s => ({ ...s, enabled: !s.enabled }))}
+                      className={cn(
+                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                        notifSettings.enabled ? "bg-primary" : "bg-slate-200",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                          notifSettings.enabled ? "translate-x-6" : "translate-x-1",
+                        )}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">Filtrar por palavras-chave</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Se configuradas, você só receberá notificações de editais que contenham estas palavras no título ou órgão.
+                        Deixe em branco para receber tudo.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        value={notifKeywordInput}
+                        onChange={e => setNotifKeywordInput(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addNotifKeyword())}
+                        placeholder="Ex: construção, TI, saúde..."
+                        disabled={!notifSettings.enabled}
+                        className="flex-1 border border-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <button
+                        onClick={addNotifKeyword}
+                        disabled={!notifSettings.enabled || !notifKeywordInput.trim()}
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+
+                    {notifSettings.palavrasChave.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {notifSettings.palavrasChave.map(kw => (
+                          <span
+                            key={kw}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium",
+                              notifSettings.enabled
+                                ? "bg-primary/10 text-primary"
+                                : "bg-slate-100 text-slate-400",
+                            )}
+                          >
+                            {kw}
+                            <button
+                              onClick={() => removeNotifKeyword(kw)}
+                              className="hover:text-red-500 transition"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">
+                        Nenhuma palavra-chave configurada — você receberá notificações de todos os editais.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSaveNotifSettings}
+                    disabled={notifSaving}
+                    className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-60"
+                  >
+                    {notifSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Salvar configurações
+                  </button>
+                  {notifSaved && (
+                    <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Salvo com sucesso!
+                    </span>
+                  )}
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-700">
+                    As configurações de notificação afetam apenas o sino (🔔) na barra superior.
+                    O portal continua exibindo todos os editais encontrados pelos monitores,
+                    independente dessas configurações.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        <CreateProcessDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+          prefill={createDialogPrefill}
+        />
       </div>
     </AppLayout>
   );

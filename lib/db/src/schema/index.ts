@@ -15,3 +15,4 @@ export * from "./call-submitted-documents";
 export * from "./call-validation-items";
 export * from "./companies";
 export * from "./company-documents";
+export * from "./notification-settings";

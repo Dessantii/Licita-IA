@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { monitorsTable, monitorAlertsTable } from "@workspace/db";
+import { monitorsTable, monitorAlertsTable, notificationSettingsTable } from "@workspace/db";
 import { eq, and, desc, count, ilike, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { buscarPublicacoesPncp, filtragemPorPalavras, pncpUrl, MODALIDADES } from "../../services/pncp";
@@ -37,6 +37,55 @@ router.post("/", async (req, res) => {
     ...parsed.data,
   }).returning();
   res.status(201).json(monitor);
+});
+
+router.get("/notification-settings", async (req, res) => {
+  const userId = (req as any).userId as number;
+  const [settings] = await db
+    .select()
+    .from(notificationSettingsTable)
+    .where(eq(notificationSettingsTable.userId, userId));
+  if (!settings) {
+    const [created] = await db
+      .insert(notificationSettingsTable)
+      .values({ userId, enabled: true, palavrasChave: [] })
+      .returning();
+    res.json(created);
+    return;
+  }
+  res.json(settings);
+});
+
+const notificationSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  palavrasChave: z.array(z.string()).optional(),
+});
+
+router.patch("/notification-settings", async (req, res) => {
+  const userId = (req as any).userId as number;
+  const parsed = notificationSettingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Dados inválidos." });
+    return;
+  }
+  const existing = await db
+    .select()
+    .from(notificationSettingsTable)
+    .where(eq(notificationSettingsTable.userId, userId));
+  if (existing.length === 0) {
+    const [created] = await db
+      .insert(notificationSettingsTable)
+      .values({ userId, enabled: true, palavrasChave: [], ...parsed.data })
+      .returning();
+    res.json(created);
+    return;
+  }
+  const [updated] = await db
+    .update(notificationSettingsTable)
+    .set({ ...parsed.data, updatedAt: new Date() })
+    .where(eq(notificationSettingsTable.userId, userId))
+    .returning();
+  res.json(updated);
 });
 
 router.patch("/:id", async (req, res) => {

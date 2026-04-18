@@ -30,6 +30,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
+  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [notifKeywords, setNotifKeywords] = useState<string[]>([]);
 
   const initials = user?.name
     ? user.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
@@ -45,20 +47,42 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/settings", icon: Settings, label: "Configurações" },
   ];
 
+  async function loadNotifSettings() {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/monitors/notification-settings", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setNotifEnabled(data.enabled ?? true);
+      setNotifKeywords(data.palavrasChave ?? []);
+    } catch {}
+  }
+
+  function applyNotifFilter(data: Alert[], enabled: boolean, keywords: string[]) {
+    if (!enabled) return [];
+    if (!keywords.length) return data.slice(0, 10);
+    return data.filter(a => {
+      const text = `${a.titulo} ${a.orgao ?? ""}`.toLowerCase();
+      return keywords.some(k => text.includes(k.toLowerCase()));
+    }).slice(0, 10);
+  }
+
   async function loadAlerts() {
     if (!token) return;
     try {
-      const res = await fetch("/api/monitors/alerts?limit=10", {
+      const res = await fetch("/api/monitors/alerts?limit=50", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
       const data: Alert[] = await res.json();
-      setAlerts(data.slice(0, 10));
-      setUnreadCount(data.filter((a) => !a.isRead).length);
+      setAlerts(data);
     } catch {}
   }
 
   useEffect(() => {
+    loadNotifSettings();
     loadAlerts();
     const interval = setInterval(loadAlerts, 60 * 1000);
     return () => clearInterval(interval);
@@ -222,40 +246,53 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             {/* Bell notification */}
             <div className="relative" ref={bellRef}>
-              <button
-                onClick={() => setBellOpen((v) => !v)}
-                className="p-2 text-slate-400 hover:text-slate-700 transition-colors relative"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5 border-2 border-white">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </button>
+              {(() => {
+                const filtered = applyNotifFilter(alerts, notifEnabled, notifKeywords);
+                const filteredUnread = filtered.filter(a => !a.isRead).length;
+                return (
+                  <>
+                    <button
+                      onClick={() => setBellOpen((v) => !v)}
+                      className="p-2 text-slate-400 hover:text-slate-700 transition-colors relative"
+                    >
+                      <Bell className="w-5 h-5" />
+                      {filteredUnread > 0 && (
+                        <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5 border-2 border-white">
+                          {filteredUnread > 9 ? "9+" : filteredUnread}
+                        </span>
+                      )}
+                    </button>
 
-              {bellOpen && (
-                <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                    <span className="font-semibold text-sm text-foreground">Novos editais encontrados</span>
-                    {unreadCount > 0 && (
-                      <button
-                        onClick={markAllRead}
-                        className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-                      >
-                        <CheckCheck className="w-3.5 h-3.5" />
-                        Marcar todos como lidos
-                      </button>
-                    )}
-                  </div>
+                    {bellOpen && (
+                      <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                          <span className="font-semibold text-sm text-foreground">Novos editais encontrados</span>
+                          {filteredUnread > 0 && (
+                            <button
+                              onClick={markAllRead}
+                              className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                            >
+                              <CheckCheck className="w-3.5 h-3.5" />
+                              Marcar todos como lidos
+                            </button>
+                          )}
+                        </div>
 
-                  {alerts.length === 0 ? (
-                    <div className="py-8 text-center text-muted-foreground text-sm">
-                      Nenhuma notificação ainda.
-                    </div>
-                  ) : (
-                    <div className="max-h-96 overflow-y-auto divide-y divide-border">
-                      {alerts.map((alert) => (
+                        {!notifEnabled ? (
+                          <div className="py-8 text-center text-muted-foreground text-sm px-4">
+                            <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                            Notificações desativadas.{" "}
+                            <Link href="/monitors" onClick={() => setBellOpen(false)} className="text-primary hover:underline">
+                              Configurar
+                            </Link>
+                          </div>
+                        ) : filtered.length === 0 ? (
+                          <div className="py-8 text-center text-muted-foreground text-sm">
+                            Nenhuma notificação ainda.
+                          </div>
+                        ) : (
+                          <div className="max-h-96 overflow-y-auto divide-y divide-border">
+                            {filtered.map((alert) => (
                         <div
                           key={alert.id}
                           className={cn(
@@ -328,17 +365,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   )}
 
-                  <div className="px-4 py-2 border-t border-border">
-                    <Link
-                      href="/monitors"
-                      onClick={() => setBellOpen(false)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Gerenciar monitoramentos →
-                    </Link>
-                  </div>
-                </div>
-              )}
+                        <div className="px-4 py-2 border-t border-border">
+                          <Link
+                            href="/monitors"
+                            onClick={() => setBellOpen(false)}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Gerenciar monitoramentos →
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm">

@@ -451,7 +451,7 @@ export function ProcessDetailPage() {
                         <FileListItem
                           key={file.id}
                           file={file}
-                          onDelete={(fid) => removeFile.mutate({ id: fid })}
+                          onDelete={(fid) => removeFile.mutate ({ id: fid })}
                         />
                       ))}
                     </div>
