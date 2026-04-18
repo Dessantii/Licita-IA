@@ -287,17 +287,17 @@ router.post("/:id/project-ideas", async (req, res) => {
       messages: [
         {
           role: "system",
-          content: `Você é um especialista em criação de projetos para editais.
+          content: `Você é um especialista em criação de projetos para editais. Responda sempre em JSON válido.
 Seu trabalho é propor ideias viáveis e alinhadas ao edital.`,
         },
         {
           role: "user",
-          content: `Com base no edital abaixo, sugira 3 ideias de projetos viáveis.
+          content: `Com base no edital abaixo, sugira 3 ideias de projetos viáveis. Responda em JSON.
 
 EDITAL:
 ${editalContext}
 
-Formato de resposta:
+Formato JSON de resposta:
 {
   "ideias": [
     { "titulo": "", "descricao": "", "impacto": "" }
@@ -324,7 +324,9 @@ Regras:
 
     res.json(result);
   } catch (err: unknown) {
-    res.status(502).json({ error: "Falha ao gerar ideias com IA" });
+    req.log.error({ err }, "Falha ao gerar ideias de projeto com OpenAI");
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    res.status(502).json({ error: "Falha ao gerar ideias com IA", detail: message });
   }
 });
 

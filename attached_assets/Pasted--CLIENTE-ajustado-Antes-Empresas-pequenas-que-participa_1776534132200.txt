@@ -1,0 +1,72 @@
+.
+
+🧠 CLIENTE (ajustado)
+
+Antes:
+Empresas pequenas que participam de licitação sem estrutura dedicada, escritórios de contabilidade
+
+Depois (melhor):
+
+Empresas de pequeno porte (1 a 20 funcionários) que participam de licitações públicas regularmente e não possuem equipe dedicada para análise de editais, geralmente com o próprio dono ou administrativo assumindo essa função.
+Inclui também escritórios de contabilidade que prestam suporte operacional para participação em licitações de clientes.
+
+Confiança: 4
+
+Se errada:
+Você vai falar com pessoas que não sentem dor suficiente ou não têm volume de licitações, e o produto vira “interessante”, mas não essencial — não vende.
+
+🔥 DOR (ajustado)
+
+Antes:
+A maior dor é tempo + risco de erro
+
+Depois (melhor):
+
+“Eu gasto horas lendo edital e ainda fico inseguro se entendi tudo certo ou se estou esquecendo algum documento, o que pode me eliminar da licitação.”
+
+Confiança: 4
+
+Se errada:
+O usuário não percebe valor claro na automação e não vê urgência em pagar — o produto vira opcional.
+
+💰 VALOR / TICKET (ajustado)
+
+Antes:
+Pagariam R$50–R$150/mês
+
+Depois (melhor):
+
+Acreditamos que empresas que participam de pelo menos 3 a 10 licitações por mês estão dispostas a pagar entre R$79 e R$149/mês, desde que o sistema reduza tempo operacional e diminua risco de erro de forma clara.
+
+Confiança: 2
+
+Se errada:
+Ou o preço fica alto demais e trava aquisição, ou baixo demais e não sustenta o negócio — inviabilizando o modelo.
+
+📢 CANAL (ajustado)
+
+Antes:
+WhatsApp + abordagem direta
+
+Depois (melhor):
+
+Aquisição inicial via abordagem direta no WhatsApp e contatos pessoais com empresas que já participam de licitações, utilizando demonstração prática do sistema com edital real como principal gatilho de conversão.
+
+Confiança: 3
+
+Se errada:
+O custo de aquisição aumenta ou o canal não escala, travando crescimento.
+
+⚡ RESULTADO (ajustado)
+
+Antes:
+Usuário reduz tempo de análise em mais de 70%
+
+Depois (melhor):
+
+Usuário reduz de 2–4 horas para menos de 30 minutos o tempo necessário para analisar um edital e organizar os documentos necessários para participação.
+
+Confiança: 3
+
+Se errada:
+O ganho de eficiência não é significativo o suficiente para justificar o uso contínuo do sistema.
