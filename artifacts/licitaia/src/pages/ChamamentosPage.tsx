@@ -116,6 +116,7 @@ function CreateCallNoticeDialog({
   const { toast } = useToast();
   const createMutation = useCreateCallNotice();
   const { data: companies } = useListCompanies();
+  const { activeCompany } = useActiveCompany();
   const token = getToken();
 
   const [mode, setMode] = useState<CreateMode>("manual");
@@ -125,14 +126,22 @@ function CreateCallNoticeDialog({
   const [dragOver, setDragOver] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const defaultCompanyId = activeCompany ? String(activeCompany.id) : "";
+
   const [form, setForm] = useState<CreateCallNoticeForm>({
     title: "",
     agency: "",
     referenceNumber: "",
     category: "",
     deadline: "",
-    companyId: "",
+    companyId: defaultCompanyId,
   });
+
+  useEffect(() => {
+    if (open) {
+      setForm(f => ({ ...f, companyId: activeCompany ? String(activeCompany.id) : f.companyId }));
+    }
+  }, [open, activeCompany]);
 
   const resetAll = () => {
     setMode("manual");
@@ -141,7 +150,7 @@ function CreateCallNoticeDialog({
     setExtracted(false);
     setDragOver(false);
     setSubmitting(false);
-    setForm({ title: "", agency: "", referenceNumber: "", category: "", deadline: "", companyId: "" });
+    setForm({ title: "", agency: "", referenceNumber: "", category: "", deadline: "", companyId: activeCompany ? String(activeCompany.id) : "" });
   };
 
   const handleClose = () => {
