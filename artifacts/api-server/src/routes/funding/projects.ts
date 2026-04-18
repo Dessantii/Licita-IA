@@ -770,6 +770,85 @@ router.get("/:id/export", async (req, res) => {
       .text("Nenhuma secao foi preenchida ainda.", ML, 200, { width: W, align: "center" });
   }
 
+  // ── Página de Validação (opcional) ──────────────────────────────────────
+  const wantValidation = req.query.includeValidation === "true";
+  if (wantValidation && project.validationResult) {
+    const vr = project.validationResult as {
+      pontos_fortes?: string[];
+      pontos_fracos?: string[];
+      itens_faltantes?: string[];
+      recomendacoes?: string[];
+      nivel_aderencia?: number;
+      resumo?: string;
+    };
+    doc.addPage();
+
+    // Cabeçalho colorido
+    const GREEN = "#16a34a";
+    const RED = "#dc2626";
+    const AMBER = "#d97706";
+    const VAL_COLOR = "#7c3aed"; // roxo para distinguir das seções de projeto
+    doc.rect(0, 0, PW, 52).fill(VAL_COLOR);
+    doc.fill("#ffffff").font("Helvetica-Bold").fontSize(8)
+      .text("RELATORIO DE VALIDACAO", ML, 14, { width: W, align: "left" });
+    doc.fill("#e2e8f0").font("Helvetica").fontSize(14)
+      .text("Conferencia de Aderencia ao Edital", ML, 28, { width: W });
+    doc.rect(ML, 58, W, 0.5).fill("#7c3aed");
+
+    let vy = 72;
+
+    // Score de aderência (destaque visual)
+    const score = Number(vr.nivel_aderencia ?? 0);
+    const scoreColor = score >= 70 ? GREEN : score >= 40 ? AMBER : RED;
+    doc.roundedRect(ML, vy, W, 56, 6).fill("#f5f3ff");
+    doc.fill(scoreColor).font("Helvetica-Bold").fontSize(36)
+      .text(`${score}%`, ML + 12, vy + 10, { width: 80, align: "center" });
+    doc.fill(TEXT).font("Helvetica-Bold").fontSize(12)
+      .text("Score de aderencia", ML + 100, vy + 10, { width: W - 100 });
+    const scoreLabel = score >= 70 ? "Alta aderencia ao edital" : score >= 40 ? "Aderencia moderada — requer ajustes" : "Baixa aderencia — revisao necessaria";
+    doc.fill(MUTED).font("Helvetica").fontSize(9)
+      .text(scoreLabel, ML + 100, vy + 30, { width: W - 100 });
+    vy += 68;
+
+    // Resumo (se houver)
+    if (vr.resumo?.trim()) {
+      doc.fill(MUTED).font("Helvetica").fontSize(8).text("Resumo:", ML, vy);
+      vy = doc.y + 2;
+      doc.fill(TEXT).font("Helvetica").fontSize(9).text(vr.resumo, ML, vy, { width: W });
+      vy = doc.y + 12;
+    }
+
+    // Helper para renderizar uma categoria
+    function renderValSection(label: string, items: string[], color: string, bgColor: string) {
+      if (!items || items.length === 0) return;
+      if (vy > PH - 72 - 80) { doc.addPage(); vy = 72; }
+      doc.rect(ML, vy, W, 22).fill(bgColor);
+      doc.fill(color).font("Helvetica-Bold").fontSize(9)
+        .text(label, ML + 10, vy + 7, { width: W - 20 });
+      vy += 28;
+      for (const item of items) {
+        if (vy > PH - 72 - 20) { doc.addPage(); vy = 72; }
+        const safe = item.replace(/[\u0100-\uFFFF]/g, (c) => {
+          const map: Record<string,string> = {
+            "\u2013":"- ", "\u2014":"- ", "\u2026":"...",
+            "\u201c":'"', "\u201d":'"', "\u2018":"'", "\u2019":"'",
+            "\u00b7":"-", "\u2022":"-",
+          };
+          return map[c] ?? "";
+        });
+        doc.fill(TEXT).font("Helvetica").fontSize(9)
+          .text(`- ${safe}`, ML + 6, vy, { width: W - 12 });
+        vy = doc.y + 5;
+      }
+      vy += 8;
+    }
+
+    renderValSection("Pontos Fortes", vr.pontos_fortes ?? [], GREEN, "#f0fdf4");
+    renderValSection("Pontos a Melhorar", vr.pontos_fracos ?? [], RED, "#fef2f2");
+    renderValSection("Itens Faltantes", vr.itens_faltantes ?? [], AMBER, "#fffbeb");
+    renderValSection("Recomendacoes", vr.recomendacoes ?? [], VAL_COLOR, "#f5f3ff");
+  }
+
   doc.end();
 });
 

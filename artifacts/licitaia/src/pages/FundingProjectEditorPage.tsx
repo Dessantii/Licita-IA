@@ -4,6 +4,7 @@ import { getToken } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useParams, Link } from "wouter";
 import {
   Loader2,
@@ -99,6 +100,7 @@ export function FundingProjectEditorPage() {
 
   // Export
   const [exporting, setExporting] = useState(false);
+  const [includeValidation, setIncludeValidation] = useState(false);
 
   // Rewrite
   const [rewriting, setRewriting] = useState<string | null>(null);
@@ -133,7 +135,9 @@ export function FundingProjectEditorPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (vRes.ok) {
-        setValidation(await vRes.json());
+        const v = await vRes.json();
+        setValidation(v);
+        setIncludeValidation(true); // enable by default when validation exists
       }
     } catch {
       toast({ title: "Erro ao carregar projeto", variant: "destructive" });
@@ -171,7 +175,8 @@ export function FundingProjectEditorPage() {
   async function handleExport() {
     setExporting(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/export`, {
+      const params = includeValidation && validation ? "?includeValidation=true" : "";
+      const res = await fetch(`/api/projects/${projectId}/export${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
@@ -281,8 +286,18 @@ export function FundingProjectEditorPage() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <span className="text-xs text-slate-500">{filledCount}/{SECTION_TYPES.length} seções</span>
+            {validation && (
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <Checkbox
+                  checked={includeValidation}
+                  onCheckedChange={(c) => setIncludeValidation(!!c)}
+                  id="include-validation-check"
+                />
+                <span className="text-xs text-slate-600">Incluir validação no PDF</span>
+              </label>
+            )}
             <Button
               onClick={handleExport}
               disabled={exporting || filledCount === 0}
