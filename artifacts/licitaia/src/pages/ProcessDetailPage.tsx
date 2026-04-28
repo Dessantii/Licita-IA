@@ -53,6 +53,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 
 type Tab = "documentos" | "analise" | "conferencia";
 
@@ -84,10 +85,10 @@ export function ProcessDetailPage() {
     try {
       await deleteMutation.mutateAsync({ id });
       queryClient.invalidateQueries({ queryKey: getListProcessesQueryKey() });
-      toast({ title: "Processo excluído com sucesso" });
+      notify(toast, "process_deleted");
       navigate("/processes");
     } catch {
-      toast({ title: "Erro ao excluir processo", variant: "destructive" });
+      notify(toast, "process_delete_error");
     }
   };
 

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getToken, getUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -69,7 +70,7 @@ export function UsuáriosPage() {
       const data = await apiFetch("/api/admin/users");
       setUsers(data);
     } catch (e: any) {
-      toast({ title: "Erro ao carregar usuários", description: e.message, variant: "destructive" });
+      notify(toast, "user_load_error");
     } finally {
       setLoading(false);
     }
@@ -86,9 +87,9 @@ export function UsuáriosPage() {
       setUsers((prev) => [...prev, newUser]);
       setForm({ name: "", email: "", password: "", role: "user" });
       setShowForm(false);
-      toast({ title: "Usuário criado com sucesso!" });
-    } catch (e: any) {
-      toast({ title: "Erro ao criar usuário", description: e.message, variant: "destructive" });
+      notify(toast, "user_created");
+    } catch {
+      notify(toast, "user_create_error");
     } finally {
       setCreating(false);
     }
@@ -99,9 +100,9 @@ export function UsuáriosPage() {
     try {
       await apiFetch(`/api/admin/users/${id}`, { method: "DELETE" });
       setUsers((prev) => prev.filter((u) => u.id !== id));
-      toast({ title: "Usuário removido." });
-    } catch (e: any) {
-      toast({ title: "Erro ao remover", description: e.message, variant: "destructive" });
+      notify(toast, "user_removed");
+    } catch {
+      notify(toast, "user_remove_error");
     } finally {
       setDeleting(null);
     }
@@ -115,9 +116,9 @@ export function UsuáriosPage() {
         body: JSON.stringify({ role: newRole }),
       });
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      toast({ title: `Função de ${user.name} alterada para ${newRole === "admin" ? "Administrador" : "Usuário"}.` });
-    } catch (e: any) {
-      toast({ title: "Erro ao alterar função", description: e.message, variant: "destructive" });
+      notify(toast, "user_role_changed", { title: `Função de ${user.name} alterada para ${newRole === "admin" ? "Administrador" : "Usuário"}` });
+    } catch {
+      notify(toast, "user_role_change_error");
     }
   }
 
@@ -130,11 +131,11 @@ export function UsuáriosPage() {
         method: "PATCH",
         body: JSON.stringify({ password: resetPassword }),
       });
-      toast({ title: `Senha de ${resetTarget.name} redefinida com sucesso!` });
+      notify(toast, "user_password_reset", { title: `Senha de ${resetTarget.name} redefinida` });
       setResetTarget(null);
       setResetPassword("");
-    } catch (e: any) {
-      toast({ title: "Erro ao redefinir senha", description: e.message, variant: "destructive" });
+    } catch {
+      notify(toast, "user_password_reset_error");
     } finally {
       setResetting(false);
     }

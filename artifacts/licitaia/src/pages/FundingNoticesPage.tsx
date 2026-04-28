@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { getToken } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -79,11 +80,11 @@ export function FundingNoticesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao excluir");
-      toast({ title: "Edital excluído" });
+      notify(toast, "funding_notice_deleted");
       setDeleteId(null);
       setNotices((prev) => prev.filter((n) => n.id !== deleteId));
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+    } catch {
+      notify(toast, "funding_notice_delete_error");
     } finally {
       setDeleting(false);
     }
@@ -101,8 +102,8 @@ export function FundingNoticesPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao gerar ideias");
       setIdeas(data.ideias ?? []);
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+    } catch {
+      notify(toast, "project_create_error");
       setIdeasNoticeId(null);
     } finally {
       setLoadingIdeas(false);
@@ -117,7 +118,7 @@ export function FundingNoticesPage() {
       if (!res.ok) throw new Error();
       setNotices(await res.json());
     } catch {
-      toast({ title: "Erro ao carregar editais", variant: "destructive" });
+      notify(toast, "funding_notice_load_error");
     } finally {
       setLoading(false);
     }
@@ -126,7 +127,7 @@ export function FundingNoticesPage() {
   useEffect(() => { loadNotices(); }, []);
 
   async function handleUpload() {
-    if (!file) { toast({ title: "Selecione um arquivo PDF", variant: "destructive" }); return; }
+    if (!file) { notify(toast, "pdf_only"); return; }
     setUploading(true);
     try {
       const form = new FormData();
@@ -139,13 +140,13 @@ export function FundingNoticesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro no upload");
-      toast({ title: "Edital processado com sucesso!" });
+      notify(toast, "funding_notice_processed");
       setUploadOpen(false);
       setFile(null);
       setSource("");
       loadNotices();
-    } catch (e: any) {
-      toast({ title: e.message ?? "Erro ao processar edital", variant: "destructive" });
+    } catch {
+      notify(toast, "funding_notice_process_error");
     } finally {
       setUploading(false);
     }

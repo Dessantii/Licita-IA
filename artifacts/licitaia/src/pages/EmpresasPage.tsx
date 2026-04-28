@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,11 +88,11 @@ function CreateCompanyDialog({
         },
       });
       queryClient.invalidateQueries({ queryKey: getListCompaniesQueryKey() });
-      toast({ title: "Empresa cadastrada com sucesso" });
+      notify(toast, "company_created");
       onClose();
       setForm({ name: "", cnpj: "", email: "", phone: "", address: "", notes: "" });
     } catch {
-      toast({ title: "Erro ao cadastrar empresa", variant: "destructive" });
+      notify(toast, "company_create_error");
     }
   };
 
@@ -193,9 +194,9 @@ export function EmpresasPage() {
     try {
       await deleteMutation.mutateAsync({ id: deleteTarget.id });
       queryClient.invalidateQueries({ queryKey: getListCompaniesQueryKey() });
-      toast({ title: "Empresa excluída" });
+      notify(toast, "company_deleted");
     } catch {
-      toast({ title: "Erro ao excluir empresa", variant: "destructive" });
+      notify(toast, "company_delete_error");
     }
     setDeleteTarget(null);
   };

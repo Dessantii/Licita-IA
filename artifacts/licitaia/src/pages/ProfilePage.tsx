@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { getUser, getToken, saveAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 
 export function ProfilePage() {
   const user = getUser();
@@ -31,15 +32,15 @@ export function ProfilePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: "Erro", description: data.error ?? "Não foi possível atualizar o nome.", variant: "destructive" });
+        notify(toast, "profile_update_error", { description: data.error ?? "Não foi possível atualizar o nome." });
         return;
       }
       if (user) {
         saveAuth(token!, { ...user, name: data.name });
       }
-      toast({ title: "Nome atualizado", description: "Seu nome foi atualizado com sucesso." });
+      notify(toast, "profile_updated");
     } catch {
-      toast({ title: "Erro", description: "Erro de conexão.", variant: "destructive" });
+      notify(toast, "connection_error");
     } finally {
       setNameLoading(false);
     }
@@ -48,11 +49,11 @@ export function ProfilePage() {
   async function handlePasswordSave(e: React.FormEvent) {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      toast({ title: "Erro", description: "A nova senha e a confirmação não coincidem.", variant: "destructive" });
+      notify(toast, "password_mismatch");
       return;
     }
     if (newPassword.length < 6) {
-      toast({ title: "Erro", description: "A nova senha deve ter pelo menos 6 caracteres.", variant: "destructive" });
+      notify(toast, "password_too_short");
       return;
     }
     setPasswordLoading(true);
@@ -67,15 +68,15 @@ export function ProfilePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: "Erro", description: data.error ?? "Não foi possível alterar a senha.", variant: "destructive" });
+        notify(toast, "password_change_error", { description: data.error ?? "Não foi possível alterar a senha." });
         return;
       }
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      toast({ title: "Senha alterada", description: "Sua senha foi alterada com sucesso." });
+      notify(toast, "password_changed");
     } catch {
-      toast({ title: "Erro", description: "Erro de conexão.", variant: "destructive" });
+      notify(toast, "connection_error");
     } finally {
       setPasswordLoading(false);
     }

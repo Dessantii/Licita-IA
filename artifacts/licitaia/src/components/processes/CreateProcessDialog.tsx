@@ -23,6 +23,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import {
   FolderPlus,
   Loader2,
@@ -174,16 +175,14 @@ export function CreateProcessDialog({ prefill, defaultOpen, open: controlledOpen
       queryClient.invalidateQueries({ queryKey: getListProcessesQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(newProcess.id) });
 
-      toast({
-        title: mode === "import"
-          ? "Processo criado com edital anexado!"
-          : "Processo criado com sucesso",
-      });
+      notify(toast, "process_created", mode === "import"
+        ? { title: "Processo criado com edital anexado" }
+        : undefined);
 
       handleClose();
       navigate(`/processes/${newProcess.id}`);
     } catch {
-      toast({ title: "Erro ao criar processo", variant: "destructive" });
+      notify(toast, "process_create_error");
     }
   };
 

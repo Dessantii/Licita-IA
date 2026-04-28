@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -131,11 +132,11 @@ function CreateCompanyDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
-      toast({ title: "Empresa criada com sucesso" });
+      notify(toast, "company_created");
       handleClose();
     },
     onError: () => {
-      toast({ title: "Erro ao criar empresa", variant: "destructive" });
+      notify(toast, "company_create_error");
     },
   });
 
@@ -163,7 +164,7 @@ function CreateCompanyDialog({
       setAiFields(filled);
       setMode("review");
     } catch {
-      toast({ title: "Não foi possível extrair os dados. Tente novamente ou preencha manualmente.", variant: "destructive" });
+      notify(toast, "company_create_error", { description: "Não foi possível extrair os dados. Preencha manualmente." });
       setMode("cnpj-upload");
     }
   }, [token, toast]);

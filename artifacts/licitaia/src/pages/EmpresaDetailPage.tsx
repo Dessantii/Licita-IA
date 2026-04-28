@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useRoute, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { getToken } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -148,7 +149,7 @@ export function EmpresaDetailPage() {
       setForm(data);
       setCertidoes((data.certidoes as Certidoes) ?? {});
     } catch {
-      toast({ title: "Erro ao carregar empresa", variant: "destructive" });
+      notify(toast, "load_error");
     } finally {
       setIsLoading(false);
     }
@@ -179,9 +180,9 @@ export function EmpresaDetailPage() {
       const updated = await res.json();
       setCompany(c => ({ ...c!, ...updated }));
       setEditing(false);
-      toast({ title: "Empresa atualizada com sucesso" });
+      notify(toast, "company_updated");
     } catch {
-      toast({ title: "Erro ao salvar", variant: "destructive" });
+      notify(toast, "company_update_error");
     } finally {
       setSaving(false);
     }
@@ -190,25 +191,25 @@ export function EmpresaDetailPage() {
   async function handleDelete() {
     try {
       await fetch(`/api/companies/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      toast({ title: "Empresa excluída" });
+      notify(toast, "company_deleted");
       navigate("/empresas");
     } catch {
-      toast({ title: "Erro ao excluir empresa", variant: "destructive" });
+      notify(toast, "company_delete_error");
     }
   }
 
   async function lookupCnpj() {
     const cnpj = (form.cnpj ?? "").replace(/\D/g, "");
-    if (cnpj.length !== 14) { toast({ title: "CNPJ inválido — informe 14 dígitos", variant: "destructive" }); return; }
+    if (cnpj.length !== 14) { notify(toast, "cnpj_invalid"); return; }
     setLookingUp(true);
     try {
       const res = await fetch(`/api/companies/cnpj-lookup/${cnpj}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) { toast({ title: "CNPJ não encontrado na Receita Federal", variant: "destructive" }); return; }
+      if (!res.ok) { notify(toast, "cnpj_not_found"); return; }
       const data = await res.json();
       setForm(f => ({ ...f, ...data }));
-      toast({ title: "Dados preenchidos automaticamente da Receita Federal" });
+      notify(toast, "cnpj_loaded");
     } catch {
-      toast({ title: "Erro ao consultar Receita Federal", variant: "destructive" });
+      notify(toast, "cnpj_not_found");
     } finally {
       setLookingUp(false);
     }
@@ -223,13 +224,13 @@ export function EmpresaDetailPage() {
       });
       const data = await res.json();
       if (data.encontrado) {
-        toast({ title: "Empresa encontrada no SICAF" });
+        notify(toast, "sicaf_found");
         load();
       } else {
-        toast({ title: data.mensagem ?? "CNPJ não localizado no SICAF", variant: "destructive" });
+        notify(toast, "sicaf_not_found", data.mensagem ? { title: data.mensagem } : undefined);
       }
     } catch {
-      toast({ title: "Erro ao verificar SICAF", variant: "destructive" });
+      notify(toast, "sicaf_error");
     } finally {
       setVerifyingSicaf(false);
     }

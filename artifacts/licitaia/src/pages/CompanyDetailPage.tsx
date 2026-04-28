@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -187,11 +188,11 @@ export function CompanyDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
-      toast({ title: "Empresa excluída" });
+      notify(toast, "company_deleted");
       navigate("/companies");
     },
     onError: () => {
-      toast({ title: "Erro ao excluir empresa", variant: "destructive" });
+      notify(toast, "company_delete_error");
     },
   });
 
@@ -205,10 +206,10 @@ export function CompanyDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["company", id] });
-      toast({ title: "Documento removido" });
+      notify(toast, "company_doc_removed");
     },
     onError: () => {
-      toast({ title: "Erro ao remover documento", variant: "destructive" });
+      notify(toast, "company_doc_remove_error");
     },
   });
 
@@ -267,12 +268,12 @@ export function CompanyDetailPage() {
       if (!res.ok) throw new Error("Erro ao enviar documento");
 
       queryClient.invalidateQueries({ queryKey: ["company", id] });
-      toast({ title: "Documento enviado com sucesso" });
+      notify(toast, "company_doc_uploaded");
       setUploadForm({ titulo: "", tipo: "outros", dataEmissao: "", dataValidade: "", file: null });
       setAutoFilledFields(new Set());
       setAiUsed(false);
     } catch {
-      toast({ title: "Erro ao enviar documento", variant: "destructive" });
+      notify(toast, "company_doc_upload_error");
     } finally {
       setIsUploading(false);
     }

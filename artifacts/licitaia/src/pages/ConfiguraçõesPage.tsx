@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import {
   Building2,
   User,
@@ -80,7 +81,7 @@ export function ConfiguraçõesPage() {
       if (!res.ok) throw new Error(data.error ?? "Erro ao alterar senha.");
       setPwSuccess(true);
       setPwForm({ current: "", next: "", confirm: "" });
-      toast({ title: "Senha alterada com sucesso!" });
+      notify(toast, "password_changed");
       setTimeout(() => setPwSuccess(false), 3000);
     } catch (err: any) {
       setPwError(err.message);
@@ -100,10 +101,10 @@ export function ConfiguraçõesPage() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       setSaved(true);
-      toast({ title: "Configurações salvas com sucesso" });
+      notify(toast, "settings_saved");
       setTimeout(() => setSaved(false), 3000);
     } catch {
-      toast({ title: "Erro ao salvar configurações", variant: "destructive" });
+      notify(toast, "settings_save_error");
     }
   };
 

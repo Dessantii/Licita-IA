@@ -20,6 +20,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -84,10 +85,10 @@ export function EditProcessDialog({ process, open, onOpenChange }: EditProcessDi
       });
       queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(process.id) });
       queryClient.invalidateQueries({ queryKey: getListProcessesQueryKey() });
-      toast({ title: "Processo atualizado com sucesso" });
+      notify(toast, "process_updated");
       onOpenChange(false);
     } catch {
-      toast({ title: "Erro ao atualizar processo", variant: "destructive" });
+      notify(toast, "process_update_error");
     }
   };
 

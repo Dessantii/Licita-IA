@@ -21,6 +21,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -201,9 +202,9 @@ export function ChamamentoDetailPage() {
     try {
       await uploadEditalMutation.mutateAsync({ id, data: { file } });
       invalidate();
-      toast({ title: "Edital enviado com sucesso" });
+      notify(toast, "chamamento_edital_uploaded");
     } catch {
-      toast({ title: "Erro ao enviar edital", variant: "destructive" });
+      notify(toast, "chamamento_edital_upload_error");
     }
   };
 
@@ -211,9 +212,9 @@ export function ChamamentoDetailPage() {
     try {
       await uploadDocumentMutation.mutateAsync({ id, data: { file, fileType } });
       invalidate();
-      toast({ title: "Documento enviado com sucesso" });
+      notify(toast, "chamamento_doc_uploaded");
     } catch {
-      toast({ title: "Erro ao enviar documento", variant: "destructive" });
+      notify(toast, "chamamento_doc_upload_error");
     }
   };
 
@@ -221,9 +222,9 @@ export function ChamamentoDetailPage() {
     try {
       await deleteFileMutation.mutateAsync({ id: fileId });
       invalidate();
-      toast({ title: "Arquivo removido" });
+      notify(toast, "chamamento_file_removed");
     } catch {
-      toast({ title: "Erro ao remover arquivo", variant: "destructive" });
+      notify(toast, "chamamento_file_remove_error");
     }
   };
 
@@ -231,9 +232,9 @@ export function ChamamentoDetailPage() {
     try {
       await analyzeEditalMutation.mutateAsync({ id });
       invalidate();
-      toast({ title: "Análise concluída com sucesso" });
+      notify(toast, "chamamento_analyzed");
     } catch {
-      toast({ title: "Erro ao analisar edital", variant: "destructive" });
+      notify(toast, "chamamento_analyze_error");
     }
   };
 
@@ -241,12 +242,9 @@ export function ChamamentoDetailPage() {
     try {
       const result = await analyzeDocsMutation.mutateAsync({ id });
       invalidate();
-      toast({
-        title: "Conferência concluída",
-        description: result.message,
-      });
+      notify(toast, "chamamento_docs_checked");
     } catch {
-      toast({ title: "Erro ao conferir documentos", variant: "destructive" });
+      notify(toast, "chamamento_docs_check_error");
     }
   };
 
@@ -254,10 +252,10 @@ export function ChamamentoDetailPage() {
     try {
       await deleteNoticeMutation.mutateAsync({ id });
       queryClient.invalidateQueries({ queryKey: getListCallNoticesQueryKey() });
-      toast({ title: "Chamamento excluído" });
+      notify(toast, "chamamento_deleted");
       navigate("/chamamentos");
     } catch {
-      toast({ title: "Erro ao excluir", variant: "destructive" });
+      notify(toast, "chamamento_delete_error");
     }
   };
 

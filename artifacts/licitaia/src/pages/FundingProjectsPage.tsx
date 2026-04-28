@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { getToken } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -80,14 +81,14 @@ export function FundingProjectsPage() {
       if (pRes.ok) setProjects(await pRes.json());
       if (nRes.ok) setNotices(await nRes.json());
     } catch {
-      toast({ title: "Erro ao carregar dados", variant: "destructive" });
+      notify(toast, "load_error");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleCreate() {
-    if (!title.trim()) { toast({ title: "Informe o título do projeto", variant: "destructive" }); return; }
+    if (!title.trim()) { notify(toast, "project_title_missing"); return; }
     setCreating(true);
     try {
       const body: Record<string, unknown> = { title: title.trim() };
@@ -99,13 +100,13 @@ export function FundingProjectsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao criar projeto");
-      toast({ title: "Projeto criado!" });
+      notify(toast, "project_created");
       setCreateOpen(false);
       setTitle("");
       setNoticeId(preselectedNoticeId ?? "");
       loadAll();
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+    } catch {
+      notify(toast, "project_create_error");
     } finally {
       setCreating(false);
     }
@@ -121,11 +122,11 @@ export function FundingProjectsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao excluir");
-      toast({ title: "Projeto excluído" });
+      notify(toast, "project_deleted");
       setDeleteId(null);
       setProjects((prev) => prev.filter((p) => p.id !== deleteId));
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+    } catch {
+      notify(toast, "project_delete_error");
     } finally {
       setDeleting(false);
     }

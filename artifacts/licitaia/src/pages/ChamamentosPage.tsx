@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { getToken } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -160,7 +161,7 @@ function CreateCallNoticeDialog({
 
   const handleFileSelect = async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".pdf")) {
-      toast({ title: "Apenas arquivos PDF são aceitos", variant: "destructive" });
+      notify(toast, "pdf_only");
       return;
     }
     setEditalFile(file);
@@ -186,7 +187,7 @@ function CreateCallNoticeDialog({
       }));
       setExtracted(true);
     } catch {
-      toast({ title: "Não foi possível extrair dados do edital", description: "Preencha os campos manualmente", variant: "destructive" });
+      notify(toast, "chamamento_extract_error");
       setExtracted(false);
     } finally {
       setExtracting(false);
@@ -232,10 +233,10 @@ function CreateCallNoticeDialog({
       }
 
       queryClient.invalidateQueries({ queryKey: getListCallNoticesQueryKey() });
-      toast({ title: "Chamamento criado com sucesso" });
+      notify(toast, "chamamento_created");
       handleClose();
     } catch {
-      toast({ title: "Erro ao criar chamamento", variant: "destructive" });
+      notify(toast, "chamamento_create_error");
     } finally {
       setSubmitting(false);
     }

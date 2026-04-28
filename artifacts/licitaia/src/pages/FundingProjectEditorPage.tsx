@@ -6,6 +6,7 @@ import { ReadinessScore } from "@/components/ReadinessScore";
 import { computeCaptacaoReadiness } from "@/lib/readiness-score";
 import { getToken } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -144,7 +145,7 @@ export function FundingProjectEditorPage() {
         setIncludeValidation(true); // enable by default when validation exists
       }
     } catch {
-      toast({ title: "Erro ao carregar projeto", variant: "destructive" });
+      notify(toast, "project_load_error");
     } finally {
       setLoading(false);
     }
@@ -154,7 +155,7 @@ export function FundingProjectEditorPage() {
 
   async function handleGenerate(sectionType: string) {
     if (!contexto.trim()) {
-      toast({ title: "Informe o contexto do projeto antes de gerar", variant: "destructive" });
+      notify(toast, "section_context_missing");
       return;
     }
     setGenerating(sectionType);
@@ -168,9 +169,9 @@ export function FundingProjectEditorPage() {
       if (!res.ok) throw new Error(data.error ?? "Erro ao gerar seção");
       setSections((prev) => ({ ...prev, [sectionType]: data }));
       setEditContent((prev) => ({ ...prev, [sectionType]: data.content ?? "" }));
-      toast({ title: "Seção gerada com sucesso!" });
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+      notify(toast, "section_generated");
+    } catch {
+      notify(toast, "section_generate_error");
     } finally {
       setGenerating(null);
     }
@@ -198,8 +199,8 @@ export function FundingProjectEditorPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+    } catch {
+      notify(toast, "project_export_error");
     } finally {
       setExporting(false);
     }
@@ -208,7 +209,7 @@ export function FundingProjectEditorPage() {
   async function handleRewrite(sectionType: string) {
     const currentText = editContent[sectionType] ?? "";
     if (currentText.trim().length < 10) {
-      toast({ title: "Escreva pelo menos um parágrafo antes de melhorar", variant: "destructive" });
+      notify(toast, "section_rewrite_short");
       return;
     }
     setRewriting(sectionType);
@@ -221,9 +222,9 @@ export function FundingProjectEditorPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao melhorar texto");
       setEditContent((prev) => ({ ...prev, [sectionType]: data.improved }));
-      toast({ title: "Texto melhorado com sucesso!" });
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+      notify(toast, "section_rewritten");
+    } catch {
+      notify(toast, "section_rewrite_error");
     } finally {
       setRewriting(null);
     }
@@ -241,8 +242,8 @@ export function FundingProjectEditorPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao validar projeto");
       setValidation(data);
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
+    } catch {
+      notify(toast, "project_validate_error");
     } finally {
       setValidating(false);
     }

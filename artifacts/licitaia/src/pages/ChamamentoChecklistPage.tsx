@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -368,9 +369,9 @@ export function ChamamentoChecklistPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      toast({ title: "Kit gerado com sucesso!", description: `${stats.ok} documento(s) incluído(s).` });
-    } catch (e: any) {
-      toast({ title: "Erro ao gerar kit", description: e.message, variant: "destructive" });
+      notify(toast, "kit_generated", { description: `${stats.ok} documento(s) incluído(s).` });
+    } catch {
+      notify(toast, "kit_generate_error");
     } finally {
       setIsGeneratingKit(false);
     }
@@ -421,9 +422,9 @@ export function ChamamentoChecklistPage() {
         },
       });
       queryClient.invalidateQueries({ queryKey: getGetCallNoticeQueryKey(id) });
-      toast({ title: "Item atualizado com sucesso" });
+      notify(toast, "checklist_item_updated");
     } catch {
-      toast({ title: "Erro ao atualizar item", variant: "destructive" });
+      notify(toast, "checklist_item_update_error");
     }
   };
 

@@ -17,8 +17,8 @@ import {
   getGetReportQueryKey
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/feedback";
 
-// Wrappers around generated hooks to handle cache invalidation and toasts
 export function useAppActions() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -26,11 +26,11 @@ export function useAppActions() {
   const createProcess = useCreateProcess({
     mutation: {
       onSuccess: () => {
-        toast({ title: "Processo criado com sucesso", variant: "default" });
+        notify(toast, "process_created");
         queryClient.invalidateQueries({ queryKey: getListProcessesQueryKey() });
       },
-      onError: (error) => {
-        toast({ title: "Erro ao criar processo", description: error.message, variant: "destructive" });
+      onError: () => {
+        notify(toast, "process_create_error");
       }
     }
   });
@@ -38,12 +38,12 @@ export function useAppActions() {
   const updateProcess = useUpdateProcess({
     mutation: {
       onSuccess: (data) => {
-        toast({ title: "Processo atualizado", variant: "default" });
+        notify(toast, "process_updated");
         queryClient.invalidateQueries({ queryKey: getListProcessesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(data.id) });
       },
-      onError: (error) => {
-        toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+      onError: () => {
+        notify(toast, "process_update_error");
       }
     }
   });
@@ -51,7 +51,7 @@ export function useAppActions() {
   const deleteProcess = useDeleteProcess({
     mutation: {
       onSuccess: () => {
-        toast({ title: "Processo excluído", variant: "default" });
+        notify(toast, "process_deleted");
         queryClient.invalidateQueries({ queryKey: getListProcessesQueryKey() });
       }
     }
@@ -60,30 +60,29 @@ export function useAppActions() {
   const uploadEdital = useUploadEdital({
     mutation: {
       onSuccess: (data) => {
-        toast({ title: "Edital enviado", variant: "default" });
+        notify(toast, "edital_uploaded");
         queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(data.processId) });
         queryClient.invalidateQueries({ queryKey: getListFilesQueryKey(data.processId) });
       },
-      onError: () => toast({ title: "Erro no upload", variant: "destructive" })
+      onError: () => notify(toast, "edital_upload_error")
     }
   });
 
   const uploadDocument = useUploadDocument({
     mutation: {
       onSuccess: (data) => {
+        notify(toast, "doc_uploaded");
         queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(data.processId) });
         queryClient.invalidateQueries({ queryKey: getListFilesQueryKey(data.processId) });
       },
-      onError: () => toast({ title: "Erro no upload", variant: "destructive" })
+      onError: () => notify(toast, "doc_upload_error")
     }
   });
 
   const removeFile = useDeleteFile({
     mutation: {
-      onSuccess: (_, variables) => {
-        toast({ title: "Arquivo removido", variant: "default" });
-        // Since we don't know the processId easily here without passing it, 
-        // we invalidate all files and processes to be safe
+      onSuccess: () => {
+        notify(toast, "file_removed");
         queryClient.invalidateQueries({ queryKey: ["/api/processes"] });
       }
     }
@@ -92,24 +91,24 @@ export function useAppActions() {
   const analyzeEdital = useAnalyzeEdital({
     mutation: {
       onSuccess: (_, variables) => {
-        toast({ title: "Análise concluída", description: "As exigências foram extraídas.", variant: "default" });
+        notify(toast, "edital_analyzed");
         queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(variables.id) });
         queryClient.invalidateQueries({ queryKey: getListRequirementsQueryKey(variables.id) });
         queryClient.invalidateQueries({ queryKey: getListValidationItemsQueryKey(variables.id) });
       },
-      onError: () => toast({ title: "Erro na análise", variant: "destructive" })
+      onError: () => notify(toast, "edital_analyze_error")
     }
   });
 
   const analyzeDocs = useAnalyzeDocuments({
     mutation: {
       onSuccess: (_, variables) => {
-        toast({ title: "Conferência concluída", description: "Os documentos foram analisados.", variant: "default" });
+        notify(toast, "docs_checked");
         queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(variables.id) });
         queryClient.invalidateQueries({ queryKey: getListValidationItemsQueryKey(variables.id) });
         queryClient.invalidateQueries({ queryKey: getGetReportQueryKey(variables.id) });
       },
-      onError: () => toast({ title: "Erro na conferência", variant: "destructive" })
+      onError: () => notify(toast, "docs_check_error")
     }
   });
 
