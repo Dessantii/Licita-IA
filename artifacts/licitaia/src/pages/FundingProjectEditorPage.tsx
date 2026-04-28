@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { NextActionBanner } from "@/components/NextActionBanner";
+import { computeProjectNextAction } from "@/lib/next-action";
 import { getToken } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -326,6 +328,36 @@ export function FundingProjectEditorPage() {
             </Button>
           </div>
         </div>
+
+        {/* Próxima Ação */}
+        {(() => {
+          const sectionsMap = new Map(
+            Object.entries(sections).map(([k, v]) => [k, { content: v.content }])
+          );
+          const nextAction = computeProjectNextAction(sectionsMap, validation);
+          const handleNextAction = () => {
+            const dest = nextAction.targetId;
+            if (dest === "validacao") {
+              handleValidate();
+            } else if (dest === "export") {
+              handleExport();
+            } else if (dest === "problema") {
+              setActiveSection("problema");
+            } else if (dest === "editor") {
+              const firstEmpty = SECTION_TYPES.find(
+                (s) => !sections[s.key]?.content?.trim()
+              );
+              if (firstEmpty) setActiveSection(firstEmpty.key);
+            }
+          };
+          return (
+            <NextActionBanner
+              action={nextAction}
+              onAction={handleNextAction}
+              className="mb-6"
+            />
+          );
+        })()}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Sections list + context */}

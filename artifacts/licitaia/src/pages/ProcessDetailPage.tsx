@@ -4,6 +4,8 @@ import { Link, useRoute, useLocation } from "wouter";
 import { useGetProcess, useDeleteProcess, ProcessStatus, getListProcessesQueryKey } from "@workspace/api-client-react";
 import { useAppActions } from "@/hooks/use-app-actions";
 import { ProcessStatusBadge } from "@/components/processes/ProcessStatusBadge";
+import { NextActionBanner } from "@/components/NextActionBanner";
+import { computeProcessNextAction } from "@/lib/next-action";
 import { ValidationStatusBadge } from "@/components/processes/ValidationStatusBadge";
 import { RequirementsReviewPanel } from "@/components/processes/RequirementsReviewPanel";
 import { EditProcessDialog } from "@/components/processes/EditProcessDialog";
@@ -324,6 +326,33 @@ export function ProcessDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Próxima Ação */}
+      {(() => {
+        const nextAction = computeProcessNextAction({
+          status: process.status,
+          requirements: process.requirements,
+          validationItems: process.validationItems,
+        });
+        const handleNextAction = () => {
+          const dest = nextAction.targetId as Tab | undefined;
+          if (dest && tabs.some(t => t.key === dest && !t.locked)) {
+            setActiveTab(dest);
+          } else if (nextAction.targetId === "conferencia" && !isInConference) {
+            setActiveTab("documentos");
+          } else if (dest) {
+            const unlocked = tabs.find(t => t.key === dest);
+            if (!unlocked?.locked) setActiveTab(dest as Tab);
+          }
+        };
+        return (
+          <NextActionBanner
+            action={nextAction}
+            onAction={handleNextAction}
+            className="mb-6"
+          />
+        );
+      })()}
 
       {/* Tab Bar */}
       <div className="flex gap-1 border-b border-slate-200 mb-6">

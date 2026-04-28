@@ -1,5 +1,7 @@
 import { useState, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { NextActionBanner } from "@/components/NextActionBanner";
+import { computeChamamentoNextAction } from "@/lib/next-action";
 import { Link, useRoute, useLocation } from "wouter";
 import {
   useGetCallNotice,
@@ -34,7 +36,6 @@ import {
   Upload,
   BrainCircuit,
   CheckSquare,
-  ArrowRight,
   Loader2,
   Play,
   ChevronLeft,
@@ -313,8 +314,6 @@ export function ChamamentoDetailPage() {
     }
   }
 
-  const nextStep = getNextStep();
-
   const proposta_types = ["proposta", "plano_trabalho", "cronograma"];
   const propostaFiles = documentFiles.filter(f => proposta_types.includes(f.fileType));
   const oscFiles = documentFiles.filter(f => f.fileType === "documento_osc");
@@ -388,15 +387,28 @@ export function ChamamentoDetailPage() {
         </div>
       </div>
 
-      {nextStep && (
-        <div className="mb-6 flex items-start gap-3 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
-          <ArrowRight className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-indigo-900">Próximo passo</p>
-            <p className="text-sm text-indigo-700 mt-0.5">{nextStep}</p>
-          </div>
-        </div>
-      )}
+      {/* Próxima Ação */}
+      {(() => {
+        const nextAction = computeChamamentoNextAction({
+          status: notice.status,
+          requirements,
+          validationItems,
+        });
+        const handleNextAction = () => {
+          const dest = nextAction.targetId as Tab | undefined;
+          const validTabs: Tab[] = ["edital", "documentos", "checklist"];
+          if (dest && validTabs.includes(dest)) {
+            setActiveTab(dest);
+          }
+        };
+        return (
+          <NextActionBanner
+            action={nextAction}
+            onAction={handleNextAction}
+            className="mb-6"
+          />
+        );
+      })()}
 
       {hasRequirements && totalCount > 0 && (
         <div className="mb-6">
