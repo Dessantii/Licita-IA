@@ -6,6 +6,8 @@ import { useAppActions } from "@/hooks/use-app-actions";
 import { ProcessStatusBadge } from "@/components/processes/ProcessStatusBadge";
 import { NextActionBanner } from "@/components/NextActionBanner";
 import { computeProcessNextAction } from "@/lib/next-action";
+import { ReadinessScore } from "@/components/ReadinessScore";
+import { computeLicitacaoReadiness } from "@/lib/readiness-score";
 import { ValidationStatusBadge } from "@/components/processes/ValidationStatusBadge";
 import { RequirementsReviewPanel } from "@/components/processes/RequirementsReviewPanel";
 import { EditProcessDialog } from "@/components/processes/EditProcessDialog";
@@ -326,6 +328,12 @@ export function ProcessDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Score de Prontidão */}
+      <ReadinessScore
+        result={computeLicitacaoReadiness(process.status, process.validationItems)}
+        className="mb-3"
+      />
 
       {/* Próxima Ação */}
       {(() => {

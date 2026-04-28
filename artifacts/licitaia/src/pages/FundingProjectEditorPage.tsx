@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { NextActionBanner } from "@/components/NextActionBanner";
 import { computeProjectNextAction } from "@/lib/next-action";
+import { ReadinessScore } from "@/components/ReadinessScore";
+import { computeCaptacaoReadiness } from "@/lib/readiness-score";
 import { getToken } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -328,6 +330,17 @@ export function FundingProjectEditorPage() {
             </Button>
           </div>
         </div>
+
+        {/* Score de Prontidão */}
+        {(() => {
+          const filledWithContent = Object.values(sections).filter((s) => s.content?.trim()).length;
+          return (
+            <ReadinessScore
+              result={computeCaptacaoReadiness(filledWithContent, validation?.nivel_aderencia ?? null)}
+              className="mb-3"
+            />
+          );
+        })()}
 
         {/* Próxima Ação */}
         {(() => {

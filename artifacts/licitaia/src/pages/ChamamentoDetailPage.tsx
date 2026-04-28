@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { NextActionBanner } from "@/components/NextActionBanner";
 import { computeChamamentoNextAction } from "@/lib/next-action";
+import { ReadinessScore } from "@/components/ReadinessScore";
+import { computeChamamentoReadiness } from "@/lib/readiness-score";
 import { Link, useRoute, useLocation } from "wouter";
 import {
   useGetCallNotice,
@@ -386,6 +388,12 @@ export function ChamamentoDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Score de Prontidão */}
+      <ReadinessScore
+        result={computeChamamentoReadiness(notice.status, validationItems)}
+        className="mb-3"
+      />
 
       {/* Próxima Ação */}
       {(() => {
