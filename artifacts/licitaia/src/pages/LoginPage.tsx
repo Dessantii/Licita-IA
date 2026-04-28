@@ -18,7 +18,7 @@ export function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate("/processes");
+      navigate("/");
       return;
     }
     fetch("/api/auth/status")
@@ -42,7 +42,7 @@ export function LoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao configurar conta.");
       saveAuth(data.token, data.user);
-      navigate("/processes");
+      navigate("/");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -63,7 +63,7 @@ export function LoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao fazer login.");
       saveAuth(data.token, data.user);
-      navigate("/processes");
+      navigate("/");
     } catch (err: any) {
       setError(err.message);
     } finally {

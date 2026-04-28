@@ -9,6 +9,7 @@ import { getToken, isAuthenticated } from "@/hooks/use-auth";
 
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LoginPage } from "@/pages/LoginPage";
+import { ModuleHubPage } from "@/pages/ModuleHubPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { ProcessesPage } from "@/pages/ProcessesPage";
 import { ProcessDetailPage } from "@/pages/ProcessDetailPage";
@@ -49,7 +50,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/">
-        {() => <Redirect to="/processes" />}
+        {() => isAuthenticated() ? <ModuleHubPage /> : <Redirect to="/login" />}
       </Route>
       <Route path="/login" component={LoginPage} />
       <Route path="/processes">

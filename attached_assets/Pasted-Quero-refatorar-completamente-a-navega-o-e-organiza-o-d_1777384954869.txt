@@ -1,0 +1,104 @@
+Quero refatorar completamente a navegação e organização do sistema.
+
+Contexto atual:
+Hoje o sistema possui uma sidebar global com todos os módulos misturados:
+- Empresas
+- Licitações
+- Chamamentos
+- Captação de recursos
+- Relatórios
+- Usuários
+- Configurações
+
+Isso está deixando a experiência confusa, poluída e pouco focada.
+
+Objetivo:
+Transformar o sistema em um modelo baseado em seleção de módulos, onde cada módulo funciona como um ambiente isolado, quase como um sistema independente.
+
+Nova arquitetura desejada:
+
+1. Tela inicial após login (Module Hub)
+- O usuário NÃO entra direto no sistema com sidebar
+- Ele entra em uma tela de seleção de módulos
+- Essa tela deve conter cards grandes, simples e claros:
+
+Módulos:
+- Licitações
+- Chamamentos
+- Captação de Recursos
+- Relatórios
+
+Cada card deve ter:
+- nome do módulo
+- breve descrição
+- botão de acessar
+
+2. Ao entrar em um módulo:
+- O sistema muda completamente o contexto
+- NÃO deve exibir os outros módulos
+- O layout deve parecer um sistema dedicado àquele módulo
+
+3. Navegação dentro do módulo:
+- Cada módulo deve ter sua própria sidebar (ou navegação)
+- Exemplo:
+
+Licitações:
+- Dashboard
+- Processos
+- Checklist
+- Documentos
+- Montador
+
+Chamamentos:
+- Dashboard
+- Editais
+- Propostas
+- Documentos
+
+Captação de Recursos:
+- Oportunidades
+- Submissões
+- Projetos
+- Documentos
+
+Relatórios:
+- Visão geral
+- Indicadores
+- Exportações
+
+4. Mudança visual por módulo:
+- Pequena variação de identidade visual (cor, ícone, título)
+- Não exagerar, manter consistência
+- Mas deixar claro que o usuário mudou de contexto
+
+5. Header global:
+- Nome do módulo atual visível
+- Botão “Trocar módulo”
+- Perfil do usuário
+
+6. UX importante:
+- O usuário deve sempre saber:
+  - onde está
+  - em qual módulo está
+  - como voltar para seleção de módulos
+
+7. O que NÃO quero:
+- Sidebar única com tudo misturado
+- Módulos aparecendo juntos
+- Poluição visual
+
+8. O que quero:
+- Foco
+- Separação clara de contexto
+- Sensação de sistema profissional
+- Navegação simples
+
+Entregue:
+1. Nova estrutura de navegação
+2. Organização de layout por módulo
+3. Estrutura da tela de seleção de módulos
+4. Sugestão de componentes UI
+5. Exemplo de fluxo do usuário
+6. Recomendações de UX
+
+Depois disso, gere a implementação.
