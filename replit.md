@@ -71,6 +71,19 @@ artifacts-monorepo/
 - `companies` - Company/client portfolio (razaoSocial, nomeFantasia, cnpj, email, telefone, endereco, inscricaoEstadual, inscricaoMunicipal, representanteLegal, observacoes)
 - `company_documents` - Company document library (titulo, tipo, dataEmissao, dataValidade, file metadata)
 
+### Módulo de Captação de Recursos
+- `funding_notices` - Manually uploaded funding opportunity PDFs (title, description, source, deadline, maxValue, rawText, structuredData)
+- `funding_projects` - Captação project submissions (linked to fundingNotice, status: draft/in_progress/completed)
+- `project_sections` - Individual project sections for funding submissions
+- `opportunity_sources` - Registry of monitored funding opportunity sources (name, url, type, fetchMethod: rss/html_ai, areaHint, isActive, fetchIntervalHours, lastFetchedAt, lastFetchStatus)
+- `opportunities` - Auto-collected funding opportunities (title, description, area, targetAudience, link, maxValue, publishDate, deadline, contentHash for dedup, isNew, sourceName)
+- `user_opportunity_prefs` - User preferences for opportunity matching (areas array, keywords array)
+
+### Monitoramento PNCP (Licitações)
+- `monitors` - PNCP search monitors (userId, name, uf, modalidadeId, palavrasChave, municipio, isActive)
+- `monitor_alerts` - Alerts from PNCP monitors
+- `notification_settings` - User notification settings
+
 ## Process States (Licitações)
 
 criado → edital_enviado → edital_processando → exigencias_extraidas → aguardando_documentos → documentos_enviados → em_conferencia → pendencias_encontradas | pronto_para_revisao → concluido
@@ -102,6 +115,12 @@ documento_institucional, certidao_regularidade, comprovacao_experiencia, declara
 - `/chamamentos` → ChamamentosPage (list, filter by status, create new)
 - `/chamamentos/:id` → ChamamentoDetailPage (edital upload, OSC docs, proposal section, AI analysis, next-step guidance)
 - `/chamamentos/:id/checklist` → ChamamentoChecklistPage (checklist with filter by type/status, manual edit)
+
+### Captação de Recursos
+- `/oportunidades` → OportunidadesPage (auto-monitored opportunities: 3 tabs — Oportunidades/Fontes/Preferências, filter by area/keywords, "Iniciar submissão" button, "Executar coleta" manual trigger)
+- `/funding-notices` → FundingNoticesPage (manually uploaded funding notice PDFs)
+- `/funding-projects` → FundingProjectsPage (list of funding project submissions)
+- `/funding-projects/:id` → FundingProjectEditorPage (project editor with sections, AI validation, readiness score)
 
 ### Empresas
 - `/companies` → CompaniesPage (list with search, filter by doc status, create new company inline dialog)
@@ -151,6 +170,28 @@ documento_institucional, certidao_regularidade, comprovacao_experiencia, declara
 - POST /companies/:id/verificar-sicaf (consulta compras.dados.gov.br)
 - POST /companies/:id/documents (multipart, with titulo, tipo, dataEmissao, dataValidade body fields)
 - DELETE /companies/:companyId/documents/:docId
+
+### Captação — Monitoramento Automático de Oportunidades
+- GET /opportunities — list with filters (q, area, novasSomente, page, limit)
+- GET /opportunities/stats — {total, novas, fontes}
+- GET /opportunities/sources — list all monitored sources
+- POST /opportunities/sources — add new source
+- PATCH /opportunities/sources/:id — toggle isActive
+- GET /opportunities/preferences — user opportunity preferences (areas, keywords)
+- PATCH /opportunities/preferences — update user preferences
+- POST /opportunities/collect — trigger manual collection
+
+### Captação — Funding Notices e Projects
+- GET/POST /funding-notices
+- GET/PATCH/DELETE /funding-notices/:id
+- GET/POST /projects (funding projects)
+- GET/PATCH /projects/:id
+
+### PNCP Licitações Monitoring
+- GET/POST/PATCH/DELETE /monitors
+- GET /monitors/notification-settings
+- PATCH /monitors/notification-settings
+- GET /monitors/:id/alerts
 
 ### Automação RPA
 - GET /rpa/jobs → lista todos os jobs (últimos 100)

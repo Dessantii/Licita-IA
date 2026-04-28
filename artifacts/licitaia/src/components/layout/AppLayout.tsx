@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   FolderKanban, BarChart3, Settings, LogOut, Bell, Activity,
   ExternalLink, CheckCheck, FilePlus, Users, BookOpen, Building2,
-  ChevronDown, Check, UserCircle, Target, LayoutGrid, ArrowLeft,
+  ChevronDown, Check, UserCircle, Target, LayoutGrid, ArrowLeft, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
@@ -61,7 +61,8 @@ const MODULES: Record<ModuleId, ModuleDef> = {
     activeText: "text-white",
     dotColor: "bg-violet-400",
     navItems: [
-      { href: "/funding-notices", icon: Target, label: "Oportunidades" },
+      { href: "/oportunidades", icon: Sparkles, label: "Oportunidades" },
+      { href: "/funding-notices", icon: Target, label: "Editais" },
       { href: "/funding-projects", icon: FilePlus, label: "Projetos" },
     ],
   },
@@ -94,7 +95,7 @@ const MODULES: Record<ModuleId, ModuleDef> = {
 };
 
 function detectModule(path: string): ModuleId {
-  if (path.startsWith("/funding")) return "captacao";
+  if (path.startsWith("/funding") || path.startsWith("/oportunidades")) return "captacao";
   if (path.startsWith("/chamamentos")) return "chamamentos";
   if (path.startsWith("/reports") || path.startsWith("/settings") || path.startsWith("/admin")) return "relatorios";
   if (path === "/companies" || path.startsWith("/companies/")) {

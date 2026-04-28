@@ -28,6 +28,7 @@ import { EmpresaDetailPage } from "@/pages/EmpresaDetailPage";
 import { FundingNoticesPage } from "@/pages/FundingNoticesPage";
 import { FundingProjectsPage } from "@/pages/FundingProjectsPage";
 import { FundingProjectEditorPage } from "@/pages/FundingProjectEditorPage";
+import { OportunidadesPage } from "@/pages/OportunidadesPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -94,6 +95,9 @@ function Router() {
       </Route>
       <Route path="/companies/:id">
         {() => <ProtectedRoute component={EmpresaDetailPage} />}
+      </Route>
+      <Route path="/oportunidades">
+        {() => <ProtectedRoute component={OportunidadesPage} />}
       </Route>
       <Route path="/funding-notices">
         {() => <ProtectedRoute component={FundingNoticesPage} />}

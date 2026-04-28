@@ -19,3 +19,6 @@ export * from "./notification-settings";
 export * from "./funding-notices";
 export * from "./funding-projects";
 export * from "./project-sections";
+export * from "./opportunity-sources";
+export * from "./opportunities";
+export * from "./user-opportunity-prefs";

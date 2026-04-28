@@ -13,6 +13,7 @@ import companiesRouter from "./companies/companies";
 import companyDocumentsRouter from "./companies/documents";
 import fundingNoticesRouter from "./funding/notices";
 import fundingProjectsRouter from "./funding/projects";
+import opportunitiesRouter from "./captacao/opportunities";
 
 const router: IRouter = Router();
 
@@ -36,6 +37,6 @@ router.use("/companies", companyDocumentsRouter);
 
 router.use("/funding-notices", fundingNoticesRouter);
 router.use("/projects", fundingProjectsRouter);
-
+router.use("/opportunities", opportunitiesRouter);
 
 export default router;
