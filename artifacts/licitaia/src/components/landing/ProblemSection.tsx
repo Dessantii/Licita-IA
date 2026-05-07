@@ -39,37 +39,37 @@ export function ProblemSection() {
   return (
     <section id="problema" style={{ background: "#060c18" }}>
       <div
-        className="py-24"
+        className="py-16 sm:py-24"
         style={{
           background: "linear-gradient(180deg, #060c18 0%, #08101e 100%)",
           borderTop: "1px solid rgba(255,255,255,0.04)",
         }}
       >
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6">
+          <div className="text-center mb-10 sm:mb-16">
             <div
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-6"
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-5 sm:mb-6"
               style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}
             >
               O problema
             </div>
             <h2
-              className="text-3xl md:text-4xl font-bold mb-4"
+              className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4"
               style={{ fontFamily: "'Manrope', sans-serif", color: "#ffffff" }}
             >
               O processo ainda é manual e fragmentado
             </h2>
-            <p className="text-base max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.45)" }}>
+            <p className="text-sm sm:text-base max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.45)" }}>
               Empresas e organizações perdem oportunidades todos os dias por falta de visibilidade,
               organização e automação no ciclo de participação pública.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {PROBLEMS.map(({ icon: Icon, title, desc }) => (
               <div
                 key={title}
-                className="group rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02]"
+                className="group rounded-2xl p-5 sm:p-6 transition-all duration-300"
                 style={{
                   background: "rgba(255,255,255,0.03)",
                   border: "1px solid rgba(255,255,255,0.07)",

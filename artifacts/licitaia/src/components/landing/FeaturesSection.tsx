@@ -63,32 +63,32 @@ const FEATURES = [
 export function FeaturesSection() {
   return (
     <section id="funcionalidades" style={{ background: "#060c18", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-      <div className="py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
+      <div className="py-16 sm:py-24">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6">
+          <div className="text-center mb-10 sm:mb-16">
             <div
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-6"
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-5 sm:mb-6"
               style={{ background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.2)", color: "#22d3ee" }}
             >
               Funcionalidades
             </div>
             <h2
-              className="text-3xl md:text-4xl font-bold mb-4"
+              className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4"
               style={{ fontFamily: "'Manrope', sans-serif", color: "#ffffff" }}
             >
               Automação operacional com IA
             </h2>
-            <p className="text-base max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.45)" }}>
+            <p className="text-sm sm:text-base max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.45)" }}>
               Cada funcionalidade foi desenhada para eliminar etapas manuais e reduzir o risco
               de desclassificação em processos públicos.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {FEATURES.map(({ icon: Icon, title, desc, color }) => (
               <div
                 key={title}
-                className="group rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02] cursor-default"
+                className="group rounded-2xl p-5 sm:p-6 transition-all duration-300 cursor-default"
                 style={{
                   background: "rgba(255,255,255,0.03)",
                   border: "1px solid rgba(255,255,255,0.06)",
@@ -111,7 +111,7 @@ export function FeaturesSection() {
                   <Icon className="w-5 h-5" style={{ color }} />
                 </div>
                 <h3 className="text-sm font-semibold mb-1.5" style={{ color: "#ffffff" }}>{title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>{desc}</p>
+                <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>{desc}</p>
               </div>
             ))}
           </div>

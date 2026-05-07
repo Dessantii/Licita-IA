@@ -31,59 +31,59 @@ function DashboardMockup() {
           className="flex-1 mx-3 h-5 rounded-md flex items-center px-3"
           style={{ background: "rgba(255,255,255,0.06)" }}
         >
-          <span className="text-white/30 text-[10px] font-mono">app.licitaia.com.br/processes</span>
+          <span className="text-white/30 text-[10px] font-mono truncate">app.licitaia.com.br/processes</span>
         </div>
       </div>
 
       {/* Dashboard content */}
-      <div className="p-5 space-y-4" style={{ background: "#0a1628" }}>
+      <div className="p-4 space-y-3" style={{ background: "#0a1628" }}>
         {/* Header bar */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1">
           <div>
             <div className="text-white font-semibold text-sm">Licitações</div>
             <div className="text-white/40 text-xs">12 processos ativos</div>
           </div>
           <div
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-teal-400"
+            className="px-2.5 py-1 rounded-lg text-xs font-medium text-teal-400 whitespace-nowrap"
             style={{ background: "rgba(13,148,136,0.15)" }}
           >
-            + Novo processo
+            + Novo
           </div>
         </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-4 gap-2.5">
+        {/* Stat cards — 2 cols on mobile, 4 on larger */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {statCards.map((s, i) => (
             <div
               key={i}
-              className="rounded-xl p-3"
+              className="rounded-xl p-2.5"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
             >
-              <div className="text-white/40 text-[10px] mb-1 leading-tight">{s.label}</div>
-              <div className="text-white font-bold text-base">{s.value}</div>
+              <div className="text-white/40 text-[9px] mb-0.5 leading-tight">{s.label}</div>
+              <div className="text-white font-bold text-sm">{s.value}</div>
             </div>
           ))}
         </div>
 
         {/* Process list */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {processes.map((p, i) => (
             <div
               key={i}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+              className="flex items-center gap-2.5 rounded-xl px-3 py-2"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
             >
               <div
-                className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
+                className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-[9px] font-bold"
                 style={{ background: `${p.color}22`, color: p.color }}
               >
                 {String.fromCharCode(65 + i)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-white/80 text-xs truncate">{p.name}</div>
+                <div className="text-white/80 text-[11px] truncate">{p.name}</div>
               </div>
               <div
-                className="text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0"
+                className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0"
                 style={{
                   background: p.status === "ok" ? "rgba(13,148,136,0.2)" : "rgba(245,158,11,0.2)",
                   color: p.status === "ok" ? "#2dd4bf" : "#fbbf24",
@@ -95,25 +95,25 @@ function DashboardMockup() {
           ))}
         </div>
 
-        {/* Progress bars */}
+        {/* Progress bars — hidden on very small screens */}
         <div
-          className="rounded-xl p-4"
+          className="hidden sm:block rounded-xl p-3"
           style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
         >
-          <div className="text-white/50 text-xs mb-3">Prontidão Documental</div>
+          <div className="text-white/50 text-[10px] mb-2.5">Prontidão Documental</div>
           {[
             { label: "Habilitação Jurídica", pct: 100 },
             { label: "Regularidade Fiscal", pct: 83 },
             { label: "Qualificação Técnica", pct: 67 },
           ].map((bar, i) => (
-            <div key={i} className="mb-2 last:mb-0">
-              <div className="flex justify-between text-[10px] mb-1">
+            <div key={i} className="mb-1.5 last:mb-0">
+              <div className="flex justify-between text-[9px] mb-1">
                 <span className="text-white/40">{bar.label}</span>
                 <span className="text-white/60">{bar.pct}%</span>
               </div>
               <div className="h-1 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="h-full rounded-full"
                   style={{
                     width: `${bar.pct}%`,
                     background: bar.pct === 100
@@ -138,7 +138,7 @@ export function HeroSection() {
   }
 
   return (
-    <section className="relative min-h-screen flex flex-col" style={{ background: "#060c18" }}>
+    <section className="relative min-h-screen flex flex-col overflow-hidden" style={{ background: "#060c18" }}>
       {/* Grid background */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -150,7 +150,6 @@ export function HeroSection() {
           backgroundSize: "64px 64px",
         }}
       />
-
       {/* Radial glow */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -166,27 +165,31 @@ export function HeroSection() {
       />
 
       {/* Content */}
-      <div className="relative flex-1 flex items-center pt-24 pb-16">
-        <div className="max-w-7xl mx-auto px-6 w-full">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+      <div className="relative flex-1 flex items-center pt-20 pb-12 lg:pt-24 lg:pb-16 w-full">
+        <div className="w-full max-w-7xl mx-auto" style={{ padding: "0 20px" }}>
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             {/* Left */}
-            <div className="space-y-8">
+            <div className="space-y-6 lg:space-y-8 min-w-0 overflow-hidden">
               <div
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
                 style={{
                   background: "rgba(13,148,136,0.12)",
                   border: "1px solid rgba(13,148,136,0.25)",
                   color: "#2dd4bf",
                 }}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse flex-shrink-0" />
                 Plataforma operacional de licitações
               </div>
 
               <div className="space-y-4">
                 <h1
-                  className="text-5xl xl:text-6xl font-bold leading-[1.05] tracking-tight"
-                  style={{ fontFamily: "'Manrope', sans-serif", color: "#ffffff" }}
+                  className="font-bold leading-[1.05] tracking-tight"
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    color: "#ffffff",
+                    fontSize: "clamp(2rem, 7vw, 3.75rem)",
+                  }}
                 >
                   Menos burocracia.
                   <br />
@@ -200,9 +203,8 @@ export function HeroSection() {
                     Mais execução.
                   </span>
                 </h1>
-                <p className="text-lg leading-relaxed" style={{ color: "rgba(255,255,255,0.55)" }}>
-                  Centralize licitações, chamamentos públicos e captação de recursos em uma única
-                  plataforma com automação e inteligência artificial.
+                <p className="text-base sm:text-lg leading-relaxed w-full" style={{ color: "rgba(255,255,255,0.55)", overflowWrap: "break-word", wordBreak: "break-word" }}>
+                  Centralize licitações, chamamentos públicos e captação de recursos em uma única plataforma com automação e inteligência artificial.
                 </p>
               </div>
 
@@ -225,22 +227,22 @@ export function HeroSection() {
               </div>
 
               {/* Trust indicators */}
-              <div className="flex items-center gap-6 pt-2">
+              <div className="flex items-center gap-5 sm:gap-8 pt-1">
                 {[
                   { num: "4", label: "módulos integrados" },
                   { num: "100%", label: "web, sem instalação" },
                   { num: "IA", label: "análise automática" },
                 ].map((item, i) => (
                   <div key={i} className="text-center">
-                    <div className="text-lg font-bold" style={{ color: "#06b6d4" }}>{item.num}</div>
-                    <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>{item.label}</div>
+                    <div className="text-base sm:text-lg font-bold" style={{ color: "#06b6d4" }}>{item.num}</div>
+                    <div className="text-[10px] sm:text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>{item.label}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Right — Dashboard mockup */}
-            <div className="relative">
+            {/* Right — Dashboard mockup, shown below on mobile */}
+            <div className="relative w-full min-w-0 overflow-hidden">
               <div
                 className="absolute -inset-8 rounded-3xl pointer-events-none"
                 style={{ background: "radial-gradient(ellipse at center, rgba(13,148,136,0.1) 0%, transparent 70%)" }}
@@ -252,7 +254,7 @@ export function HeroSection() {
       </div>
 
       {/* Scroll indicator */}
-      <div className="flex justify-center pb-10">
+      <div className="flex justify-center pb-8">
         <button
           onClick={() => document.querySelector("#problema")?.scrollIntoView({ behavior: "smooth" })}
           className="flex flex-col items-center gap-2 opacity-40 hover:opacity-70 transition-opacity"

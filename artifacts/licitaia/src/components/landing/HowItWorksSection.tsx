@@ -42,22 +42,22 @@ const STEPS = [
 export function HowItWorksSection() {
   return (
     <section id="como-funciona" style={{ background: "#08101e", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-      <div className="py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
+      <div className="py-16 sm:py-24">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6">
+          <div className="text-center mb-10 sm:mb-16">
             <div
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-6"
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-5 sm:mb-6"
               style={{ background: "rgba(13,148,136,0.1)", border: "1px solid rgba(13,148,136,0.2)", color: "#2dd4bf" }}
             >
               Processo
             </div>
             <h2
-              className="text-3xl md:text-4xl font-bold mb-4"
+              className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4"
               style={{ fontFamily: "'Manrope', sans-serif", color: "#ffffff" }}
             >
               Do edital à submissão
             </h2>
-            <p className="text-base max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.45)" }}>
+            <p className="text-sm sm:text-base max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.45)" }}>
               Um fluxo linear e inteligente que elimina etapas repetitivas e centraliza
               toda a gestão documental em um único lugar.
             </p>
@@ -65,12 +65,10 @@ export function HowItWorksSection() {
 
           {/* Desktop: horizontal timeline */}
           <div className="hidden lg:block relative">
-            {/* Connector line */}
             <div
-              className="absolute top-11 left-[calc(100%/12)] right-[calc(100%/12)] h-px"
+              className="absolute top-[26px] left-[calc(100%/12)] right-[calc(100%/12)] h-px"
               style={{ background: "linear-gradient(90deg, transparent 0%, rgba(13,148,136,0.3) 10%, rgba(6,182,212,0.3) 50%, rgba(13,148,136,0.3) 90%, transparent 100%)" }}
             />
-
             <div className="grid grid-cols-6 gap-4">
               {STEPS.map(({ icon: Icon, title, desc, color }, i) => (
                 <div key={title} className="flex flex-col items-center text-center">
@@ -100,20 +98,20 @@ export function HowItWorksSection() {
             </div>
           </div>
 
-          {/* Mobile: vertical list */}
-          <div className="lg:hidden space-y-4">
+          {/* Mobile/tablet: 2-column grid */}
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
             {STEPS.map(({ icon: Icon, title, desc, color }, i) => (
               <div
                 key={title}
-                className="flex gap-4 rounded-2xl p-5"
+                className="flex gap-4 rounded-2xl p-4 sm:p-5"
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
               >
                 <div className="relative flex-shrink-0">
                   <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
                     style={{ background: `${color}18` }}
                   >
-                    <Icon className="w-5 h-5" style={{ color }} />
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color }} />
                   </div>
                   <div
                     className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
@@ -124,7 +122,7 @@ export function HowItWorksSection() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold mb-1" style={{ color: "#ffffff" }}>{title}</h3>
-                  <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>{desc}</p>
+                  <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>{desc}</p>
                 </div>
               </div>
             ))}

@@ -66,34 +66,34 @@ const MODULES = [
 export function SolutionSection() {
   return (
     <section id="modulos" style={{ background: "#08101e" }}>
-      <div className="py-24" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
+      <div className="py-16 sm:py-24" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+        <div className="max-w-7xl mx-auto px-5 sm:px-6">
+          <div className="text-center mb-10 sm:mb-16">
             <div
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-6"
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-5 sm:mb-6"
               style={{ background: "rgba(13,148,136,0.1)", border: "1px solid rgba(13,148,136,0.2)", color: "#2dd4bf" }}
             >
               A solução
             </div>
             <h2
-              className="text-3xl md:text-4xl font-bold mb-4"
+              className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4"
               style={{ fontFamily: "'Manrope', sans-serif", color: "#ffffff" }}
             >
               Uma plataforma para todo o ciclo operacional
             </h2>
-            <p className="text-base max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.45)" }}>
+            <p className="text-sm sm:text-base max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.45)" }}>
               Quatro módulos integrados que cobrem do monitoramento de oportunidades à entrega dos documentos.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {MODULES.map(({ icon: Icon, name, tagline, color, features, glow, border }) => (
               <div
                 key={name}
-                className="group relative rounded-2xl p-7 transition-all duration-300 hover:scale-[1.01]"
+                className="group relative rounded-2xl p-5 sm:p-7 transition-all duration-300"
                 style={{
                   background: "rgba(255,255,255,0.03)",
-                  border: `1px solid rgba(255,255,255,0.07)`,
+                  border: "1px solid rgba(255,255,255,0.07)",
                 }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget as HTMLDivElement;
@@ -106,23 +106,23 @@ export function SolutionSection() {
                   el.style.borderColor = "rgba(255,255,255,0.07)";
                 }}
               >
-                <div className="flex items-start gap-4 mb-5">
+                <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-5">
                   <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: `${color}20` }}
                   >
                     <Icon className="w-5 h-5" style={{ color }} />
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold" style={{ color: "#ffffff", fontFamily: "'Manrope', sans-serif" }}>{name}</h3>
-                    <p className="text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>{tagline}</p>
+                    <h3 className="text-sm sm:text-base font-semibold" style={{ color: "#ffffff", fontFamily: "'Manrope', sans-serif" }}>{name}</h3>
+                    <p className="text-xs sm:text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>{tagline}</p>
                   </div>
                 </div>
-                <ul className="space-y-2.5">
+                <ul className="space-y-2 sm:space-y-2.5">
                   {features.map((f) => (
                     <li key={f} className="flex items-center gap-2.5">
                       <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                      <span className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>{f}</span>
+                      <span className="text-xs sm:text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>{f}</span>
                     </li>
                   ))}
                 </ul>
