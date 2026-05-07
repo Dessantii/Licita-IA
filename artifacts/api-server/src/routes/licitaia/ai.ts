@@ -32,7 +32,10 @@ const tempUpload = multer({
 });
 
 async function extractTextFromFile(filePath: string, mimeType: string): Promise<string> {
-  const fullPath = path.join(UPLOADS_DIR, filePath);
+  // filePath is stored as "/uploads/filename.pdf" (URL path).
+  // Strip the leading "/uploads/" prefix so we can join it with UPLOADS_DIR correctly.
+  const filename = filePath.replace(/^\/uploads\//, "");
+  const fullPath = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(fullPath)) {
     return "";
   }

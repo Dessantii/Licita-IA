@@ -970,10 +970,10 @@ export function MonitoramentosPage() {
           <DialogContent className="max-w-sm">
             <DialogHeader>
               <DialogTitle>Vincular empresa ao processo</DialogTitle>
-              <p className="text-sm text-slate-500 mt-1">
-                Selecione a empresa que vai participar deste processo, ou crie sem vínculo.
-              </p>
             </DialogHeader>
+            <p className="text-sm text-slate-500 -mt-2">
+              Selecione a empresa que vai participar deste processo, ou crie sem vínculo.
+            </p>
 
             <div className="space-y-2 my-2">
               {/* No company option */}
