@@ -267,11 +267,12 @@ router.post("/alerts/read-all", async (req, res) => {
 });
 
 router.post("/import-from-pncp", async (req, res) => {
-  const { urlPncp, title, agency, modality } = req.body as {
+  const { urlPncp, title, agency, modality, companyId } = req.body as {
     urlPncp: string;
     title: string;
     agency: string;
     modality: string;
+    companyId?: number | null;
   };
 
   if (!urlPncp || !title || !agency) {
@@ -315,6 +316,7 @@ router.post("/import-from-pncp", async (req, res) => {
     agency,
     modality: modality || "Não informada",
     status: editalDoc ? "edital_enviado" : "criado",
+    companyId: companyId ?? null,
   }).returning();
 
   if (!process) {

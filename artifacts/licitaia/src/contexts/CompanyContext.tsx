@@ -25,12 +25,17 @@ const CompanyContext = createContext<CompanyContextValue>({
 });
 
 const STORAGE_KEY = "licitaia_active_company_id";
+const ALL_VALUE = "all";
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeCompanyId, setActiveCompanyIdState] = useState<number | null>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === ALL_VALUE) return null;
     return stored ? parseInt(stored, 10) : null;
+  });
+  const [userChoseAll, setUserChoseAll] = useState<boolean>(() => {
+    return localStorage.getItem(STORAGE_KEY) === ALL_VALUE;
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -44,6 +49,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       const data: Company[] = await res.json();
       setCompanies(data);
       setActiveCompanyIdState(prev => {
+        // If user explicitly chose "all", keep it
+        if (localStorage.getItem(STORAGE_KEY) === ALL_VALUE) return null;
         if (prev !== null && data.some(c => c.id === prev)) return prev;
         if (data.length > 0) {
           localStorage.setItem(STORAGE_KEY, String(data[0]!.id));
@@ -59,8 +66,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   function setActiveCompanyId(id: number | null) {
     setActiveCompanyIdState(id);
-    if (id === null) localStorage.removeItem(STORAGE_KEY);
-    else localStorage.setItem(STORAGE_KEY, String(id));
+    if (id === null) {
+      localStorage.setItem(STORAGE_KEY, ALL_VALUE);
+      setUserChoseAll(true);
+    } else {
+      localStorage.setItem(STORAGE_KEY, String(id));
+      setUserChoseAll(false);
+    }
   }
 
   const activeCompany = companies.find(c => c.id === activeCompanyId) ?? null;

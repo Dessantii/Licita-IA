@@ -4,7 +4,7 @@ import {
   Plus, Trash2, PlayCircle, PauseCircle, RefreshCw, Activity, MapPin, Tag,
   CheckCircle2, Loader2, AlertTriangle, Search, ExternalLink, Calendar,
   Building2, LayoutGrid, Settings2, ChevronLeft, ChevronRight, X, Filter,
-  Newspaper, TrendingUp, Clock, FolderPlus, Bell, BellOff, Save,
+  Newspaper, TrendingUp, Clock, FolderPlus, Bell, BellOff, Save, Check,
 } from "lucide-react";
 import { getToken } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,9 @@ import { ptBR } from "date-fns/locale";
 import { CreateProcessDialog } from "@/components/processes/CreateProcessDialog";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveCompany } from "@/contexts/CompanyContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const UFS = [
   "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
@@ -225,8 +228,11 @@ export function MonitoramentosPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createDialogPrefill, setCreateDialogPrefill] = useState<{ title?: string; agency?: string; modality?: string } | undefined>();
   const [importingAlertId, setImportingAlertId] = useState<number | null>(null);
+  const [pendingImportAlert, setPendingImportAlert] = useState<Alert | null>(null);
+  const [selectedCompanyForImport, setSelectedCompanyForImport] = useState<string>("none");
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { companies, activeCompany } = useActiveCompany();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 400);
@@ -298,12 +304,23 @@ export function MonitoramentosPage() {
     setNotifSettings(s => ({ ...s, palavrasChave: s.palavrasChave.filter(k => k !== kw) }));
   }
 
-  async function handleImportFromPncp(alert: Alert) {
+  function handleImportFromPncp(alert: Alert) {
+    setSelectedCompanyForImport(activeCompany ? String(activeCompany.id) : "none");
+    setPendingImportAlert(alert);
+  }
+
+  async function handleConfirmImport() {
+    if (!pendingImportAlert) return;
+    const alert = pendingImportAlert;
+    const companyId = selectedCompanyForImport !== "none" ? parseInt(selectedCompanyForImport, 10) : null;
+    setPendingImportAlert(null);
+
     if (!alert.urlPncp) {
       setCreateDialogPrefill({ title: alert.titulo, agency: alert.orgao ?? "", modality: alert.modalidade ?? "" });
       setCreateDialogOpen(true);
       return;
     }
+
     setImportingAlertId(alert.id);
     try {
       const res = await fetch("/api/monitors/import-from-pncp", {
@@ -314,6 +331,7 @@ export function MonitoramentosPage() {
           title: alert.titulo,
           agency: alert.orgao ?? "",
           modality: alert.modalidade ?? "",
+          companyId,
         }),
       });
       const data = await res.json();
@@ -946,6 +964,75 @@ export function MonitoramentosPage() {
           onOpenChange={setCreateDialogOpen}
           prefill={createDialogPrefill}
         />
+
+        {/* Company selection dialog before creating process from edital */}
+        <Dialog open={!!pendingImportAlert} onOpenChange={(open) => { if (!open) setPendingImportAlert(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Vincular empresa ao processo</DialogTitle>
+              <p className="text-sm text-slate-500 mt-1">
+                Selecione a empresa que vai participar deste processo, ou crie sem vínculo.
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-2 my-2">
+              {/* No company option */}
+              <button
+                onClick={() => setSelectedCompanyForImport("none")}
+                className={cn(
+                  "w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all",
+                  selectedCompanyForImport === "none"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-slate-300",
+                )}
+              >
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                  <X className="w-4 h-4 text-slate-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800">Nenhuma empresa</p>
+                  <p className="text-xs text-slate-400">Processo sem vínculo</p>
+                </div>
+                {selectedCompanyForImport === "none" && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
+              </button>
+
+              {companies.map((company) => {
+                const name = company.nomeFantasia ?? company.razaoSocial ?? "Sem nome";
+                const sub = company.nomeFantasia && company.razaoSocial ? company.razaoSocial : company.cnpj;
+                const isSelected = selectedCompanyForImport === String(company.id);
+                return (
+                  <button
+                    key={company.id}
+                    onClick={() => setSelectedCompanyForImport(String(company.id))}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all",
+                      isSelected ? "border-primary bg-primary/5" : "border-border hover:border-slate-300",
+                    )}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("text-sm font-medium truncate", isSelected ? "text-primary" : "text-slate-800")}>{name}</p>
+                      {sub && <p className="text-xs text-slate-400 truncate">{sub}</p>}
+                    </div>
+                    {isSelected && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setPendingImportAlert(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleConfirmImport}>
+                <FolderPlus className="w-4 h-4 mr-1.5" />
+                Criar processo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
