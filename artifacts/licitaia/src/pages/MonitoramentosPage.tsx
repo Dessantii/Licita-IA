@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CreateProcessDialog } from "@/components/processes/CreateProcessDialog";
+import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 const UFS = [
   "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
@@ -48,6 +50,7 @@ interface Alert {
   uf: string | null;
   dataPublicacao: string | null;
   urlPncp: string | null;
+  pncpId: string | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -99,9 +102,10 @@ function ModalidadeBadge({ modalidade }: { modalidade: string | null }) {
   );
 }
 
-function LicitacaoCard({ alert, onCreateProcess }: {
+function LicitacaoCard({ alert, onImportFromPncp, isImporting }: {
   alert: Alert;
-  onCreateProcess?: (prefill: { title: string; agency: string; modality: string }) => void;
+  onImportFromPncp?: (alert: Alert) => void;
+  isImporting?: boolean;
 }) {
   const date = alert.dataPublicacao
     ? (() => {
@@ -155,17 +159,23 @@ function LicitacaoCard({ alert, onCreateProcess }: {
         )}
       </div>
 
-      {onCreateProcess && (
+      {onImportFromPncp && (
         <button
-          onClick={() => onCreateProcess({
-            title: alert.titulo,
-            agency: alert.orgao ?? "",
-            modality: alert.modalidade ?? "",
-          })}
-          className="w-full flex items-center justify-center gap-2 mt-1 py-2 px-3 rounded-lg border border-dashed border-primary/30 text-primary text-xs font-medium hover:bg-primary/5 hover:border-primary/50 transition-all"
+          onClick={() => !isImporting && onImportFromPncp(alert)}
+          disabled={isImporting}
+          className="w-full flex items-center justify-center gap-2 mt-1 py-2 px-3 rounded-lg border border-dashed border-primary/30 text-primary text-xs font-medium hover:bg-primary/5 hover:border-primary/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <FolderPlus className="w-3.5 h-3.5" />
-          Criar processo a partir deste edital
+          {isImporting ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Importando edital do PNCP...
+            </>
+          ) : (
+            <>
+              <FolderPlus className="w-3.5 h-3.5" />
+              Criar processo a partir deste edital
+            </>
+          )}
         </button>
       )}
     </div>
@@ -214,6 +224,9 @@ export function MonitoramentosPage() {
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createDialogPrefill, setCreateDialogPrefill] = useState<{ title?: string; agency?: string; modality?: string } | undefined>();
+  const [importingAlertId, setImportingAlertId] = useState<number | null>(null);
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), 400);
@@ -285,9 +298,39 @@ export function MonitoramentosPage() {
     setNotifSettings(s => ({ ...s, palavrasChave: s.palavrasChave.filter(k => k !== kw) }));
   }
 
-  function handleCreateProcessFromAlert(prefill: { title: string; agency: string; modality: string }) {
-    setCreateDialogPrefill(prefill);
-    setCreateDialogOpen(true);
+  async function handleImportFromPncp(alert: Alert) {
+    if (!alert.urlPncp) {
+      setCreateDialogPrefill({ title: alert.titulo, agency: alert.orgao ?? "", modality: alert.modalidade ?? "" });
+      setCreateDialogOpen(true);
+      return;
+    }
+    setImportingAlertId(alert.id);
+    try {
+      const res = await fetch("/api/monitors/import-from-pncp", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          urlPncp: alert.urlPncp,
+          title: alert.titulo,
+          agency: alert.orgao ?? "",
+          modality: alert.modalidade ?? "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao importar.");
+      if (data.editalDownloaded) {
+        toast({ title: "Edital importado com sucesso!", description: "O PDF foi baixado do PNCP e anexado ao processo." });
+      } else {
+        toast({ title: "Processo criado", description: "O edital não estava disponível para download automático." });
+      }
+      navigate(`/processes/${data.processId}`);
+    } catch {
+      toast({ title: "Importação automática indisponível", description: "Preencha o processo manualmente.", variant: "destructive" });
+      setCreateDialogPrefill({ title: alert.titulo, agency: alert.orgao ?? "", modality: alert.modalidade ?? "" });
+      setCreateDialogOpen(true);
+    } finally {
+      setImportingAlertId(null);
+    }
   }
 
   const hasActiveFilters = filters.search || filters.uf || filters.municipio || filters.modalidade || filters.dataInicial || filters.dataFinal;
@@ -553,7 +596,7 @@ export function MonitoramentosPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {portalData.data.map(alert => (
-                    <LicitacaoCard key={alert.id} alert={alert} onCreateProcess={handleCreateProcessFromAlert} />
+                    <LicitacaoCard key={alert.id} alert={alert} onImportFromPncp={handleImportFromPncp} isImporting={importingAlertId === alert.id} />
                   ))}
                 </div>
 

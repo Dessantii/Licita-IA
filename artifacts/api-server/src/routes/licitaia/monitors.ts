@@ -1,9 +1,13 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { monitorsTable, monitorAlertsTable, notificationSettingsTable } from "@workspace/db";
+import { monitorsTable, monitorAlertsTable, notificationSettingsTable, processesTable, uploadedFilesTable } from "@workspace/db";
 import { eq, and, desc, count, ilike, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { buscarPublicacoesPncp, filtragemPorPalavras, pncpUrl, MODALIDADES } from "../../services/pncp";
+import fs from "fs";
+import path from "path";
+
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
 const router: IRouter = Router();
 
@@ -260,6 +264,95 @@ router.post("/alerts/read-all", async (req, res) => {
     .set({ isRead: true })
     .where(eq(monitorAlertsTable.userId, userId));
   res.status(204).send();
+});
+
+router.post("/import-from-pncp", async (req, res) => {
+  const { urlPncp, title, agency, modality } = req.body as {
+    urlPncp: string;
+    title: string;
+    agency: string;
+    modality: string;
+  };
+
+  if (!urlPncp || !title || !agency) {
+    res.status(400).json({ error: "Dados obrigatórios ausentes." });
+    return;
+  }
+
+  const match = urlPncp.match(/\/editais\/(\d+)\/(\d{4})\/(\d+)/);
+  if (!match) {
+    res.status(400).json({ error: "URL PNCP inválida." });
+    return;
+  }
+
+  const [, cnpj, anoStr, seqStr] = match;
+  const sequencial = parseInt(seqStr, 10);
+
+  let docs: any[] = [];
+  try {
+    const docsApiUrl = `https://pncp.gov.br/api/pncp/v1/orgaos/${cnpj}/compras/${anoStr}/${sequencial}/arquivos`;
+    const docsRes = await fetch(docsApiUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (docsRes.ok) {
+      const body = await docsRes.json();
+      docs = Array.isArray(body) ? body : [];
+    }
+  } catch {
+    // Continue — process will be created without edital
+  }
+
+  const editalDoc = docs.find((d: any) =>
+    d.url && (
+      d.tipoDocumentoDescricao?.toLowerCase().includes("edital") ||
+      d.titulo?.toLowerCase().includes("edital")
+    )
+  ) ?? docs.find((d: any) => d.url) ?? null;
+
+  const [process] = await db.insert(processesTable).values({
+    title,
+    agency,
+    modality: modality || "Não informada",
+    status: editalDoc ? "edital_enviado" : "criado",
+  }).returning();
+
+  if (!process) {
+    res.status(500).json({ error: "Erro ao criar processo." });
+    return;
+  }
+
+  let editalDownloaded = false;
+
+  if (editalDoc) {
+    const downloadUrl = editalDoc.url as string;
+    try {
+      const fileRes = await fetch(downloadUrl, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(30000),
+      });
+      if (fileRes.ok) {
+        const buffer = Buffer.from(await fileRes.arrayBuffer());
+        const filename = `edital_${process.id}_${Date.now()}.pdf`;
+        if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        fs.writeFileSync(`${UPLOADS_DIR}/${filename}`, buffer);
+        const docName = (editalDoc.titulo as string | undefined) ?? "Edital";
+        await db.insert(uploadedFilesTable).values({
+          processId: process.id,
+          fileType: "edital",
+          name: docName.length > 200 ? docName.slice(0, 200) : docName,
+          path: `/uploads/${filename}`,
+          mimeType: "application/pdf",
+          size: buffer.length,
+        });
+        editalDownloaded = true;
+      }
+    } catch {
+      // Download failed — process still exists, just without edital
+    }
+  }
+
+  res.status(201).json({ processId: process.id, editalDownloaded });
 });
 
 export async function checkMonitor(monitor: typeof monitorsTable.$inferSelect, userId: number): Promise<number> {
