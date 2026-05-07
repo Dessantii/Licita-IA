@@ -1,0 +1,294 @@
+Quero criar uma Landing Page moderna, profissional e focada em conversão para o sistema LicitaIA.
+
+Contexto do produto:
+O LicitaIA é uma plataforma web brasileira para gestão de processos de participação pública e captação de recursos.
+
+O sistema possui 4 módulos principais:
+1. Licitações
+2. Chamamentos Públicos
+3. Captação de Recursos
+4. Empresas
+
+O objetivo do sistema é reduzir burocracia operacional, automatizar análise documental e facilitar participação em processos públicos.
+
+IMPORTANTE:
+A landing page NÃO deve parecer genérica de IA.
+Ela deve parecer uma plataforma séria, moderna, confiável e operacional.
+
+Objetivo da landing page:
+- Explicar claramente o problema
+- Mostrar como o LicitaIA resolve
+- Apresentar funcionalidades
+- Gerar confiança
+- Levar o usuário para login
+
+Estrutura desejada:
+
+==================================================
+1. HERO SECTION
+==================================================
+
+Objetivo:
+Impactar imediatamente.
+
+Conteúdo:
+- Headline forte
+- Subheadline clara
+- Botões CTA
+- Visual moderno
+
+Headline sugerida:
+"Menos burocracia. Mais execução."
+
+Subheadline:
+"Centralize licitações, chamamentos públicos e captação de recursos em uma única plataforma com automação e IA."
+
+Botões:
+- "Entrar na plataforma"
+- "Conhecer funcionalidades"
+
+IMPORTANTE:
+O botão "Entrar na plataforma" deve redirecionar para a tela de login já existente no sistema.
+
+Visual:
+- Layout premium
+- Dashboard mockup do sistema
+- Gradientes leves
+- Aparência SaaS moderna
+- Muito espaço em branco
+- Visual limpo
+
+==================================================
+2. SEÇÃO: O PROBLEMA
+==================================================
+
+Título:
+"O processo ainda é manual e fragmentado"
+
+Mostrar dores reais:
+- Editais espalhados
+- Documentos vencidos
+- Prazos perdidos
+- Conferência manual
+- Risco de desclassificação
+- Muitas plataformas diferentes
+
+Visual:
+- Cards com problemas
+- Ícones minimalistas
+
+==================================================
+3. SEÇÃO: COMO O LICITAIA RESOLVE
+==================================================
+
+Título:
+"Uma plataforma para todo o ciclo operacional"
+
+Mostrar os 4 módulos visualmente:
+
+Licitações
+- Monitoramento PNCP
+- Extração automática de exigências
+- Conferência documental
+
+Chamamentos Públicos
+- Gestão para OSCs
+- Validação de requisitos
+- Organização de submissões
+
+Captação de Recursos
+- Monitoramento automático de oportunidades
+- Organização de projetos
+- Gestão de submissões
+
+Empresas
+- Biblioteca documental
+- Regularidade
+- Centralização operacional
+
+Cada módulo:
+- Card moderno
+- Ícone
+- Pequena descrição
+- Hover elegante
+
+==================================================
+4. SEÇÃO: FUNCIONALIDADES
+==================================================
+
+Título:
+"Automação operacional com IA"
+
+Mostrar funcionalidades principais:
+
+- Leitura automática de editais
+- Extração de exigências
+- Validação de documentos
+- Score de prontidão
+- Próxima ação inteligente
+- Monitoramento automático
+- Alertas de oportunidades
+- Relatórios finais
+- Organização documental
+
+Visual:
+- Grid moderno
+- Cards elegantes
+- Micro animações suaves
+
+==================================================
+5. SEÇÃO: COMO FUNCIONA
+==================================================
+
+Título:
+"Do edital à submissão"
+
+Fluxo visual:
+
+1. Sistema monitora oportunidades
+2. Usuário inicia processo
+3. IA interpreta edital
+4. Usuário envia documentos
+5. Sistema valida exigências
+6. Processo pronto para submissão
+
+Visual:
+- Timeline horizontal moderna
+- Ícones conectados
+
+==================================================
+6. SEÇÃO: DIFERENCIAL
+==================================================
+
+Título:
+"Mais do que monitoramento"
+
+Texto:
+"A maioria das soluções apenas lista oportunidades. O LicitaIA organiza todo o processo operacional: monitoramento, interpretação, documentação, validação e submissão."
+
+Visual:
+- Comparativo elegante
+- Não exagerar em marketing
+
+==================================================
+7. SEÇÃO: SUPORTE E FALE CONOSCO
+==================================================
+
+Criar seção profissional contendo:
+
+- suporte
+- contato
+- dúvidas
+- canais de comunicação
+
+Campos:
+- Nome
+- Email
+- Mensagem
+
+Botão:
+"Enviar mensagem"
+
+Adicionar:
+- email de suporte
+- horário de atendimento
+- mensagem institucional
+
+Visual:
+- Muito limpo
+- Profissional
+- Sem aparência de formulário antigo
+
+==================================================
+8. FOOTER
+==================================================
+
+Conteúdo:
+- Logo LicitaIA
+- Links rápidos
+- Política de privacidade
+- Termos
+- Contato
+- Redes sociais
+
+==================================================
+REQUISITOS DE DESIGN
+==================================================
+
+Visual:
+- Estilo SaaS premium
+- Moderno
+- Elegante
+- Minimalista
+- Profissional
+- Tecnológico sem exagero
+
+Referências:
+- Linear
+- Stripe
+- Vercel
+- Notion
+- Arc
+
+UX:
+- Muito fluido
+- Responsivo
+- Navegação suave
+- Scroll agradável
+- Animações discretas
+- Sem poluição visual
+
+Tipografia:
+- Forte nos títulos
+- Clara e espaçada
+
+Cores:
+- Tons escuros + azul/roxo elegante
+- Alto contraste
+- Visual sofisticado
+
+IMPORTANTE:
+A landing page deve transmitir:
+- confiança
+- organização
+- automação
+- inteligência operacional
+
+==================================================
+REQUISITOS TÉCNICOS
+==================================================
+
+Stack:
+- React 19
+- Vite
+- Tailwind CSS 4
+
+Criar:
+- componentes reutilizáveis
+- animações suaves
+- responsividade completa
+- boa hierarquia visual
+
+IMPORTANTE:
+- NÃO usar sidebar
+- É uma página pública
+- Deve existir header fixo
+- CTA principal sempre visível
+
+Adicionar no header:
+- Logo
+- Funcionalidades
+- Módulos
+- Suporte
+- Login
+
+O botão Login deve redirecionar para a rota de login já existente no sistema.
+
+Entregue:
+1. Estrutura completa da landing page
+2. Componentização
+3. Layout responsivo
+4. Copywriting completo
+5. Implementação visual moderna
+6. Animações suaves
+7. Integração com rota de login existente

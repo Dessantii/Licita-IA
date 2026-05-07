@@ -29,6 +29,7 @@ import { FundingNoticesPage } from "@/pages/FundingNoticesPage";
 import { FundingProjectsPage } from "@/pages/FundingProjectsPage";
 import { FundingProjectEditorPage } from "@/pages/FundingProjectEditorPage";
 import { OportunidadesPage } from "@/pages/OportunidadesPage";
+import { LandingPage } from "@/pages/LandingPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -51,8 +52,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/">
-        {() => isAuthenticated() ? <ModuleHubPage /> : <Redirect to="/login" />}
+        {() => isAuthenticated() ? <ModuleHubPage /> : <LandingPage />}
       </Route>
+      <Route path="/landing" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/processes">
         {() => <ProtectedRoute component={ProcessesPage} />}
