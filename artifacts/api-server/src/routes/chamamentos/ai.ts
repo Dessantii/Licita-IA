@@ -78,7 +78,7 @@ ${textSample}
 
 Retorne um JSON com a seguinte estrutura exata (sem markdown, sem texto extra):
 {
-  "title": "Descrição do objeto/escopo do chamamento (resumido em até 120 caracteres)",
+  "title": "Descrição completa do objeto/escopo do chamamento, exatamente como consta no edital",
   "agency": "Nome do órgão/entidade que promove o chamamento",
   "referenceNumber": "Número de referência do chamamento (ex: Chamamento 001/2026) ou null se não encontrado",
   "category": "Área temática: saude, educacao, assistencia_social, cultura, esporte, meio_ambiente, habitacao, seguranca_publica, ciencia_tecnologia, ou outros",
@@ -88,7 +88,7 @@ Retorne um JSON com a seguinte estrutura exata (sem markdown, sem texto extra):
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_completion_tokens: 512,
+      max_completion_tokens: 1024,
       messages: [{ role: "user", content: prompt }],
     });
 

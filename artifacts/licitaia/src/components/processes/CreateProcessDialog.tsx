@@ -198,7 +198,7 @@ export function CreateProcessDialog({ prefill, defaultOpen, open: controlledOpen
       )}
 
       <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-        <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Processo Licitatório</DialogTitle>
           </DialogHeader>
@@ -341,7 +341,7 @@ export function CreateProcessDialog({ prefill, defaultOpen, open: controlledOpen
                   <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-green-800">Informações extraídas pelo edital</p>
-                    <p className="text-xs text-green-700 mt-0.5 truncate">{pendingFile.name}</p>
+                    <p className="text-xs text-green-700 mt-0.5 break-all line-clamp-2">{pendingFile.name}</p>
                   </div>
                   <button
                     type="button"
@@ -355,7 +355,7 @@ export function CreateProcessDialog({ prefill, defaultOpen, open: controlledOpen
 
               <div className="space-y-2">
                 <Label htmlFor="title">Objeto/Título *</Label>
-                <Input id="title" placeholder="Ex: Aquisição de equipamentos TI" {...register("title")} />
+                <Textarea id="title" placeholder="Ex: Aquisição de equipamentos TI" {...register("title")} rows={3} className="resize-none" />
                 {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
               </div>
 

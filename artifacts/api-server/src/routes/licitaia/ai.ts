@@ -80,7 +80,7 @@ ${textSample}
 
 Retorne um JSON com a seguinte estrutura exata (sem markdown, sem texto extra):
 {
-  "title": "Descrição do objeto/escopo da licitação (resumido em até 120 caracteres)",
+  "title": "Descrição completa do objeto/escopo da licitação, exatamente como consta no edital",
   "agency": "Nome do órgão promotor/contratante",
   "modality": "Modalidade licitatória (ex: Pregão Eletrônico, Concorrência, Tomada de Preços...)",
   "editalNumber": "Número do edital (ex: 033/2026) ou null se não encontrado",
@@ -90,7 +90,7 @@ Retorne um JSON com a seguinte estrutura exata (sem markdown, sem texto extra):
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_tokens: 512,
+      max_tokens: 1024,
       messages: [{ role: "user", content: prompt }],
     });
 
