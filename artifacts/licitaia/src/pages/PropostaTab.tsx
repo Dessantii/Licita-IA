@@ -256,7 +256,7 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
           setObservations(data.proposal.observations ?? "");
           if (data.proposal.declaredCost) setDeclaredCost(String(data.proposal.declaredCost));
           if (data.proposal.docxPath) {
-            setGeneratedUrl(`${apiBase}/uploads/${data.proposal.docxPath}`);
+            setGeneratedUrl(`${apiBase}/api/processes/${process.id}/proposal/download-docx`);
             setGeneratedFilename(data.proposal.docxPath);
           }
           if (data.proposal.signedDocxPath) setSignedDone(true);
@@ -365,7 +365,7 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
       });
       if (res.ok) {
         const data = await res.json() as { downloadUrl: string; filename: string };
-        setGeneratedUrl(`${apiBase}${data.downloadUrl}`);
+        setGeneratedUrl(`${apiBase}/api/processes/${process.id}/proposal/download-docx`);
         setGeneratedFilename(data.filename);
         setShowChecklist(true);
         setProposalStep(prev => Math.max(prev, 2));

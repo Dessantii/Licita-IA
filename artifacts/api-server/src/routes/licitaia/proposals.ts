@@ -381,6 +381,28 @@ Use null apenas se for absolutamente impossível estimar. Valores devem ser o to
   });
 });
 
+// ── GET /processes/:id/proposal/download-docx ───────────────────────────────
+
+router.get("/processes/:id/proposal/download-docx", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [existing] = await db
+    .select()
+    .from(processProposalsTable)
+    .where(eq(processProposalsTable.processId, id))
+    .limit(1);
+
+  if (!existing?.docxPath) { res.status(404).json({ error: "No docx generated yet" }); return; }
+
+  const filepath = path.join(UPLOADS_DIR, existing.docxPath);
+  if (!fs.existsSync(filepath)) { res.status(404).json({ error: "File not found" }); return; }
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  res.setHeader("Content-Disposition", `attachment; filename="${existing.docxPath}"`);
+  res.sendFile(filepath);
+});
+
 // ── POST /processes/:id/proposal/generate-docx ──────────────────────────────
 
 router.post("/processes/:id/proposal/generate-docx", async (req, res) => {
