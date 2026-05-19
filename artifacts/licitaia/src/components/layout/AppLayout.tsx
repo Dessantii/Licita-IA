@@ -1,87 +1,173 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  Home, Compass, Search, Building2, BookOpen, MessageSquare,
+  Building2, BookOpen, MessageSquare,
   Bell, LogOut, CheckCheck, ExternalLink, FilePlus, ChevronDown,
   Check, Settings, Users, BarChart3, LayoutGrid, UserCircle,
+  Gavel, Search, TrendingUp, Compass, ArrowLeft, ChevronLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
 import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
 import { useActiveCompany } from "@/contexts/CompanyContext";
 
-// ── Nav items ──────────────────────────────────────────────────────────────
+// ── Module detection ────────────────────────────────────────────────────────
 
-type NavId = "inicio" | "comecar" | "oportunidades" | "empresa" | "guias" | "ajuda" | "outros";
+type ModuleId = "licitacoes" | "chamamentos" | "captacao" | "empresa" | "outros";
 
 interface NavItem {
-  id: NavId;
   href: string;
   icon: React.ElementType;
   label: string;
-  description: string;
+  match: (path: string) => boolean;
 }
 
-const NAV: NavItem[] = [
+interface ModuleConfig {
+  id: ModuleId;
+  label: string;
+  primary: NavItem[];
+  support: NavItem[];
+}
+
+const SUPPORT_ITEMS: NavItem[] = [
   {
-    id: "inicio",
-    href: "/",
-    icon: Home,
-    label: "Início",
-    description: "Visão geral e próximos passos",
-  },
-  {
-    id: "comecar",
     href: "/comecar",
     icon: Compass,
-    label: "Começar",
-    description: "Guia de primeiros passos",
+    label: "Como Começar",
+    match: (p) => p.startsWith("/comecar"),
   },
   {
-    id: "oportunidades",
-    href: "/oportunidades",
-    icon: Search,
-    label: "Oportunidades",
-    description: "Editais e processos disponíveis",
-  },
-  {
-    id: "empresa",
-    href: "/companies",
-    icon: Building2,
-    label: "Minha Empresa",
-    description: "Documentos e situação cadastral",
-  },
-  {
-    id: "guias",
     href: "/guias",
     icon: BookOpen,
     label: "Guias",
-    description: "Tutoriais e explicações simples",
+    match: (p) => p.startsWith("/guias"),
   },
   {
-    id: "ajuda",
+    href: "/reports",
+    icon: BarChart3,
+    label: "Relatórios",
+    match: (p) => p.startsWith("/reports"),
+  },
+  {
     href: "/ajuda",
     icon: MessageSquare,
     label: "Ajuda",
-    description: "Tire dúvidas com a IA",
+    match: (p) => p.startsWith("/ajuda"),
   },
 ];
 
-function detectNav(path: string): NavId {
-  if (path === "/" || path === "") return "inicio";
-  if (path.startsWith("/comecar")) return "comecar";
-  if (
-    path.startsWith("/oportunidades") ||
-    path.startsWith("/processes") ||
-    path.startsWith("/chamamentos") ||
-    path.startsWith("/monitors") ||
-    path.startsWith("/funding")
-  )
-    return "oportunidades";
-  if (path.startsWith("/companies") || path.startsWith("/empresa")) return "empresa";
-  if (path.startsWith("/guias")) return "guias";
-  if (path.startsWith("/ajuda")) return "ajuda";
+const MODULES: ModuleConfig[] = [
+  {
+    id: "licitacoes",
+    label: "Licitações",
+    primary: [
+      {
+        href: "/processes",
+        icon: Gavel,
+        label: "Processos",
+        match: (p) => p.startsWith("/processes"),
+      },
+      {
+        href: "/monitors",
+        icon: Bell,
+        label: "Monitoramentos",
+        match: (p) => p.startsWith("/monitors"),
+      },
+      {
+        href: "/oportunidades",
+        icon: Search,
+        label: "Oportunidades",
+        match: (p) => p.startsWith("/oportunidades"),
+      },
+    ],
+    support: SUPPORT_ITEMS,
+  },
+  {
+    id: "chamamentos",
+    label: "Chamamentos",
+    primary: [
+      {
+        href: "/chamamentos",
+        icon: Users,
+        label: "Chamamentos",
+        match: (p) => p.startsWith("/chamamentos"),
+      },
+      {
+        href: "/companies",
+        icon: Building2,
+        label: "Minha Empresa",
+        match: (p) => p.startsWith("/companies"),
+      },
+    ],
+    support: SUPPORT_ITEMS,
+  },
+  {
+    id: "captacao",
+    label: "Captação de Recursos",
+    primary: [
+      {
+        href: "/funding-notices",
+        icon: TrendingUp,
+        label: "Editais de Fomento",
+        match: (p) => p.startsWith("/funding-notices"),
+      },
+      {
+        href: "/funding-projects",
+        icon: FilePlus,
+        label: "Meus Projetos",
+        match: (p) => p.startsWith("/funding-projects"),
+      },
+    ],
+    support: SUPPORT_ITEMS,
+  },
+  {
+    id: "empresa",
+    label: "Empresa",
+    primary: [
+      {
+        href: "/companies",
+        icon: Building2,
+        label: "Minhas Empresas",
+        match: (p) => p.startsWith("/companies"),
+      },
+    ],
+    support: [
+      {
+        href: "/comecar",
+        icon: Compass,
+        label: "Como Começar",
+        match: (p) => p.startsWith("/comecar"),
+      },
+      {
+        href: "/guias",
+        icon: BookOpen,
+        label: "Guias",
+        match: (p) => p.startsWith("/guias"),
+      },
+      {
+        href: "/ajuda",
+        icon: MessageSquare,
+        label: "Ajuda",
+        match: (p) => p.startsWith("/ajuda"),
+      },
+    ],
+  },
+];
+
+function detectModule(path: string): ModuleId {
+  if (path.startsWith("/processes") || path.startsWith("/monitors") || path.startsWith("/oportunidades"))
+    return "licitacoes";
+  if (path.startsWith("/chamamentos"))
+    return "chamamentos";
+  if (path.startsWith("/funding"))
+    return "captacao";
+  if (path.startsWith("/companies") || path.startsWith("/empresa"))
+    return "empresa";
   return "outros";
+}
+
+function getModuleConfig(moduleId: ModuleId): ModuleConfig | null {
+  return MODULES.find((m) => m.id === moduleId) ?? null;
 }
 
 // ── Alerts ─────────────────────────────────────────────────────────────────
@@ -98,6 +184,32 @@ interface Alert {
   isRead: boolean;
 }
 
+// ── NavLink ─────────────────────────────────────────────────────────────────
+
+function SidebarNavLink({ item, path }: { item: NavItem; path: string }) {
+  const isActive = item.match(path);
+  return (
+    <Link
+      href={item.href}
+      className="relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
+      style={{
+        backgroundColor: isActive ? '#1A3A5C' : 'transparent',
+        color: isActive ? '#ffffff' : 'rgba(255,255,255,0.65)',
+        fontWeight: isActive ? 500 : 400,
+      }}
+    >
+      {isActive && (
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-white rounded-r-full" />
+      )}
+      <item.icon
+        className="w-[18px] h-[18px] flex-shrink-0"
+        style={{ opacity: isActive ? 1 : 0.7 }}
+      />
+      {item.label}
+    </Link>
+  );
+}
+
 // ── AppLayout ──────────────────────────────────────────────────────────────
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -106,7 +218,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const token = getToken();
   const { companies, activeCompany, setActiveCompanyId } = useActiveCompany();
 
-  const activeNav = detectNav(location);
+  const moduleId = detectModule(location);
+  const moduleConfig = getModuleConfig(moduleId);
 
   const initials = user?.name
     ? user.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
@@ -211,83 +324,132 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         className="hidden md:flex w-[256px] flex-shrink-0 flex-col"
         style={{ backgroundColor: '#0A2540' }}
       >
-        {/* Logo */}
-        <div className="h-16 flex items-center px-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <button onClick={() => navigate("/")} className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: 'rgba(255,255,255,0.10)' }}
-            >
-              <Building2 className="w-[18px] h-[18px] text-white" />
-            </div>
-            <span className="font-semibold text-[17px] tracking-tight text-white">LicitaIA</span>
-          </button>
+        {/* Logo + back button */}
+        <div className="h-16 flex flex-col justify-center px-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          {moduleConfig ? (
+            <>
+              <button
+                onClick={() => navigate("/")}
+                className="flex items-center gap-1.5 text-xs mb-1 transition-colors"
+                style={{ color: 'rgba(255,255,255,0.40)' }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.75)')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.40)')}
+              >
+                <ChevronLeft className="w-3 h-3" />
+                Módulos
+              </button>
+              <span className="text-sm font-semibold text-white tracking-tight truncate">
+                {moduleConfig.label}
+              </span>
+            </>
+          ) : (
+            <button onClick={() => navigate("/")} className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: 'rgba(255,255,255,0.10)' }}
+              >
+                <Building2 className="w-[18px] h-[18px] text-white" />
+              </div>
+              <span className="font-semibold text-[17px] tracking-tight text-white">LicitaIA</span>
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-5 space-y-0.5">
-          {NAV.map(({ id, href, icon: Icon, label }) => {
-            const isActive = activeNav === id;
-            return (
-              <Link
-                key={id}
-                href={href}
-                className="relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
-                style={{
-                  backgroundColor: isActive ? '#1A3A5C' : 'transparent',
-                  color: isActive ? '#ffffff' : 'rgba(255,255,255,0.65)',
-                  fontWeight: isActive ? 500 : 400,
-                }}
-              >
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-white rounded-r-full" />
-                )}
-                <Icon
-                  className="w-[18px] h-[18px] flex-shrink-0"
-                  style={{ opacity: isActive ? 1 : 0.7 }}
-                />
-                {label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-5 overflow-y-auto">
+          {moduleConfig ? (
+            <>
+              {/* Primary module items */}
+              <div className="space-y-0.5">
+                {moduleConfig.primary.map((item) => (
+                  <SidebarNavLink key={item.href} item={item} path={location} />
+                ))}
+              </div>
 
-          {/* Extra items */}
-          <div className="pt-6 mt-2">
-            <p className="px-4 mb-2 text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.30)' }}>
-              Configurações
-            </p>
-            {[
-              { href: "/reports", icon: BarChart3, label: "Relatórios" },
-              { href: "/settings", icon: Settings, label: "Configurações" },
-            ].map(({ href, icon: Icon, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
-                style={{
-                  backgroundColor: location.startsWith(href) ? '#1A3A5C' : 'transparent',
-                  color: location.startsWith(href) ? '#ffffff' : 'rgba(255,255,255,0.50)',
-                  fontWeight: location.startsWith(href) ? 500 : 400,
-                }}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" style={{ opacity: location.startsWith(href) ? 1 : 0.6 }} />
-                {label}
-              </Link>
-            ))}
-            {user?.role === "admin" && (
-              <Link
-                href="/admin/users"
-                className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
-                style={{
-                  backgroundColor: location.startsWith('/admin') ? '#1A3A5C' : 'transparent',
-                  color: location.startsWith('/admin') ? '#ffffff' : 'rgba(255,255,255,0.50)',
-                }}
-              >
-                <Users className="w-4 h-4 flex-shrink-0" style={{ opacity: 0.6 }} />
-                Usuários
-              </Link>
-            )}
-          </div>
+              {/* Support items */}
+              <div className="pt-6 mt-2">
+                <p className="px-4 mb-2 text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.30)' }}>
+                  Suporte
+                </p>
+                <div className="space-y-0.5">
+                  {moduleConfig.support.map((item) => (
+                    <SidebarNavLink key={item.href} item={item} path={location} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Settings + Admin */}
+              <div className="pt-6 mt-2">
+                <p className="px-4 mb-2 text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.30)' }}>
+                  Configurações
+                </p>
+                <div className="space-y-0.5">
+                  <Link
+                    href="/settings"
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
+                    style={{
+                      backgroundColor: location.startsWith('/settings') ? '#1A3A5C' : 'transparent',
+                      color: location.startsWith('/settings') ? '#ffffff' : 'rgba(255,255,255,0.50)',
+                    }}
+                  >
+                    <Settings className="w-[18px] h-[18px] flex-shrink-0" style={{ opacity: 0.7 }} />
+                    Configurações
+                  </Link>
+                  {user?.role === "admin" && (
+                    <Link
+                      href="/admin/users"
+                      className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
+                      style={{
+                        backgroundColor: location.startsWith('/admin') ? '#1A3A5C' : 'transparent',
+                        color: location.startsWith('/admin') ? '#ffffff' : 'rgba(255,255,255,0.50)',
+                      }}
+                    >
+                      <Users className="w-[18px] h-[18px] flex-shrink-0" style={{ opacity: 0.7 }} />
+                      Usuários
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Fallback nav for pages not in any module (comecar, guias, ajuda, settings...) */
+            <div className="space-y-0.5">
+              {[
+                { href: "/", icon: ArrowLeft, label: "Início" },
+                { href: "/comecar", icon: Compass, label: "Como Começar" },
+                { href: "/guias", icon: BookOpen, label: "Guias" },
+                { href: "/ajuda", icon: MessageSquare, label: "Ajuda" },
+                { href: "/reports", icon: BarChart3, label: "Relatórios" },
+                { href: "/settings", icon: Settings, label: "Configurações" },
+              ].map(({ href, icon: Icon, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
+                  style={{
+                    backgroundColor: location === href || (href !== "/" && location.startsWith(href)) ? '#1A3A5C' : 'transparent',
+                    color: location === href || (href !== "/" && location.startsWith(href)) ? '#ffffff' : 'rgba(255,255,255,0.65)',
+                  }}
+                >
+                  <Icon className="w-[18px] h-[18px] flex-shrink-0" style={{ opacity: 0.7 }} />
+                  {label}
+                </Link>
+              ))}
+              {user?.role === "admin" && (
+                <Link
+                  href="/admin/users"
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
+                  style={{
+                    backgroundColor: location.startsWith('/admin') ? '#1A3A5C' : 'transparent',
+                    color: location.startsWith('/admin') ? '#ffffff' : 'rgba(255,255,255,0.50)',
+                  }}
+                >
+                  <Users className="w-[18px] h-[18px] flex-shrink-0" style={{ opacity: 0.7 }} />
+                  Usuários
+                </Link>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* User */}
@@ -312,6 +474,43 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {userMenuOpen && (
+            <div
+              ref={userMenuRef}
+              className="mt-2 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
+            >
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <p className="text-sm font-medium text-slate-800 truncate">{user?.name}</p>
+                <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+              </div>
+              <div className="py-1">
+                <button
+                  onClick={() => { navigate("/profile"); setUserMenuOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <UserCircle className="w-4 h-4" />
+                  Meu perfil
+                </button>
+                <button
+                  onClick={() => { navigate("/settings"); setUserMenuOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <Settings className="w-4 h-4" />
+                  Configurações
+                </button>
+                <div style={{ borderTop: "1px solid #f1f5f9" }} className="mt-1 pt-1">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors text-left"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sair
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -321,16 +520,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Top bar */}
         <header
           className="h-14 bg-white flex items-center justify-between px-6 flex-shrink-0"
-          style={{ borderBottom: "1px solid #f1f5f9" }}
+          style={{ borderBottom: "1px solid #E8EFF6" }}
         >
           {/* Mobile logo */}
           <div className="md:hidden">
             <LicitaIALogo variant="full" size="sm" theme="dark" />
           </div>
 
-          {/* Desktop: page context */}
+          {/* Desktop: module breadcrumb */}
           <div className="hidden md:flex items-center gap-2 text-sm text-slate-400">
-            {NAV.find((n) => n.id === activeNav)?.label ?? ""}
+            <button
+              onClick={() => navigate("/")}
+              className="hover:text-slate-600 transition-colors"
+            >
+              Módulos
+            </button>
+            {moduleConfig && (
+              <>
+                <span className="text-slate-300">/</span>
+                <span className="text-slate-700 font-medium">{moduleConfig.label}</span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -498,7 +708,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => setUserMenuOpen((v) => !v)}
                 className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white hover:opacity-90 transition-opacity"
-                style={{ background: "#2563eb" }}
+                style={{ background: "#0066FF" }}
               >
                 {initials}
               </button>
@@ -545,23 +755,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           className="md:hidden fixed bottom-0 left-0 right-0 bg-white flex items-center justify-around px-2 py-2 z-40"
           style={{ borderTop: "1px solid #f1f5f9" }}
         >
-          {NAV.map(({ id, href, icon: Icon, label }) => {
-            const isActive = activeNav === id;
+          <Link href="/" className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg">
+            <ArrowLeft className="w-5 h-5" style={{ color: "#94a3b8" }} />
+            <span className="text-[10px] font-medium" style={{ color: "#94a3b8" }}>Módulos</span>
+          </Link>
+          {moduleConfig?.primary.slice(0, 3).map((item) => {
+            const isActive = item.match(location);
             return (
-              <Link
-                key={id}
-                href={href}
-                className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg"
-              >
-                <Icon
-                  className="w-5 h-5"
-                  style={{ color: isActive ? "#2563eb" : "#94a3b8" }}
-                />
-                <span
-                  className="text-[10px] font-medium"
-                  style={{ color: isActive ? "#2563eb" : "#94a3b8" }}
-                >
-                  {label}
+              <Link key={item.href} href={item.href} className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg">
+                <item.icon className="w-5 h-5" style={{ color: isActive ? "#0066FF" : "#94a3b8" }} />
+                <span className="text-[10px] font-medium" style={{ color: isActive ? "#0066FF" : "#94a3b8" }}>
+                  {item.label}
                 </span>
               </Link>
             );
