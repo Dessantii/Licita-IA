@@ -204,46 +204,58 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const unreadCount = filtered.filter((a) => !a.isRead).length;
 
   return (
-    <div className="min-h-screen flex flex-row bg-slate-50">
+    <div className="min-h-screen flex flex-row" style={{ backgroundColor: '#F6F9FC' }}>
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <aside
-        className="hidden md:flex w-[220px] flex-shrink-0 flex-col bg-white"
-        style={{ borderRight: "1px solid #f1f5f9" }}
+        className="hidden md:flex w-[256px] flex-shrink-0 flex-col"
+        style={{ backgroundColor: '#0A2540' }}
       >
         {/* Logo */}
-        <div className="h-14 flex items-center px-5" style={{ borderBottom: "1px solid #f1f5f9" }}>
-          <button onClick={() => navigate("/")} className="flex items-center gap-2">
-            <LicitaIALogo variant="full" size="sm" theme="dark" />
+        <div className="h-16 flex items-center px-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <button onClick={() => navigate("/")} className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: 'rgba(255,255,255,0.10)' }}
+            >
+              <Building2 className="w-[18px] h-[18px] text-white" />
+            </div>
+            <span className="font-semibold text-[17px] tracking-tight text-white">LicitaIA</span>
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <nav className="flex-1 px-3 py-5 space-y-0.5">
           {NAV.map(({ id, href, icon: Icon, label }) => {
             const isActive = activeNav === id;
             return (
               <Link
                 key={id}
                 href={href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
-                  isActive
-                    ? "bg-slate-100 text-slate-900"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                )}
+                className="relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
+                style={{
+                  backgroundColor: isActive ? '#1A3A5C' : 'transparent',
+                  color: isActive ? '#ffffff' : 'rgba(255,255,255,0.65)',
+                  fontWeight: isActive ? 500 : 400,
+                }}
               >
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-white rounded-r-full" />
+                )}
                 <Icon
                   className="w-[18px] h-[18px] flex-shrink-0"
-                  style={{ color: isActive ? "#2563eb" : undefined }}
+                  style={{ opacity: isActive ? 1 : 0.7 }}
                 />
                 {label}
               </Link>
             );
           })}
 
-          {/* Extra items for power users */}
-          <div className="pt-4 mt-4" style={{ borderTop: "1px solid #f1f5f9" }}>
+          {/* Extra items */}
+          <div className="pt-6 mt-2">
+            <p className="px-4 mb-2 text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.30)' }}>
+              Configurações
+            </p>
             {[
               { href: "/reports", icon: BarChart3, label: "Relatórios" },
               { href: "/settings", icon: Settings, label: "Configurações" },
@@ -251,28 +263,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={href}
                 href={href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-150",
-                  location.startsWith(href)
-                    ? "bg-slate-100 text-slate-700 font-medium"
-                    : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-                )}
+                className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
+                style={{
+                  backgroundColor: location.startsWith(href) ? '#1A3A5C' : 'transparent',
+                  color: location.startsWith(href) ? '#ffffff' : 'rgba(255,255,255,0.50)',
+                  fontWeight: location.startsWith(href) ? 500 : 400,
+                }}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon className="w-4 h-4 flex-shrink-0" style={{ opacity: location.startsWith(href) ? 1 : 0.6 }} />
                 {label}
               </Link>
             ))}
             {user?.role === "admin" && (
               <Link
                 href="/admin/users"
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-150",
-                  location.startsWith("/admin")
-                    ? "bg-slate-100 text-slate-700 font-medium"
-                    : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-                )}
+                className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
+                style={{
+                  backgroundColor: location.startsWith('/admin') ? '#1A3A5C' : 'transparent',
+                  color: location.startsWith('/admin') ? '#ffffff' : 'rgba(255,255,255,0.50)',
+                }}
               >
-                <Users className="w-4 h-4 flex-shrink-0" />
+                <Users className="w-4 h-4 flex-shrink-0" style={{ opacity: 0.6 }} />
                 Usuários
               </Link>
             )}
@@ -280,22 +291,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* User */}
-        <div className="px-3 py-4" style={{ borderTop: "1px solid #f1f5f9" }}>
-          <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl">
+        <div className="px-3 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setUserMenuOpen((v) => !v)}>
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-              style={{ background: "#2563eb" }}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+              style={{ background: '#0066FF' }}
             >
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-slate-800 truncate">{user?.name}</p>
-              <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
+              <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+              <p className="text-[11px] truncate" style={{ color: 'rgba(255,255,255,0.50)' }}>{user?.email}</p>
             </div>
             <button
-              onClick={handleLogout}
-              className="p-1 text-slate-400 hover:text-slate-600 rounded-lg transition-colors flex-shrink-0"
+              onClick={(e) => { e.stopPropagation(); handleLogout(); }}
+              className="p-1 rounded transition-colors flex-shrink-0"
               title="Sair"
+              style={{ color: 'rgba(255,255,255,0.40)' }}
             >
               <LogOut className="w-3.5 h-3.5" />
             </button>

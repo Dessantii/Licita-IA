@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { getUser, getToken } from "@/hooks/use-auth";
 import {
   Building2, FileText, Bell, ArrowRight, ChevronRight,
-  CheckCircle2, AlertCircle, Circle, Sparkles, BookOpen,
-  Compass, MapPin, ExternalLink, Zap,
+  CheckCircle2, AlertCircle, Circle, Sparkles,
+  Compass, Zap,
 } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -208,6 +208,50 @@ function StatusItem({
   );
 }
 
+// ── HomeStatCard ─────────────────────────────────────────────────────────────
+
+function HomeStatCard({
+  title, value, icon: Icon, iconColor, iconBg,
+}: {
+  title: string; value: string; icon: React.ElementType; iconColor: string; iconBg: string;
+}) {
+  return (
+    <div className="bg-white p-6 rounded-xl flex items-center justify-between" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+      <div>
+        <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+        <p className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{value}</p>
+      </div>
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: iconBg }}>
+        <Icon className="w-6 h-6" style={{ color: iconColor }} />
+      </div>
+    </div>
+  );
+}
+
+// ── HomeStepItem ──────────────────────────────────────────────────────────────
+
+function HomeStepItem({
+  label, sub, done, partial,
+}: {
+  label: string; sub: string; done: boolean; partial?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-4" style={{ opacity: done || partial ? 1 : 0.5 }}>
+      {done ? (
+        <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#10b981' }} />
+      ) : partial ? (
+        <AlertCircle className="w-5 h-5 shrink-0" style={{ color: '#f59e0b' }} />
+      ) : (
+        <Circle className="w-5 h-5 shrink-0 text-slate-300" />
+      )}
+      <div>
+        <p className="text-sm font-semibold text-slate-900">{label}</p>
+        <p className="text-xs text-slate-500">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
 // ── InicioPage ───────────────────────────────────────────────────────────────
 
 export function InicioPage() {
@@ -258,240 +302,202 @@ export function InicioPage() {
   const nextAction = computeNextAction(data);
   const recentAlerts = data.alerts.slice(0, 4);
 
-  // Company status items
   const hasCompany = data.companies.length > 0;
   const docsCount = data.documents.length;
 
   return (
     <AppLayout>
-      <div className="max-w-[680px] mx-auto px-5 sm:px-8 py-8 sm:py-12">
+      <div className="px-8 py-8">
 
-        {/* ── Hero ─────────────────────────────────────────────────────── */}
-        <div
-          className="bg-white rounded-3xl p-6 sm:p-8 mb-6"
-          style={{ border: "1px solid #f1f5f9" }}
-        >
-          <div className="flex items-start gap-6">
-            {/* Progress ring */}
-            <div className="relative flex-shrink-0">
-              <ProgressRing score={readiness} size={88} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span
-                  className="text-base font-bold"
-                  style={{ color: readinessColor(readiness) }}
-                >
-                  {readiness}%
-                </span>
+        {/* ── Page Header ──────────────────────────────────────────────── */}
+        <div className="mb-8">
+          <div className="flex items-center gap-1 text-sm mb-2" style={{ color: '#94a3b8' }}>
+            LicitaIA <ChevronRight className="w-3.5 h-3.5" /> Início
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            {greeting}, {firstName}
+          </h1>
+        </div>
+
+        {/* ── Stat Cards ───────────────────────────────────────────────── */}
+        {!loading && (
+          <div className="grid grid-cols-3 gap-5 mb-7">
+            <HomeStatCard
+              title="Empresa"
+              value={hasCompany ? (data.companies[0].nomeFantasia ?? data.companies[0].razaoSocial ?? "Cadastrada") : "Não cadastrada"}
+              icon={Building2}
+              iconColor="#0066FF"
+              iconBg="#E5F0FF"
+            />
+            <HomeStatCard
+              title="Documentos enviados"
+              value={String(docsCount)}
+              icon={FileText}
+              iconColor="#635BFF"
+              iconBg="#EFEFFF"
+            />
+            <HomeStatCard
+              title="Editais novos"
+              value={String(data.alerts.filter((a) => !a.isRead).length)}
+              icon={Bell}
+              iconColor="#00A389"
+              iconBg="#E5F6F3"
+            />
+          </div>
+        )}
+
+        {/* ── Main Grid: Progress + Next Action ────────────────────────── */}
+        <div className="grid grid-cols-12 gap-6 mb-7">
+
+          {/* Progress Card */}
+          <div className="col-span-7 bg-white rounded-xl p-7" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+            <div className="flex items-end justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Situação da empresa</h2>
+                <p className="text-sm text-slate-500 mt-1">Seu nível de prontidão para licitar</p>
+              </div>
+              <div className="text-3xl font-bold tracking-tight" style={{ color: '#0066FF' }}>
+                {loading ? "—" : `${readiness}%`}
               </div>
             </div>
 
-            {/* Text */}
-            <div className="flex-1 min-w-0 pt-1">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">
-                {greeting}, {firstName}
-              </p>
-              <h1
-                className="text-xl sm:text-2xl font-bold text-slate-900 mb-1.5 leading-tight"
-                style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "-0.02em" }}
-              >
-                Seu caminho para vender ao governo começa aqui.
-              </h1>
-              <div className="flex items-center gap-2">
-                <span
-                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                  style={{
-                    background: `${readinessColor(readiness)}18`,
-                    color: readinessColor(readiness),
-                  }}
-                >
-                  {readinessLabel(readiness)}
-                </span>
-                {readiness < 100 && (
-                  <button
-                    onClick={() => navigate("/comecar")}
-                    className="text-xs text-slate-400 hover:text-slate-700 transition-colors flex items-center gap-0.5"
-                  >
-                    Ver passo a passo <ChevronRight className="w-3 h-3" />
-                  </button>
+            <div className="w-full bg-slate-100 h-2 rounded-full mb-7 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-1000"
+                style={{ width: loading ? '0%' : `${readiness}%`, backgroundColor: '#0066FF' }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <HomeStepItem
+                label="Cadastro da empresa"
+                sub={hasCompany ? `${data.companies[0].nomeFantasia ?? data.companies[0].razaoSocial ?? "Empresa cadastrada"}` : "Empresa ainda não cadastrada"}
+                done={hasCompany}
+              />
+              <HomeStepItem
+                label="Documentos enviados"
+                sub={docsCount === 0 ? "Nenhum enviado ainda" : docsCount === 1 ? "1 documento enviado" : `${docsCount} documentos enviados`}
+                done={docsCount >= 3}
+                partial={docsCount > 0 && docsCount < 3}
+              />
+              <HomeStepItem
+                label="Alertas configurados"
+                sub={data.hasMonitor ? "Monitorando editais automaticamente" : "Configure para receber alertas"}
+                done={data.hasMonitor}
+              />
+            </div>
+          </div>
+
+          {/* Next Action Card */}
+          <div className="col-span-5">
+            <div className="bg-white rounded-xl h-full" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+              <div className="p-6 h-full flex flex-col rounded-xl" style={{ background: 'linear-gradient(180deg, #F8FAFF 0%, #FFFFFF 60%)' }}>
+                <div className="text-xs font-semibold uppercase tracking-widest mb-5 flex items-center gap-2" style={{ color: '#94a3b8' }}>
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#0066FF' }} />
+                  Próximo passo
+                </div>
+
+                {loading ? (
+                  <div className="flex-1 animate-pulse space-y-4">
+                    <div className="h-11 w-11 rounded-full bg-slate-100" />
+                    <div className="h-5 rounded bg-slate-100 w-3/4" />
+                    <div className="h-4 rounded bg-slate-100 w-full" />
+                    <div className="h-4 rounded bg-slate-100 w-5/6" />
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className="w-11 h-11 rounded-full mb-4 flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: nextAction.bg }}
+                    >
+                      <nextAction.icon className="w-5 h-5" style={{ color: nextAction.color }} />
+                    </div>
+
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">{nextAction.title}</h3>
+                    <p className="text-sm text-slate-600 leading-relaxed flex-1 mb-6">{nextAction.reason}</p>
+
+                    <button
+                      onClick={() => navigate(nextAction.href)}
+                      className="w-full py-3 rounded-xl text-white font-semibold flex items-center justify-center gap-2 text-sm transition-all hover:opacity-90 active:scale-95"
+                      style={{ backgroundColor: '#0066FF', boxShadow: '0 4px 12px rgba(0,102,255,0.25)' }}
+                    >
+                      {nextAction.cta}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── Próxima ação ──────────────────────────────────────────────── */}
-        {!loading && (
-          <div className="mb-6">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
-              Próximo passo
-            </p>
-            <div
-              className="bg-white rounded-3xl p-6 sm:p-7"
-              style={{ border: "1px solid #f1f5f9", borderLeft: `4px solid ${nextAction.color}` }}
-            >
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: nextAction.bg }}
-              >
-                <nextAction.icon className="w-5 h-5" style={{ color: nextAction.color }} />
-              </div>
-
-              <h2
-                className="text-lg sm:text-xl font-bold text-slate-900 mb-2"
-                style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "-0.01em" }}
-              >
-                {nextAction.title}
-              </h2>
-
-              <p className="text-sm text-slate-500 leading-relaxed mb-5">
-                {nextAction.reason}
-              </p>
-
-              <button
-                onClick={() => navigate(nextAction.href)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-95"
-                style={{ background: nextAction.color }}
-              >
-                {nextAction.cta}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Situação da empresa ───────────────────────────────────────── */}
-        {!loading && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-                Situação da empresa
-              </p>
-              {hasCompany && (
-                <button
-                  onClick={() => navigate(`/companies/${data.companies[0].id}`)}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  Ver detalhes →
-                </button>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <StatusItem
-                label="Cadastro"
-                sublabel={hasCompany ? `${data.companies[0].nomeFantasia ?? data.companies[0].razaoSocial ?? "Empresa cadastrada"}` : "Empresa não cadastrada"}
-                status={hasCompany ? "ok" : "missing"}
-              />
-              <StatusItem
-                label="Documentos"
-                sublabel={
-                  docsCount === 0
-                    ? "Nenhum enviado ainda"
-                    : docsCount === 1
-                    ? "1 documento enviado"
-                    : `${docsCount} documentos enviados`
-                }
-                status={docsCount >= 3 ? "ok" : docsCount >= 1 ? "partial" : "missing"}
-              />
-              <StatusItem
-                label="Alertas"
-                sublabel={data.hasMonitor ? "Monitorando editais" : "Alertas não configurados"}
-                status={data.hasMonitor ? "ok" : "missing"}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ── Oportunidades recomendadas ────────────────────────────────── */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-              Oportunidades recentes
-            </p>
+        {/* ── Oportunidades recentes ────────────────────────────────────── */}
+        <div className="mb-7">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg font-bold text-slate-900">Oportunidades recentes</h2>
             {recentAlerts.length > 0 && (
               <button
                 onClick={() => navigate("/monitors")}
-                className="text-xs text-blue-600 hover:underline"
+                className="text-sm font-medium flex items-center gap-1.5"
+                style={{ color: '#0066FF' }}
               >
-                Ver todos →
+                Ver todas <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           {loading ? (
-            <div className="bg-white rounded-3xl p-6 animate-pulse" style={{ border: "1px solid #f1f5f9" }}>
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-4 rounded bg-slate-100" style={{ width: i === 1 ? "80%" : i === 2 ? "65%" : "72%" }} />
-                ))}
-              </div>
+            <div className="grid gap-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-xl h-[72px] animate-pulse" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} />
+              ))}
             </div>
           ) : recentAlerts.length === 0 ? (
-            <div
-              className="bg-white rounded-3xl p-8 text-center"
-              style={{ border: "1px solid #f1f5f9" }}
-            >
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                style={{ background: "#eff6ff" }}
-              >
-                <Bell className="w-5 h-5 text-blue-400" />
+            <div className="bg-white rounded-xl p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#E5F0FF' }}>
+                <Bell className="w-5 h-5" style={{ color: '#0066FF' }} />
               </div>
-              <p className="text-sm font-semibold text-slate-700 mb-1">
-                Nenhuma oportunidade ainda
-              </p>
+              <p className="text-sm font-semibold text-slate-700 mb-1">Nenhuma oportunidade ainda</p>
               <p className="text-xs text-slate-400 leading-relaxed mb-4 max-w-xs mx-auto">
                 Configure alertas com palavras-chave do seu negócio e o sistema vai encontrar editais para você automaticamente.
               </p>
               <button
                 onClick={() => navigate("/monitors")}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold"
+                style={{ color: '#0066FF' }}
               >
                 Configurar alertas <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-3xl overflow-hidden" style={{ border: "1px solid #f1f5f9" }}>
-              {recentAlerts.map((alert, i) => {
+            <div className="grid gap-3">
+              {recentAlerts.map((alert) => {
                 const place = [alert.municipio, alert.uf].filter(Boolean).join(", ");
                 const modality = simplifyModalidade(alert.modalidade);
-
+                const isPregao = alert.modalidade?.toLowerCase().includes("pregão");
+                const accentColor = isPregao ? '#635BFF' : '#00A389';
                 return (
                   <div
                     key={alert.id}
-                    className="group flex items-start gap-4 px-5 py-4 cursor-pointer transition-colors hover:bg-slate-50/80"
-                    style={{ borderTop: i > 0 ? "1px solid #f8fafc" : undefined }}
+                    className="bg-white rounded-xl overflow-hidden flex cursor-pointer transition-shadow hover:shadow-md"
+                    style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
                     onClick={() => alert.urlPncp && window.open(alert.urlPncp, "_blank")}
                   >
-                    {/* Unread dot */}
-                    <div className="flex-shrink-0 mt-1.5">
-                      {!alert.isRead ? (
-                        <span className="w-2 h-2 rounded-full bg-blue-500 block" />
-                      ) : (
-                        <span className="w-2 h-2 rounded-full bg-slate-200 block" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 leading-snug line-clamp-2">
-                        {alert.titulo}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
-                        <span
-                          className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                          style={{ background: "#f1f5f9", color: "#64748b" }}
-                        >
-                          {modality}
-                        </span>
-                        {place && (
-                          <span className="text-[11px] text-slate-400 flex items-center gap-0.5">
-                            <MapPin className="w-2.5 h-2.5" />
-                            {place}
-                          </span>
-                        )}
+                    <div className="w-1.5 shrink-0" style={{ backgroundColor: accentColor }} />
+                    <div className="p-5 flex-1 min-w-0">
+                      <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: accentColor }}>
+                        {modality}
                       </div>
+                      <p className="text-sm text-slate-500 mb-0.5 truncate">{alert.orgao}</p>
+                      <p className="text-base font-bold text-slate-900 leading-snug line-clamp-1">{alert.titulo}</p>
                     </div>
-
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-300 flex-shrink-0 mt-1 group-hover:text-slate-500 transition-colors" />
+                    <div
+                      className="px-5 border-l border-slate-100 flex flex-col items-end justify-center gap-1 shrink-0"
+                      style={{ minWidth: '140px', backgroundColor: '#FAFBFC' }}
+                    >
+                      {place && <p className="text-xs text-slate-400">{place}</p>}
+                      <span className="text-xs font-semibold" style={{ color: '#0066FF' }}>Ver edital →</span>
+                    </div>
                   </div>
                 );
               })}
@@ -499,17 +505,15 @@ export function InicioPage() {
           )}
         </div>
 
-        {/* ── Guias rápidos ─────────────────────────────────────────────── */}
+        {/* ── Aprenda como funciona ─────────────────────────────────────── */}
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
-            Aprenda como funciona
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <h2 className="text-lg font-bold text-slate-900 mb-5">Aprenda como funciona</h2>
+          <div className="grid grid-cols-3 gap-4">
             {[
               {
                 icon: FileText,
-                color: "#2563eb",
-                bg: "#eff6ff",
+                color: "#0066FF",
+                bg: "#E5F0FF",
                 title: "Como emitir certidões",
                 sub: "Quais são, onde tirar e por quanto tempo valem",
                 href: "/guias",
@@ -534,19 +538,14 @@ export function InicioPage() {
               <button
                 key={title}
                 onClick={() => navigate(href)}
-                className="group text-left bg-white rounded-2xl p-4 transition-all duration-150 hover:shadow-sm"
-                style={{ border: "1px solid #f1f5f9" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = `${color}30`; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#f1f5f9"; }}
+                className="group text-left bg-white rounded-xl p-5 transition-all hover:shadow-md"
+                style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
               >
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center mb-3"
-                  style={{ background: bg }}
-                >
-                  <Icon className="w-4 h-4" style={{ color }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: bg }}>
+                  <Icon className="w-5 h-5" style={{ color }} />
                 </div>
-                <p className="text-xs font-semibold text-slate-800 leading-snug mb-1">{title}</p>
-                <p className="text-[11px] text-slate-400 leading-snug">{sub}</p>
+                <p className="text-sm font-bold text-slate-800 leading-snug mb-1">{title}</p>
+                <p className="text-xs text-slate-400 leading-snug">{sub}</p>
               </button>
             ))}
           </div>
