@@ -592,6 +592,175 @@ router.post("/processes/:id/generate-analysis", async (req, res) => {
   }
 });
 
+// ── POST /processes/:id/risk-analysis ─────────────────────────────────────────
+
+router.post("/processes/:id/risk-analysis", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [process] = await db.select().from(processesTable).where(eq(processesTable.id, id));
+  if (!process) { res.status(404).json({ error: "Process not found" }); return; }
+
+  const [editalFile] = await db.select().from(uploadedFilesTable)
+    .where(eq(uploadedFilesTable.processId, id))
+    .limit(1);
+
+  if (!editalFile || editalFile.fileType !== "edital") {
+    res.status(400).json({ error: "Nenhum edital foi enviado para este processo. Faça o upload do edital primeiro." });
+    return;
+  }
+
+  let editalText = "";
+  try {
+    editalText = await extractTextFromFile(editalFile.path, editalFile.mimeType);
+  } catch {
+    res.status(500).json({ error: "Falha ao ler o arquivo do edital" });
+    return;
+  }
+
+  let company: typeof companiesTable.$inferSelect | null = null;
+  if (process.companyId) {
+    const [c] = await db.select().from(companiesTable).where(eq(companiesTable.id, process.companyId));
+    company = c ?? null;
+  }
+
+  const isMeppp = ["ME", "EPP", "MEI"].some(p => company?.porte?.toUpperCase?.()?.includes(p) ?? false);
+  const textSample = editalText.slice(0, 12000);
+
+  const prompt = `Você é um especialista em licitações públicas brasileiras com profundo conhecimento da Lei 14.133/2021 e da Lei Complementar 123/2006.
+
+EDITAL (primeiros 12.000 caracteres):
+${textSample}
+
+EMPRESA:
+- Porte: ${company?.porte ?? "Não informado"}
+- CNPJ: ${company?.cnpj ?? "Não informado"}
+- É ME/EPP/MEI: ${isMeppp}
+
+Analise o edital e retorne APENAS um JSON válido (sem markdown, sem texto extra) com esta estrutura exata:
+{
+  "elegibilidade": {
+    "exclusividade_me_epp": { "status": "sim|nao|nao_identificado", "justificativa": "texto curto", "valor_estimado": "R$ X.XXX ou null" },
+    "empate_ficto": { "status": "previsto|ausente|nao_aplicavel", "justificativa": "texto curto" },
+    "prazo_regularizacao": { "status": "previsto|ausente", "justificativa": "texto curto" },
+    "capital_social": { "status": "sem_exigencia|exigencia_razoavel|exigencia_restritiva", "valor": "R$ X.XXX ou null", "justificativa": "texto curto" },
+    "subcontratacao": { "status": "exigida|nao_exigida", "percentual": "X% ou null" }
+  },
+  "riscos": [
+    { "categoria": "nome", "nivel": "alto|medio|baixo", "descricao": "descrição do risco", "trecho_edital": "trecho relevante (máx 150 chars)", "recomendacao": "o que fazer" }
+  ],
+  "score_risco_geral": "baixo|medio|alto",
+  "resumo": "parágrafo curto com avaliação geral",
+  "recomendacao_geral": {
+    "veredicto": "Vale a pena participar|Participar com atenção|Alto risco — avalie com cuidado",
+    "pontos_positivos": ["item 1", "item 2"],
+    "pontos_atencao": ["item 1", "item 2"]
+  },
+  "has_illegal_clauses": false,
+  "illegal_clause_details": "descrição das cláusulas ilegais ou null"
+}
+
+INSTRUÇÕES:
+- empate_ficto: "previsto" se o edital menciona explicitamente; "ausente" se deveria estar (empresa ME/EPP) mas não está; "nao_aplicavel" se não é ME/EPP
+- exclusividade_me_epp: "sim" se valor estimado ≤ R$ 80.000 ou edital declara explicitamente exclusivo ME/EPP
+- Riscos a verificar: prazo de entrega, exigências técnicas restritivas, marcas específicas, atestados atípicos, garantias, multas abusivas (>30%), pagamento >30 dias, critério técnica-e-preço
+- has_illegal_clauses: true se identificar marca específica exigida sem alternativa, empate ficto obrigatório ausente, ou outras violações claras
+- veredicto: "Vale a pena participar" se score baixo e empresa elegível; "Participar com atenção" se score médio; "Alto risco — avalie com cuidado" se score alto
+- Retorne APENAS o JSON, sem texto adicional`;
+
+  async function callGPT() {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_completion_tokens: 4096,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const content = completion.choices[0]?.message?.content ?? "{}";
+    const clean = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    return JSON.parse(clean);
+  }
+
+  let result: any;
+  try {
+    result = await callGPT();
+  } catch {
+    try {
+      result = await callGPT();
+    } catch (err) {
+      req.log.error({ err }, "Risk analysis GPT call failed after retry");
+      res.status(500).json({ error: "Falha ao gerar análise de risco. Tente novamente em alguns instantes." });
+      return;
+    }
+  }
+
+  await db.insert(processAnalysisTable)
+    .values({ processId: id, riskAnalysis: result, riskAnalyzedAt: new Date(), riskScore: result.score_risco_geral ?? "medio" } as any)
+    .onConflictDoUpdate({
+      target: processAnalysisTable.processId,
+      set: { riskAnalysis: result, riskAnalyzedAt: new Date(), riskScore: result.score_risco_geral ?? "medio" } as any,
+    });
+
+  res.json(result);
+});
+
+// ── POST /processes/:id/generate-impugnacao ────────────────────────────────────
+
+router.post("/processes/:id/generate-impugnacao", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [process] = await db.select().from(processesTable).where(eq(processesTable.id, id));
+  if (!process) { res.status(404).json({ error: "Process not found" }); return; }
+
+  const { illegalClauseDetails } = req.body as { illegalClauseDetails?: string };
+
+  let company: typeof companiesTable.$inferSelect | null = null;
+  if (process.companyId) {
+    const [c] = await db.select().from(companiesTable).where(eq(companiesTable.id, process.companyId));
+    company = c ?? null;
+  }
+
+  const today = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  const prompt = `Você é um advogado especialista em licitações públicas. Gere uma minuta formal de impugnação de edital com base nas informações abaixo.
+
+PROCESSO LICITATÓRIO:
+- Número do edital: ${process.editalNumber ?? "Não informado"}
+- Órgão: ${process.agency ?? "Não informado"}
+- Objeto: ${process.title ?? "Não informado"}
+- Modalidade: ${process.modality ?? "Não informado"}
+
+EMPRESA IMPUGNANTE:
+- Razão social: ${company?.razaoSocial ?? "Não informada"}
+- CNPJ: ${company?.cnpj ?? "Não informado"}
+
+FUNDAMENTOS DA IMPUGNAÇÃO:
+${illegalClauseDetails ?? "Cláusulas restritivas à competição identificadas pela análise de IA"}
+
+DATA: ${today}
+
+Gere a minuta de impugnação completa, formal, com:
+1. Identificação do processo e do impugnante
+2. Dos fatos (descreva o problema de forma objetiva)
+3. Do direito (cite os artigos da Lei 14.133/2021 e LC 123/2006 violados)
+4. Do pedido (peça a correção específica)
+5. Fechamento formal
+
+O texto deve ser formal, juridicamente fundamentado e adequado para protocolo em órgão público. Use linguagem jurídica brasileira padrão.`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_completion_tokens: 2048,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const text = completion.choices[0]?.message?.content ?? "";
+    res.json({ text });
+  } catch (err) {
+    req.log.error({ err }, "Failed to generate impugnacao");
+    res.status(500).json({ error: "Falha ao gerar minuta de impugnação" });
+  }
+});
+
 // ── Declaration generation ────────────────────────────────────────────────────
 
 const DECLARATION_LABELS: Record<string, string> = {

@@ -1,0 +1,252 @@
+## Contexto do projeto
+
+LicitaIA — SaaS brasileiro de gestão de licitações públicas para MEI e microempresas.
+
+Stack:
+- Frontend: React 19 + Vite, Tailwind CSS v4, Wouter, TanStack Query
+- Backend: Node.js + Express, Pino (logs)
+- Banco: PostgreSQL via Drizzle ORM
+- IA: OpenAI GPT-4o / GPT-4o-mini
+- Portas: API 8080, Frontend 24747
+
+## Estado atual — módulo de Licitações
+
+Quando o usuário cadastra um processo licitatório e faz upload do edital, 
+a IA já realiza:
+- Extração automática de exigências do edital
+- Geração de checklist de documentação
+- Armazenamento em extracted_requirements e validation_items
+
+O resultado é exibido na aba "Análise" ou "Requisitos" do processo.
+A tabela process_analysis armazena o resultado da análise atual.
+
+O que NÃO existe ainda: nenhuma análise de risco, nenhuma verificação de 
+elegibilidade para ME/MEI e nenhum alerta sobre cláusulas problemáticas.
+
+## O que precisa ser implementado
+
+### 1. Nova seção "Análise de risco e elegibilidade" na página do processo
+
+Adicionar uma seção dedicada na página do processo (/processes/:id), 
+logo abaixo do resumo do edital e antes do checklist de documentos.
+
+A seção deve ter:
+- Título: "Análise de risco e elegibilidade"
+- Botão "Analisar edital" (dispara a análise via IA)
+- Após a análise: exibir os três blocos descritos abaixo
+- Estado de loading com skeleton enquanto a IA processa
+- Possibilidade de reanalisar a qualquer momento
+
+---
+
+### 2. Bloco A — Elegibilidade ME/MEI (Lei Complementar 123/2006)
+
+A IA deve analisar o edital e identificar os seguintes pontos, retornando 
+cada um como verdadeiro/falso/não identificado com justificativa:
+
+**Verificações obrigatórias:**
+
+a) Exclusividade ME/EPP
+   Verificar se o lote/item é exclusivo para ME e EPP 
+   (art. 48, I da LC 123 — licitações com valor até R$ 80.000)
+   → Se sim: badge verde "Exclusivo ME/EPP — você tem prioridade"
+   → Se não: badge cinza "Disputa aberta"
+
+b) Direito de preferência (empate ficto)
+   Verificar se o edital menciona o tratamento de empate favorável à ME/EPP
+   (art. 44 da LC 123 — diferença de até 10% no pregão ou 5% nas demais)
+   → Se sim: badge verde "Empate ficto previsto"
+   → Se ausente e deveria estar: badge amarelo com alerta 
+     "Edital não menciona empate ficto — você pode questionar via impugnação"
+
+c) Prazo de regularização fiscal
+   Verificar se o edital prevê o prazo de 5 dias úteis para ME/EPP 
+   regularizar pendências fiscais após ser declarada vencedora (art. 43 da LC 123)
+   → Se sim: badge verde
+   → Se ausente: badge amarelo "Prazo de regularização não mencionado"
+
+d) Exigência de capital social mínimo
+   Verificar se há exigência de capital social que possa inviabilizar MEI 
+   (MEI tem limite de R$ 81.000/ano de faturamento)
+   → Se exigido e for valor alto: badge vermelho com alerta
+
+e) Subcontratação ME/EPP
+   Verificar se há cota de subcontratação obrigatória para ME/EPP (art. 48, II)
+   → Se sim: badge informativo azul
+
+**Retorno esperado da IA (JSON):**
+{
+  "exclusividade_me_epp": { 
+    "status": "sim|nao|nao_identificado", 
+    "justificativa": "texto curto",
+    "valor_estimado": "R$ X.XXX" 
+  },
+  "empate_ficto": { 
+    "status": "previsto|ausente|nao_aplicavel", 
+    "justificativa": "texto curto" 
+  },
+  "prazo_regularizacao": { 
+    "status": "previsto|ausente", 
+    "justificativa": "texto curto" 
+  },
+  "capital_social": { 
+    "status": "sem_exigencia|exigencia_razoavel|exigencia_restritiva", 
+    "valor": "R$ X.XXX ou null",
+    "justificativa": "texto curto" 
+  },
+  "subcontratacao": { 
+    "status": "exigida|nao_exigida", 
+    "percentual": "X% ou null" 
+  }
+}
+
+---
+
+### 3. Bloco B — Análise de risco do edital
+
+A IA deve identificar cláusulas potencialmente problemáticas e classificar 
+cada risco por nível: alto, médio ou baixo.
+
+**Categorias de risco a verificar:**
+
+a) Prazo de entrega/execução
+   - Verificar se o prazo é tecnicamente viável para o objeto licitado
+   - Risco alto se o prazo for inferior ao usual para o tipo de fornecimento
+
+b) Exigências técnicas restritivas
+   - Marcas específicas citadas sem alternativa (ilegal — art. 7º, §5º da Lei 14.133)
+   - Atestados com quantidades ou valores atípicos que excluem pequenas empresas
+   - Visita técnica obrigatória em prazo muito curto
+
+c) Garantia de proposta / garantia contratual
+   - Verificar se é exigida e em qual percentual
+   - Risco se percentual acima de 5% (contratual) for exigido sem justificativa
+
+d) Multas e penalidades
+   - Verificar se há cláusulas de multa com percentuais abusivos (>30% do valor)
+   - Rescisão unilateral sem compensação
+
+e) Forma de pagamento
+   - Prazo de pagamento superior a 30 dias (risco de fluxo de caixa para ME)
+   - Pagamento condicionado a terceiros ou aprovações demoradas
+
+f) Critério de julgamento
+   - Verificar se é menor preço, melhor técnica ou técnica e preço
+   - Se técnica e preço: risco médio para ME sem histórico extenso
+
+**Retorno esperado da IA (JSON):**
+{
+  "riscos": [
+    {
+      "categoria": "nome da categoria",
+      "nivel": "alto|medio|baixo",
+      "descricao": "descrição clara do risco identificado",
+      "trecho_edital": "trecho relevante do edital (máx 150 chars)",
+      "recomendacao": "o que o usuário pode fazer"
+    }
+  ],
+  "score_risco_geral": "baixo|medio|alto",
+  "resumo": "parágrafo curto com avaliação geral"
+}
+
+---
+
+### 4. Bloco C — Recomendação geral
+
+Com base nos blocos A e B, a IA deve gerar uma recomendação final com 3 campos:
+
+- Veredicto: "Vale a pena participar", "Participar com atenção" ou 
+  "Alto risco — avalie com cuidado"
+- Pontos positivos: lista de até 3 itens favoráveis encontrados
+- Pontos de atenção: lista de até 3 itens que o usuário deve resolver 
+  antes de submeter proposta
+
+Exibir o veredicto como um card destacado no topo da seção, com cor 
+condizente (verde, amarelo ou vermelho).
+
+---
+
+### 5. Botão de Impugnação assistida
+
+Se a análise identificar alguma cláusula ilegal ou ausência obrigatória 
+(ex: empate ficto ausente, marca específica exigida), exibir um botão:
+"Gerar minuta de impugnação"
+
+Ao clicar, abrir um modal onde a IA gera automaticamente uma minuta de 
+impugnação do edital com:
+- Identificação do processo (número, órgão, objeto)
+- Fundamentação legal (citando os artigos violados)
+- Pedido de correção
+- Formatação formal adequada para protocolo
+
+O usuário pode copiar ou baixar como .txt.
+
+---
+
+### 6. Endpoint de API
+
+Criar: POST /api/processes/:id/risk-analysis
+
+Funcionamento:
+1. Buscar o texto do edital já extraído do processo (campo extracted_text 
+   ou similar na tabela processes ou process_analysis)
+2. Buscar dados da empresa vinculada ao processo (regime tributário, 
+   porte — MEI/ME/EPP)
+3. Montar prompt para GPT-4o com:
+   - Texto do edital (ou resumo se muito longo — usar primeiros 12.000 tokens)
+   - Dados da empresa
+   - Instruções para retornar JSON estruturado conforme especificado acima
+4. Parsear o JSON retornado
+5. Salvar resultado na tabela process_analysis (adicionar coluna 
+   risk_analysis jsonb e risk_analyzed_at timestamp)
+6. Retornar o resultado para o frontend
+
+Se o texto do edital não estiver disponível no banco, retornar erro 
+orientando o usuário a fazer upload do edital primeiro.
+
+---
+
+### 7. Alterações no banco de dados
+
+Na tabela process_analysis, adicionar:
+- risk_analysis: jsonb (armazena o JSON completo retornado pela IA)
+- risk_analyzed_at: timestamp
+- risk_score: text (valor do score_risco_geral para queries rápidas)
+
+Criar a migration com Drizzle.
+
+---
+
+### 8. UX e visual
+
+- Usar componentes shadcn/ui já existentes no projeto
+- Badges de status: usar as cores do Tailwind já configuradas no projeto
+  - Verde: text-green-700 bg-green-50 border-green-200
+  - Amarelo: text-yellow-700 bg-yellow-50 border-yellow-200  
+  - Vermelho: text-red-700 bg-red-50 border-red-200
+  - Azul: text-blue-700 bg-blue-50 border-blue-200
+- Riscos devem ser exibidos como cards colapsáveis (accordion)
+  ordenados do mais alto para o mais baixo
+- O score geral de risco deve aparecer como um indicador visual 
+  (círculo colorido ou barra) no topo do bloco B
+- Todo texto em português (pt-BR)
+- Ícones via Lucide React (já instalado):
+  - Elegibilidade: ShieldCheck
+  - Risco: AlertTriangle
+  - Recomendação: Lightbulb
+  - Impugnação: FileWarning
+
+---
+
+### Observações importantes
+
+- Não remover nem alterar funcionalidades existentes do módulo de licitações
+- A análise de risco é independente da extração de requisitos já existente
+  — são duas análises distintas, não substituir uma pela outra
+- Tratar o caso em que a IA retorne JSON malformado: fazer retry uma vez 
+  e, se falhar novamente, exibir mensagem de erro amigável
+- O custo de tokens desta análise é maior que o usual — usar GPT-4o 
+  (não mini) para garantir qualidade na identificação de cláusulas legais
+- Todo o conteúdo jurídico gerado deve ter disclaimer fixo no rodapé 
+  da seção: "Esta análise é gerada por IA com fins informativos e não 
+  substitui orientação jurídica especializada."

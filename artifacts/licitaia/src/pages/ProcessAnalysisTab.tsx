@@ -8,6 +8,7 @@ import {
   FileText, TrendingDown, Calculator, Calendar, BarChart2, ArrowRight,
   ChevronDown, ChevronUp, RefreshCw, Sparkles, Info, Shield,
   Clock, Download, Building2,
+  ShieldCheck, Lightbulb, FileWarning, Copy, Check, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -542,6 +543,458 @@ function CompetitionSection({ similarProcesses, pricePatternInsight, suggestedBi
   );
 }
 
+// ── Risk Analysis Types ───────────────────────────────────────────────────────
+
+interface ElegibilidadeItem {
+  status: string;
+  justificativa: string;
+  valor_estimado?: string | null;
+  valor?: string | null;
+  percentual?: string | null;
+}
+
+interface RiscoItem {
+  categoria: string;
+  nivel: "alto" | "medio" | "baixo";
+  descricao: string;
+  trecho_edital: string;
+  recomendacao: string;
+}
+
+interface RiskAnalysisResult {
+  elegibilidade: {
+    exclusividade_me_epp: ElegibilidadeItem;
+    empate_ficto: ElegibilidadeItem;
+    prazo_regularizacao: ElegibilidadeItem;
+    capital_social: ElegibilidadeItem;
+    subcontratacao: ElegibilidadeItem;
+  };
+  riscos: RiscoItem[];
+  score_risco_geral: "baixo" | "medio" | "alto";
+  resumo: string;
+  recomendacao_geral: {
+    veredicto: string;
+    pontos_positivos: string[];
+    pontos_atencao: string[];
+  };
+  has_illegal_clauses: boolean;
+  illegal_clause_details?: string | null;
+}
+
+// ── Risk Analysis Component ───────────────────────────────────────────────────
+
+function RiskBadge({ level }: { level: "alto" | "medio" | "baixo" }) {
+  const cfg = {
+    alto: { label: "Risco Alto", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+    medio: { label: "Risco Médio", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+    baixo: { label: "Risco Baixo", color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
+  }[level];
+  return (
+    <span className="text-xs font-semibold px-2 py-0.5 rounded-full border" style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function ElegibilidadeBadge({ status, type }: { status: string; type: string }) {
+  type BadgeCfg = { label: string; color: string; bg: string; border: string };
+  const cfgMap: Record<string, BadgeCfg> = {
+    sim_excl:       { label: "Exclusivo ME/EPP — você tem prioridade", color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
+    nao_excl:       { label: "Disputa aberta", color: "#64748b", bg: "#F8FAFC", border: "#E2E8F0" },
+    nao_id_excl:    { label: "Não identificado", color: "#64748b", bg: "#F8FAFC", border: "#E2E8F0" },
+    previsto_emp:   { label: "Empate ficto previsto", color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
+    ausente_emp:    { label: "Empate ficto ausente — questione via impugnação", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+    na_emp:         { label: "Não aplicável", color: "#64748b", bg: "#F8FAFC", border: "#E2E8F0" },
+    previsto_praz:  { label: "Prazo de regularização previsto", color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
+    ausente_praz:   { label: "Prazo de regularização não mencionado", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+    sem_cap:        { label: "Sem exigência de capital social", color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
+    raz_cap:        { label: "Exigência de capital razoável", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+    rest_cap:       { label: "Exigência restritiva de capital social", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+    exig_sub:       { label: "Subcontratação ME/EPP exigida", color: "#1D4ED8", bg: "#EFF6FF", border: "#BFDBFE" },
+    nao_sub:        { label: "Subcontratação não exigida", color: "#64748b", bg: "#F8FAFC", border: "#E2E8F0" },
+  };
+  const key = (() => {
+    if (type === "excl") return status === "sim" ? "sim_excl" : status === "nao" ? "nao_excl" : "nao_id_excl";
+    if (type === "emp") return status === "previsto" ? "previsto_emp" : status === "ausente" ? "ausente_emp" : "na_emp";
+    if (type === "praz") return status === "previsto" ? "previsto_praz" : "ausente_praz";
+    if (type === "cap") return status === "sem_exigencia" ? "sem_cap" : status === "exigencia_razoavel" ? "raz_cap" : "rest_cap";
+    if (type === "sub") return status === "exigida" ? "exig_sub" : "nao_sub";
+    return "nao_id_excl";
+  })();
+  const cfg = cfgMap[key]!;
+  return (
+    <span className="text-xs font-semibold px-2.5 py-1 rounded-full border inline-block" style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function ScoreIndicator({ score }: { score: "baixo" | "medio" | "alto" }) {
+  const cfg = {
+    baixo: { label: "Risco Geral: Baixo", color: "#059669", bg: "#F0FDF4", border: "#BBF7D0", dot: "#22C55E" },
+    medio: { label: "Risco Geral: Médio", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", dot: "#F59E0B" },
+    alto:  { label: "Risco Geral: Alto",  color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", dot: "#EF4444" },
+  }[score];
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold" style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}>
+      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
+      {cfg.label}
+    </div>
+  );
+}
+
+function RiskAnalysisSection({ processId, token, hasEdital, process: processData }: { processId: number; token: string | null; hasEdital: boolean; process: any }) {
+  const [data, setData] = useState<RiskAnalysisResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [openRisks, setOpenRisks] = useState<Record<number, boolean>>({});
+  const [impugnacaoOpen, setImpugnacaoOpen] = useState(false);
+  const [impugnacaoText, setImpugnacaoText] = useState("");
+  const [impugnacaoLoading, setImpugnacaoLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!hasEdital) { setLoading(false); return; }
+    fetch(`${API}/api/processes/${processId}/analysis`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(a => { if (a?.riskAnalysis) setData(a.riskAnalysis as RiskAnalysisResult); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [processId, token, hasEdital]);
+
+  const handleAnalyze = async () => {
+    setAnalyzing(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`${API}/api/processes/${processId}/risk-analysis`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setData(await res.json());
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg((err as any).error ?? "Erro ao gerar análise");
+      }
+    } catch {
+      setErrorMsg("Falha na conexão. Tente novamente.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleImpugnacao = async () => {
+    setImpugnacaoOpen(true);
+    setImpugnacaoLoading(true);
+    setImpugnacaoText("");
+    try {
+      const res = await fetch(`${API}/api/processes/${processId}/generate-impugnacao`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ illegalClauseDetails: data?.illegal_clause_details }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setImpugnacaoText((json as any).text ?? "");
+      } else {
+        setImpugnacaoText("Erro ao gerar minuta. Tente novamente.");
+      }
+    } catch {
+      setImpugnacaoText("Falha na conexão. Tente novamente.");
+    } finally {
+      setImpugnacaoLoading(false);
+    }
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(impugnacaoText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleDownloadTxt = () => {
+    const blob = new Blob([impugnacaoText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `impugnacao-processo-${processId}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const sortedRiscos = [...(data?.riscos ?? [])].sort((a, b) => {
+    const order = { alto: 0, medio: 1, baixo: 2 };
+    return order[a.nivel] - order[b.nivel];
+  });
+
+  const veredictoConfig = (() => {
+    const v = data?.recomendacao_geral?.veredicto ?? "";
+    if (v.includes("Vale a pena")) return { bg: "#F0FDF4", border: "#BBF7D0", color: "#059669", icon: <CheckCircle2 className="w-5 h-5" /> };
+    if (v.includes("atenção")) return { bg: "#FFFBEB", border: "#FDE68A", color: "#D97706", icon: <AlertTriangle className="w-5 h-5" /> };
+    return { bg: "#FEF2F2", border: "#FECACA", color: "#DC2626", icon: <XCircle className="w-5 h-5" /> };
+  })();
+
+  if (!hasEdital) return null;
+
+  return (
+    <div className="space-y-6 pb-2">
+      {/* Section header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#EFF6FF' }}>
+            <ShieldCheck className="w-4 h-4" style={{ color: '#0066FF' }} />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 text-base">Análise de risco e elegibilidade</h3>
+            <p className="text-xs text-slate-500">Verificação legal LC 123/2006 e cláusulas do edital</p>
+          </div>
+        </div>
+        {data && !analyzing && (
+          <Button variant="outline" size="sm" onClick={handleAnalyze} className="gap-1.5 text-xs">
+            <RefreshCw className="w-3.5 h-3.5" /> Reanalisar
+          </Button>
+        )}
+      </div>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+          <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          <span className="text-sm text-slate-500">Carregando análise...</span>
+        </div>
+      )}
+
+      {/* Analyzing state */}
+      {analyzing && (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-xl" style={{ background: '#EFF6FF', border: '1px solid #DBEAFE' }}>
+          <div className="relative">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#DBEAFE' }}>
+              <ShieldCheck className="w-6 h-6 animate-pulse" style={{ color: '#0066FF' }} />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white flex items-center justify-center">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: '#0066FF' }} />
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="font-semibold text-blue-900 text-sm">Analisando risco e elegibilidade com GPT-4o...</p>
+            <p className="text-xs text-blue-600 mt-1">Verificando cláusulas, elegibilidade ME/EPP e riscos jurídicos</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error */}
+      {!analyzing && errorMsg && (
+        <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm text-red-800 font-medium">{errorMsg}</p>
+            <Button size="sm" variant="outline" onClick={handleAnalyze} className="mt-2 text-xs">Tentar novamente</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt button — no data yet */}
+      {!loading && !analyzing && !data && !errorMsg && (
+        <div className="rounded-xl p-6 flex flex-col items-center gap-4 text-center" style={{ background: '#FAFBFC', border: '2px dashed #E2E8F0' }}>
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: '#EFF6FF' }}>
+            <ShieldCheck className="w-6 h-6" style={{ color: '#0066FF' }} />
+          </div>
+          <div>
+            <p className="font-semibold text-slate-800 mb-1">Análise de risco ainda não realizada</p>
+            <p className="text-sm text-slate-500">O GPT-4o vai verificar elegibilidade ME/EPP, cláusulas problemáticas e classificar os riscos do edital.</p>
+          </div>
+          <Button onClick={handleAnalyze} style={{ background: '#0066FF' }} className="text-white hover:opacity-90 gap-2">
+            <ShieldCheck className="w-4 h-4" /> Analisar edital
+          </Button>
+        </div>
+      )}
+
+      {/* Results */}
+      {!analyzing && data && (
+        <div className="space-y-6">
+          {/* Bloco C: Veredicto (topo) */}
+          <div className="rounded-2xl p-5" style={{ background: veredictoConfig.bg, border: `1px solid ${veredictoConfig.border}` }}>
+            <div className="flex items-start gap-3 mb-3">
+              <div style={{ color: veredictoConfig.color }}>{veredictoConfig.icon}</div>
+              <div>
+                <p className="font-bold text-slate-900">{data.recomendacao_geral?.veredicto}</p>
+                <p className="text-sm text-slate-600 mt-1">{data.resumo}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              {(data.recomendacao_geral?.pontos_positivos?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-green-700 mb-2 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Pontos positivos
+                  </p>
+                  <ul className="space-y-1">
+                    {data.recomendacao_geral.pontos_positivos.map((p, i) => (
+                      <li key={i} className="text-xs text-slate-700 flex items-start gap-1.5">
+                        <span className="text-green-500 mt-0.5 flex-shrink-0">•</span>{p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(data.recomendacao_geral?.pontos_atencao?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-amber-700 mb-2 flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Pontos de atenção
+                  </p>
+                  <ul className="space-y-1">
+                    {data.recomendacao_geral.pontos_atencao.map((p, i) => (
+                      <li key={i} className="text-xs text-slate-700 flex items-start gap-1.5">
+                        <span className="text-amber-500 mt-0.5 flex-shrink-0">•</span>{p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bloco A: Elegibilidade ME/EPP */}
+          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E8EFF6' }}>
+            <div className="px-5 py-3.5 flex items-center gap-2" style={{ background: '#F8FAFC', borderBottom: '1px solid #E8EFF6' }}>
+              <ShieldCheck className="w-4 h-4 text-blue-500" />
+              <h4 className="font-semibold text-slate-800 text-sm">Elegibilidade ME/EPP — Lei Complementar 123/2006</h4>
+            </div>
+            <div className="divide-y" style={{ divideColor: '#F1F5F9' }}>
+              {[
+                { label: "Exclusividade ME/EPP", item: data.elegibilidade?.exclusividade_me_epp, type: "excl" },
+                { label: "Direito de preferência (empate ficto)", item: data.elegibilidade?.empate_ficto, type: "emp" },
+                { label: "Prazo de regularização fiscal", item: data.elegibilidade?.prazo_regularizacao, type: "praz" },
+                { label: "Exigência de capital social", item: data.elegibilidade?.capital_social, type: "cap" },
+                { label: "Subcontratação ME/EPP", item: data.elegibilidade?.subcontratacao, type: "sub" },
+              ].filter(r => r.item).map(({ label, item, type }) => (
+                <div key={type} className="px-5 py-3.5 flex flex-col gap-1.5" style={{ borderColor: '#F1F5F9' }}>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs font-medium text-slate-600">{label}</span>
+                    <ElegibilidadeBadge status={item!.status} type={type} />
+                  </div>
+                  {item!.justificativa && (
+                    <p className="text-xs text-slate-500">{item!.justificativa}
+                      {(item!.valor_estimado || item!.valor || item!.percentual) && (
+                        <span className="font-medium text-slate-700"> — {item!.valor_estimado ?? item!.valor ?? item!.percentual}</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bloco B: Riscos */}
+          {sortedRiscos.length > 0 && (
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E8EFF6' }}>
+              <div className="px-5 py-3.5 flex items-center justify-between" style={{ background: '#F8FAFC', borderBottom: '1px solid #E8EFF6' }}>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  <h4 className="font-semibold text-slate-800 text-sm">Análise de risco do edital</h4>
+                </div>
+                <ScoreIndicator score={data.score_risco_geral} />
+              </div>
+              <div className="divide-y" style={{ divideColor: '#F1F5F9' }}>
+                {sortedRiscos.map((risco, i) => (
+                  <div key={i}>
+                    <button
+                      className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+                      onClick={() => setOpenRisks(prev => ({ ...prev, [i]: !prev[i] }))}
+                    >
+                      <div className="flex items-center gap-3">
+                        <RiskBadge level={risco.nivel} />
+                        <span className="text-sm font-medium text-slate-700">{risco.categoria}</span>
+                      </div>
+                      {openRisks[i] ? <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                    </button>
+                    {openRisks[i] && (
+                      <div className="px-5 pb-4 space-y-3" style={{ background: '#FAFBFC', borderTop: '1px solid #F1F5F9' }}>
+                        <p className="text-sm text-slate-700">{risco.descricao}</p>
+                        {risco.trecho_edital && (
+                          <blockquote className="border-l-2 pl-3 text-xs text-slate-500 italic" style={{ borderColor: '#CBD5E1' }}>
+                            "{risco.trecho_edital}"
+                          </blockquote>
+                        )}
+                        {risco.recomendacao && (
+                          <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: '#EFF6FF' }}>
+                            <Lightbulb className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-blue-800">{risco.recomendacao}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Botão impugnação */}
+          {data.has_illegal_clauses && (
+            <div className="flex items-start gap-3 rounded-xl p-4" style={{ background: '#FFF7ED', border: '1px solid #FED7AA' }}>
+              <FileWarning className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-orange-900 mb-1">Cláusulas potencialmente ilegais identificadas</p>
+                <p className="text-xs text-orange-700 mb-3">{data.illegal_clause_details}</p>
+                <Button size="sm" onClick={handleImpugnacao} className="gap-1.5 text-xs" style={{ background: '#EA580C' }}>
+                  <FileWarning className="w-3.5 h-3.5" /> Gerar minuta de impugnação
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Disclaimer */}
+          <p className="text-xs text-slate-400 text-center border-t pt-4" style={{ borderColor: '#E8EFF6' }}>
+            Esta análise é gerada por IA com fins informativos e não substitui orientação jurídica especializada.
+          </p>
+        </div>
+      )}
+
+      {/* Modal de impugnação */}
+      {impugnacaoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: '#E8EFF6' }}>
+              <div className="flex items-center gap-2">
+                <FileWarning className="w-5 h-5 text-orange-500" />
+                <h3 className="font-bold text-slate-900">Minuta de Impugnação</h3>
+              </div>
+              <button onClick={() => setImpugnacaoOpen(false)} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {impugnacaoLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                  <p className="text-sm text-slate-500">Gerando minuta de impugnação...</p>
+                </div>
+              ) : (
+                <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{impugnacaoText}</pre>
+              )}
+            </div>
+            {!impugnacaoLoading && impugnacaoText && (
+              <div className="flex items-center justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: '#E8EFF6' }}>
+                <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5">
+                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? "Copiado!" : "Copiar"}
+                </Button>
+                <Button size="sm" onClick={handleDownloadTxt} className="gap-1.5" style={{ background: '#0066FF' }}>
+                  <Download className="w-3.5 h-3.5" /> Baixar .txt
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function ProcessAnalysisTab({ processId, process, companyData, onGoToDocuments }: Props) {
@@ -620,99 +1073,83 @@ export function ProcessAnalysisTab({ processId, process, companyData, onGoToDocu
     );
   }
 
-  if (loading || generating) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="relative">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: '#EFF6FF' }}>
-            <Sparkles className="w-7 h-7 animate-pulse" style={{ color: '#0066FF' }} />
-          </div>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center bg-white">
-            <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#0066FF' }} />
-          </div>
-        </div>
-        <div className="text-center">
-          <p className="font-semibold text-slate-800 mb-1">Analisando benefícios, riscos e viabilidade...</p>
-          <p className="text-sm text-slate-500">Estamos lendo o edital para identificar tudo o que você precisa saber.</p>
-        </div>
-        <div className="flex gap-2 mt-2">
-          {["ME/EPP", "Requisitos", "Financeiro", "Prazos"].map((label, i) => (
-            <span
-              key={label}
-              className="text-xs px-2.5 py-1 rounded-full font-medium animate-pulse"
-              style={{
-                background: '#EFF6FF',
-                color: '#0066FF',
-                animationDelay: `${i * 0.2}s`,
-              }}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !analysis) {
-    return (
-      <div className="text-center py-16 rounded-2xl" style={{ border: '1px solid #FECACA', background: '#FFF5F5' }}>
-        <XCircle className="w-10 h-10 text-red-300 mx-auto mb-3" />
-        <p className="font-semibold text-slate-700 mb-1">Não foi possível gerar a análise</p>
-        <p className="text-sm text-slate-500 mb-4">Verifique se o edital está legível e tente novamente.</p>
-        <Button
-          onClick={generateAnalysis}
-          disabled={generating}
-          style={{ background: '#0066FF' }}
-          className="text-white hover:opacity-90 gap-2"
-        >
-          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          Tentar novamente
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8">
-      {/* Bloco 1: Diagnóstico */}
-      <ViabilityBanner status={analysis.viabilityStatus} reasons={analysis.viabilityReasons ?? []} />
+      {/* ── Análise de risco e elegibilidade (nova seção) ─────────────────── */}
+      <RiskAnalysisSection processId={processId} token={token} hasEdital={hasEdital} process={process} />
 
-      {/* Bloco 2: ME/EPP */}
-      {isMeppp && <MepppSection analysis={analysis} />}
+      {/* ── Separador ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3" style={{ borderTop: '1px solid #E8EFF6' }}>
+        <div className="flex items-center gap-2 -mt-4 bg-white pr-3">
+          <Sparkles className="w-4 h-4 text-blue-400" />
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Análise de viabilidade</span>
+        </div>
+      </div>
 
-      {/* Bloco 3: Requisitos técnicos */}
-      {(analysis.technicalRequirements?.length ?? 0) > 0 && (
-        <TechRequirements reqs={analysis.technicalRequirements!} />
+      {/* ── Análise de viabilidade existente ──────────────────────────────── */}
+      {(loading || generating) ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="relative">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#EFF6FF' }}>
+              <Sparkles className="w-6 h-6 animate-pulse" style={{ color: '#0066FF' }} />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center bg-white">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: '#0066FF' }} />
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="font-semibold text-slate-800 mb-1">Analisando viabilidade do processo...</p>
+            <p className="text-sm text-slate-500">Identificando requisitos, prazos e perfil financeiro.</p>
+          </div>
+        </div>
+      ) : (error || !analysis) ? (
+        <div className="text-center py-12 rounded-2xl" style={{ border: '1px solid #FECACA', background: '#FFF5F5' }}>
+          <XCircle className="w-10 h-10 text-red-300 mx-auto mb-3" />
+          <p className="font-semibold text-slate-700 mb-1">Não foi possível gerar a análise de viabilidade</p>
+          <p className="text-sm text-slate-500 mb-4">Verifique se o edital está legível e tente novamente.</p>
+          <Button onClick={generateAnalysis} disabled={generating} style={{ background: '#0066FF' }} className="text-white hover:opacity-90 gap-2">
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Tentar novamente
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {/* Bloco 1: Diagnóstico */}
+          <ViabilityBanner status={analysis.viabilityStatus} reasons={analysis.viabilityReasons ?? []} />
+
+          {/* Bloco 2: ME/EPP */}
+          {isMeppp && <MepppSection analysis={analysis} />}
+
+          {/* Bloco 3: Requisitos técnicos */}
+          {(analysis.technicalRequirements?.length ?? 0) > 0 && (
+            <TechRequirements reqs={analysis.technicalRequirements!} />
+          )}
+
+          {/* Bloco 4: Calculadora */}
+          <FinancialCalculator
+            estimatedValue={analysis.estimatedValue}
+            estimatedTaxes={analysis.estimatedTaxesPercent}
+            isMeppp={isMeppp}
+          />
+
+          {/* Bloco 5: Linha do tempo */}
+          {(analysis.timelineEvents?.length ?? 0) > 0 && (
+            <Timeline events={analysis.timelineEvents!} />
+          )}
+
+          {/* Bloco 6: Concorrência */}
+          <CompetitionSection
+            similarProcesses={analysis.similarProcesses as SimilarProcess[] | undefined}
+            pricePatternInsight={analysis.pricePatternInsight ?? undefined}
+            suggestedBidMin={analysis.suggestedBidMin ?? undefined}
+            suggestedBidMax={analysis.suggestedBidMax ?? undefined}
+          />
+        </div>
       )}
-
-      {/* Bloco 4: Calculadora */}
-      <FinancialCalculator
-        estimatedValue={analysis.estimatedValue}
-        estimatedTaxes={analysis.estimatedTaxesPercent}
-        isMeppp={isMeppp}
-      />
-
-      {/* Bloco 5: Linha do tempo */}
-      {(analysis.timelineEvents?.length ?? 0) > 0 && (
-        <Timeline events={analysis.timelineEvents!} />
-      )}
-
-      {/* Bloco 6: Concorrência */}
-      <CompetitionSection
-        similarProcesses={analysis.similarProcesses as SimilarProcess[] | undefined}
-        pricePatternInsight={analysis.pricePatternInsight ?? undefined}
-        suggestedBidMin={analysis.suggestedBidMin ?? undefined}
-        suggestedBidMax={analysis.suggestedBidMax ?? undefined}
-      />
 
       {/* CTA to documents */}
       <div className="flex justify-end pt-4" style={{ borderTop: '1px solid #E8EFF6' }}>
-        <Button
-          onClick={onGoToDocuments}
-          style={{ background: '#0066FF' }}
-          className="text-white hover:opacity-90 gap-2"
-        >
+        <Button onClick={onGoToDocuments} style={{ background: '#0066FF' }} className="text-white hover:opacity-90 gap-2">
           Ir para documentos
           <ArrowRight className="w-4 h-4" />
         </Button>

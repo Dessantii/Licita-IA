@@ -34,6 +34,10 @@ export const processAnalysisTable = pgTable("process_analysis", {
   estimatedValue: numeric("estimated_value"),
   estimatedTaxesPercent: numeric("estimated_taxes_percent"),
 
+  riskAnalysis: jsonb("risk_analysis"),
+  riskAnalyzedAt: timestamp("risk_analyzed_at", { withTimezone: true }),
+  riskScore: text("risk_score"),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
