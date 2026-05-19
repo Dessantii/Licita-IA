@@ -491,7 +491,7 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
                         <p className="text-sm font-semibold text-amber-900">Nenhum contrato similar encontrado no PNCP</p>
                         <p className="text-xs text-amber-700 mt-1">
                           Consulte o{" "}
-                          <a href="https://paineldeprecos.economia.gov.br" target="_blank" rel="noopener noreferrer" className="underline font-semibold">
+                          <a href="https://paineldeprecos.planejamento.gov.br" target="_blank" rel="noopener noreferrer" className="underline font-semibold">
                             Painel de Preços do governo federal
                           </a>{" "}
                           para referências de mercado adicionais.
@@ -557,7 +557,7 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
               <p className="text-sm font-semibold text-slate-700">Painel de Preços — Governo Federal</p>
               <p className="text-xs text-slate-500">Base de dados de preços praticados em compras públicas</p>
             </div>
-            <a href="https://paineldeprecos.economia.gov.br" target="_blank" rel="noopener noreferrer">
+            <a href="https://paineldeprecos.planejamento.gov.br" target="_blank" rel="noopener noreferrer">
               <Button size="sm" variant="outline" className="gap-1.5 border-slate-200">
                 Acessar <ExternalLink className="w-3 h-3" />
               </Button>

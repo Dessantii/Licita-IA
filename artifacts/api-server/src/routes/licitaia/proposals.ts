@@ -20,8 +20,6 @@ import {
   TableCell,
   WidthType,
   AlignmentType,
-  HeadingLevel,
-  BorderStyle,
   Packer,
 } from "docx";
 
@@ -53,48 +51,51 @@ function calculateTaxRate(porte: string | null | undefined): number {
 
 // ── PNCP price search ────────────────────────────────────────────────────────
 
-async function searchPNCPContracts(keywords: string[], uf?: string | null) {
+async function searchPNCPContracts(keywords: string[], _uf?: string | null) {
   const endDate = new Date();
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 2);
-  const fmt = (d: Date) =>
+  const fmtDate = (d: Date) =>
     `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 
   const baseUrl = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao";
-  const params = new URLSearchParams({
-    dataInicial: fmt(startDate),
-    dataFinal: fmt(endDate),
-    pagina: "1",
-    tamanhoPagina: "20",
-  });
+  // codigoModalidadeContratacao: 6=Pregão Eletrônico, 8=Dispensa, 5=Concorrência, 4=RDC
+  const modalities = ["6", "8", "5"];
+  const kw = keywords.map(k => k.toLowerCase());
+  let allItems: unknown[] = [];
 
-  const url = `${baseUrl}?${params}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { "Accept": "application/json", "User-Agent": "LicitaIA/1.0" },
+  for (const mod of modalities) {
+    if (allItems.length >= 20) break;
+    const params = new URLSearchParams({
+      dataInicial: fmtDate(startDate),
+      dataFinal: fmtDate(endDate),
+      pagina: "1",
+      tamanhoPagina: "20",
+      codigoModalidadeContratacao: mod,
     });
-    clearTimeout(timeout);
-    if (!res.ok) return [];
-    const data = await res.json() as { data?: unknown[] };
-    const items: unknown[] = Array.isArray(data?.data) ? data.data : [];
-
-    // Filter by keywords in description
-    const kw = keywords.map(k => k.toLowerCase());
-    const filtered = items.filter((item: unknown) => {
-      const i = item as Record<string, unknown>;
-      const desc = String(i.objetoCompra ?? i.descricao ?? "").toLowerCase();
-      return kw.some(k => desc.includes(k));
-    });
-
-    return (filtered.length > 0 ? filtered : items).slice(0, 10);
-  } catch {
-    clearTimeout(timeout);
-    return [];
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(`${baseUrl}?${params}`, {
+        signal: controller.signal,
+        headers: { "Accept": "application/json", "User-Agent": "LicitaIA/1.0" },
+      });
+      clearTimeout(timeout);
+      if (!res.ok) continue;
+      const data = await res.json() as { data?: unknown[] };
+      const items: unknown[] = Array.isArray(data?.data) ? data.data : [];
+      const filtered = items.filter((item: unknown) => {
+        const i = item as Record<string, unknown>;
+        const desc = String(i.objetoCompra ?? "").toLowerCase();
+        return kw.some(k => desc.includes(k));
+      });
+      allItems = allItems.concat(filtered.slice(0, 10));
+    } catch {
+      clearTimeout(timeout);
+    }
   }
+
+  return allItems.slice(0, 10);
 }
 
 // ── GET /processes/:id/proposal ──────────────────────────────────────────────
@@ -401,51 +402,50 @@ router.post("/processes/:id/proposal/generate-docx", async (req, res) => {
 
   const totalExtenso = numberToExtenso(totalValue ?? 0);
 
-  // Build table rows
-  const tableRows: TableRow[] = [
-    new TableRow({
-      tableHeader: true,
-      children: ["Nº", "Descrição", "Qtd", "Unid.", "Preço Unit.", "Total"].map(text =>
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 20 })] })],
-          width: { size: text === "Descrição" ? 35 : 13, type: WidthType.PERCENTAGE },
-          shading: { fill: "F1F5F9" },
-        })
-      ),
-    }),
-    ...(items ?? []).map(item =>
-      new TableRow({
-        children: [
-          String(item.itemNumber),
-          item.description,
-          String(item.quantity),
-          item.unit,
-          item.unitPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-          item.total.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-        ].map((text, ci) =>
-          new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text, size: 20 })] })],
-            width: { size: ci === 1 ? 35 : 13, type: WidthType.PERCENTAGE },
-          })
-        ),
+  // Build table rows (no shading/borders to ensure docx v9 compatibility)
+  const colHeaders = ["Nº", "Descrição", "Qtd", "Unid.", "Preço Unit.", "Total"];
+  const headerRow = new TableRow({
+    children: colHeaders.map((text, ci) =>
+      new TableCell({
+        children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 20 })] })],
+        width: { size: ci === 1 ? 35 : 13, type: WidthType.PERCENTAGE },
       })
     ),
+  });
+
+  const dataRows = (items ?? []).map(item =>
     new TableRow({
       children: [
-        new TableCell({ children: [new Paragraph({ children: [] })], columnSpan: 4 }),
+        String(item.itemNumber),
+        item.description,
+        String(item.quantity),
+        item.unit,
+        `R$ ${item.unitPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        `R$ ${item.total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      ].map((text, ci) =>
         new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "TOTAL GERAL", bold: true, size: 20 })] })],
-          shading: { fill: "EFF6FF" },
-        }),
-        new TableCell({
-          children: [new Paragraph({
-            children: [new TextRun({ text: totalBRL, bold: true, size: 20, color: "0066FF" })],
-          })],
-          shading: { fill: "EFF6FF" },
-        }),
-      ],
-    }),
-  ];
+          children: [new Paragraph({ children: [new TextRun({ text, size: 20 })] })],
+          width: { size: ci === 1 ? 35 : 13, type: WidthType.PERCENTAGE },
+        })
+      ),
+    })
+  );
+
+  const totalRow = new TableRow({
+    children: [
+      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "" })] })], columnSpan: 4 }),
+      new TableCell({
+        children: [new Paragraph({ children: [new TextRun({ text: "VALOR TOTAL GERAL", bold: true, size: 20 })] })],
+      }),
+      new TableCell({
+        children: [new Paragraph({
+          children: [new TextRun({ text: totalBRL, bold: true, size: 20 })],
+        })],
+      }),
+    ],
+  });
+
+  const tableRows: TableRow[] = [headerRow, ...dataRows, totalRow];
 
   const doc = new Document({
     sections: [{
@@ -477,14 +477,6 @@ router.post("/processes/:id/proposal/generate-docx", async (req, res) => {
         new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           rows: tableRows,
-          borders: {
-            top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-            bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-            left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-            right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-            insideH: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-            insideV: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          },
         }),
         new Paragraph({
           spacing: { before: 240, after: 120 },
@@ -495,14 +487,14 @@ router.post("/processes/:id/proposal/generate-docx", async (req, res) => {
         }),
         new Paragraph({ spacing: { before: 240, after: 80 }, children: [new TextRun({ text: "CONDIÇÕES:", bold: true })] }),
         new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: `• Validade da proposta: ${validityDays ?? 60} dias corridos` })] }),
-        deliveryTerm ? new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: `• Prazo de entrega/execução: ${deliveryTerm}` })] }) : new Paragraph({ children: [] }),
+        ...(deliveryTerm ? [new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: `• Prazo de entrega/execução: ${deliveryTerm}` })] })] : []),
         new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: "• Forma de pagamento: conforme edital" })] }),
-        observations ? new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: `• Observações: ${observations}` })] }) : new Paragraph({ children: [] }),
+        ...(observations ? [new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: `• Observações: ${observations}` })] })] : []),
         new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: "Declaramos que os preços propostos incluem todos os custos diretos e indiretos, tributos, encargos sociais e trabalhistas, seguros e demais despesas necessárias à perfeita execução do objeto." })] }),
         new Paragraph({ spacing: { before: 240, after: 600 }, alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${city}, ${today}.` })] }),
         new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "_________________________________" })] }),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [new TextRun({ text: company?.representanteLegal ?? company?.nomeResponsavel ?? "Representante Legal", bold: true })] }),
-        company?.cpfResponsavel ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [new TextRun({ text: `CPF: ${company.cpfResponsavel}` })] }) : new Paragraph({ children: [] }),
+        ...(company?.cpfResponsavel ? [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [new TextRun({ text: `CPF: ${company.cpfResponsavel}` })] })] : []),
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [new TextRun({ text: company?.razaoSocial ?? "" })] }),
         new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `CNPJ: ${company?.cnpj ?? ""}` })] }),
       ],
