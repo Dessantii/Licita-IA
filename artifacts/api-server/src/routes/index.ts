@@ -15,6 +15,7 @@ import fundingNoticesRouter from "./funding/notices";
 import fundingProjectsRouter from "./funding/projects";
 import opportunitiesRouter from "./captacao/opportunities";
 import ajudaChatRouter from "./ajuda/chat";
+import proposalsRouter from "./licitaia/proposals";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use("/funding-notices", fundingNoticesRouter);
 router.use("/projects", fundingProjectsRouter);
 router.use("/opportunities", opportunitiesRouter);
 router.use(ajudaChatRouter);
+router.use(proposalsRouter);
 
 export default router;

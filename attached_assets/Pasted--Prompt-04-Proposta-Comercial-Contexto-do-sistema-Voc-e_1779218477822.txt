@@ -1,0 +1,462 @@
+# Prompt 04 — Proposta Comercial
+
+## Contexto do sistema
+
+Você está construindo do zero a **etapa de proposta comercial** do LicitaIA — a quarta aba na tela de detalhe do processo (`/processes/:id`).
+
+**O que já existe e deve ser preservado:**
+- Aba "Resumo" com dados extraídos do edital (objeto, valor estimado, critério de julgamento, itens/lotes)
+- Aba "Análise" com diagnóstico de viabilidade e calculadora básica (construída no Prompt 02)
+- Aba "Documentos" com checklist de habilitação (construída no Prompt 03)
+- Dados da empresa: CNPJ, razão social, endereço, representante legal, regime tributário
+- Itens/lotes do edital já extraídos pela IA em `process_requirements`
+
+**O que este prompt constrói:**
+A aba **"Proposta"** — onde o usuário define seus preços, entende se está competitivo e gera o documento final pronto para enviar ao portal.
+
+---
+
+## O problema a resolver
+
+A proposta comercial é o coração da licitação — é o que define se a empresa ganha ou perde. Hoje o usuário:
+1. Não sabe qual preço praticar (sem referência de mercado)
+2. Não sabe se vai ter margem depois de impostos e custos
+3. Precisa criar o documento Word do zero, sem template
+4. Frequentemente comete erros de formatação que desclassificam a proposta
+
+A aba "Proposta" resolve os três problemas de uma vez.
+
+---
+
+## O que construir
+
+### Estrutura da aba "Proposta"
+
+A aba é dividida em 3 sub-seções navegáveis por âncora (não tabs):
+
+```
+[ 1. Pesquisa de preço ]  [ 2. Monte sua proposta ]  [ 3. Gerar documento ]
+```
+
+---
+
+### Sub-seção 1 — Pesquisa de preço de mercado
+
+**Objetivo:** dar ao usuário uma referência de preço antes de definir o seu.
+
+**Fonte de dados:** consultar o PNCP pela API pública buscando contratos/atas com objeto similar nos últimos 24 meses.
+
+**Endpoint PNCP a usar:**
+```
+GET https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/compras?...
+GET https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?...
+```
+
+**Parâmetros de busca:** palavras-chave extraídas do objeto do edital + UF do órgão.
+
+**UI da pesquisa:**
+
+```
+┌─ Referências de preço encontradas no PNCP ────────────────────┐
+│                                                               │
+│  Buscando por: "seguro de veículos" · Paraná · 2023–2025     │
+│                                                               │
+│  Contrato 41/2025 · UNIOESTE                                 │
+│  Objeto: Seguro de veículos da frota institucional           │
+│  Valor contratado: R$ 287.400     Qtd veículos: 48           │
+│  Preço unitário: R$ 5.987/veículo                            │
+│  Data: ago/2025                                              │
+│                                                              │
+│  Contrato 28/2024 · UNIOESTE                                 │
+│  Valor contratado: R$ 312.000     Qtd veículos: 48           │
+│  Preço unitário: R$ 6.500/veículo                            │
+│  Data: ago/2024                                              │
+│                                                              │
+│  ─────────────────────────────────────────────────────────  │
+│  📊 Análise dos últimos 24 meses (3 contratos similares)     │
+│                                                              │
+│  Menor valor homologado:   R$ 271.200   (R$ 5.650/un)       │
+│  Valor médio:              R$ 296.800   (R$ 6.183/un)       │
+│  Maior valor homologado:   R$ 331.000   (R$ 6.896/un)       │
+│  Estimativa do edital:     R$ 330.196   (R$ 6.879/un)       │
+│                                                              │
+│  💡 Lances vencedores ficaram em média 9% abaixo da         │
+│     estimativa do órgão.                                    │
+│                                                              │
+│  [Usar valor médio como referência →]                       │
+└───────────────────────────────────────────────────────────────┘
+```
+
+Se não encontrar resultados no PNCP: exibir orientação para pesquisa manual com links para o Painel de Preços do governo federal (`paineldeprecos.economia.gov.br`).
+
+---
+
+### Sub-seção 2 — Monte sua proposta
+
+**Objetivo:** o usuário define o preço de cada item/lote e o sistema calcula tudo em tempo real.
+
+#### 2a. Tabela de itens
+
+Renderizar os itens/lotes extraídos do edital em uma tabela editável:
+
+```
+┌──────┬──────────────────────────────┬──────┬──────────┬──────────────┬──────────────┐
+│ Item │ Descrição                    │ Qtd  │ Und      │ Preço unit.  │ Total        │
+├──────┼──────────────────────────────┼──────┼──────────┼──────────────┼──────────────┤
+│  1   │ Seguro auto frota — veíc leve│  32  │ veículo  │ R$ [_____]  │ R$ ______    │
+│  2   │ Seguro auto frota — veíc pesado│ 16 │ veículo  │ R$ [_____]  │ R$ ______    │
+├──────┴──────────────────────────────┴──────┴──────────┼──────────────┼──────────────┤
+│                                              TOTAL    │              │ R$ ______    │
+└───────────────────────────────────────────────────────┴──────────────┴──────────────┘
+```
+
+- Campos de preço unitário são editáveis
+- Total por item e total geral calculados em tempo real
+- Ao lado do campo de preço: indicador visual de posicionamento vs. mercado:
+  - 🟢 Competitivo (abaixo da média de mercado)
+  - 🟡 Na média
+  - 🔴 Acima do estimado (risco de desclassificação)
+
+#### 2b. Painel de análise financeira (fixo no lado direito ou abaixo da tabela)
+
+Atualizado em tempo real conforme o usuário digita os preços:
+
+```
+┌─ Análise da sua proposta ─────────────────────────────┐
+│                                                        │
+│  Valor total da proposta:      R$ 293.244,00          │
+│  Estimativa do órgão:          R$ 330.196,92          │
+│  Diferença:                    -R$ 36.952,92 (-11,2%) │
+│                                                        │
+│  ─────────────────────────────────────────────────── │
+│  Regime tributário: Simples Nacional                  │
+│                                                        │
+│  (-) Impostos estimados (DAS):  R$ 17.594,64  (6,0%) │
+│  (-) Custo do serviço:          R$ [_______]          │
+│       ↑ informe seu custo para ver a margem           │
+│                                                        │
+│  Margem estimada:               —                     │
+│                                                        │
+│  ─────────────────────────────────────────────────── │
+│  🏆 Benefício ME/EPP — Empate ficto                  │
+│  Você pode cobrir lances até:  R$ 307.906,20          │
+│  (5% acima do seu valor de proposta)                  │
+│                                                        │
+│  ─────────────────────────────────────────────────── │
+│  Garantia contratual (5%):     R$ 14.662,20           │
+│  ⚠️ Reserve este valor antes de enviar a proposta.   │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+Campo "Custo do serviço" é opcional mas desbloqueado para quem quiser ver a margem real. Não é enviado para nenhum relatório, é só para uso interno do usuário.
+
+**Alerta de desclassificação:** se o total da proposta ficar **acima do valor estimado** pelo órgão, exibir banner vermelho:
+```
+🚫 Proposta acima do estimado
+Seu valor (R$ 345.000) está 4,5% acima da estimativa do órgão (R$ 330.196).
+Propostas acima do estimado são geralmente desclassificadas em pregões.
+Reduza o preço ou verifique os valores com o edital.
+```
+
+#### 2c. Campos complementares da proposta
+
+Campos que completam o documento de proposta além dos preços:
+
+```
+Validade da proposta:   [ 60 ] dias  ← mínimo exigido pelo edital: 60 dias
+Prazo de entrega:       [___________]  ← conforme edital ou livre se não especificado
+Marca / Fabricante:     [___________]  ← obrigatório para alguns editais
+Observações:            [___________]  ← campo livre, opcional
+```
+
+Pré-preencher "Validade da proposta" com o mínimo exigido pelo edital (extraído na análise).
+
+---
+
+### Sub-seção 3 — Gerar documento
+
+**Objetivo:** produzir o arquivo de proposta pronto para assinar e enviar ao portal.
+
+**UI:**
+
+```
+┌─ Gerar proposta comercial ────────────────────────────────────┐
+│                                                               │
+│  Formato:  ● Word (.docx)   ○ PDF                            │
+│                                                               │
+│  Incluir no documento:                                        │
+│  ✅ Dados da empresa (razão social, CNPJ, endereço)          │
+│  ✅ Tabela de itens com preços                               │
+│  ✅ Validade da proposta                                     │
+│  ✅ Prazo de entrega                                         │
+│  ✅ Local e data                                             │
+│  ✅ Campo de assinatura do representante legal               │
+│  ☐  Declaração de ME/EPP (se já gerada, incluir aqui)       │
+│                                                               │
+│  Preview:  [Visualizar proposta →]                           │
+│                                                               │
+│  [✨ Gerar proposta]                                         │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Ao clicar "Gerar proposta":**
+
+1. Sistema monta o documento usando os dados preenchidos
+2. Usa a OpenAI para formatar o texto de apresentação da proposta em linguagem formal
+3. Gera arquivo .docx para download
+4. Salva uma cópia em `process_proposals`
+5. Exibe confirmação:
+
+```
+✅ Proposta gerada com sucesso
+
+📄 Proposta_Comercial_Pregão_53-2026_[EMPRESA].docx
+
+⚠️ Antes de enviar:
+1. Revise todos os valores
+2. Assine o documento (física ou digitalmente)
+3. Acesse o portal: [ComprasNet / BNC / Portal do órgão ↗]
+
+[Baixar proposta]   [Ver checklist final →]
+```
+
+**Template do documento Word gerado:**
+
+```
+[LOGO DA EMPRESA se cadastrado]
+
+PROPOSTA COMERCIAL
+
+Pregão Eletrônico nº 53/2026
+[NOME DO ÓRGÃO]
+
+[RAZÃO SOCIAL], pessoa jurídica de direito privado, inscrita no CNPJ sob o
+nº [CNPJ], com sede em [ENDEREÇO COMPLETO], CEP [CEP], neste ato
+representada por [NOME DO REPRESENTANTE], [CARGO], portador do CPF nº
+[CPF], vem, por meio desta proposta, apresentar os seguintes preços para
+o objeto do pregão em referência:
+
+TABELA DE PREÇOS:
+
+[TABELA COM ITENS, QUANTIDADES E PREÇOS]
+
+VALOR TOTAL DA PROPOSTA: R$ [TOTAL POR EXTENSO]
+
+CONDIÇÕES:
+• Validade da proposta: [X] dias corridos
+• Prazo de entrega/execução: [PRAZO]
+• Forma de pagamento: conforme edital
+
+Declaramos que os preços propostos incluem todos os custos diretos e
+indiretos, tributos, encargos sociais e trabalhistas, seguros e demais
+despesas necessárias à perfeita execução do objeto.
+
+[Cidade], [data por extenso].
+
+_________________________________
+[NOME DO REPRESENTANTE LEGAL]
+[CPF]
+[CARGO]
+[EMPRESA]
+CNPJ: [CNPJ]
+```
+
+---
+
+### Sub-seção 4 — Checklist final antes do envio
+
+Exibida após a geração do documento, como última verificação:
+
+```
+┌─ Checklist final — pronto para enviar? ───────────────────────┐
+│                                                               │
+│  Habilitação                                                  │
+│  ✅ Todos os documentos de habilitação estão prontos         │
+│                                                               │
+│  Proposta                                                     │
+│  ✅ Proposta gerada e baixada                                │
+│  ❌ Proposta assinada (faça upload abaixo)                   │
+│  ✅ Valor abaixo da estimativa do órgão                      │
+│  ✅ Validade mínima atendida (60 dias)                       │
+│                                                               │
+│  Acesso ao portal                                             │
+│  ✅ Portal identificado: ComprasNet                          │
+│  ℹ️ Número do edital para busca: 53/2026                     │
+│  [Acessar portal ↗]                                         │
+│                                                               │
+│  Data e hora da sessão                                        │
+│  ✅ Sessão: 28/05/2026 às 10h00                              │
+│  [Adicionar ao calendário 📅]                               │
+│  [Ativar lembrete 1h antes 🔔]                              │
+│                                                               │
+│  [Upload da proposta assinada]                               │
+│                                                               │
+│  Status: ⚠️ Pendente — faça upload da proposta assinada     │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+Quando todos os itens estiverem ✅, o status do processo muda para **"Pronto para envio"** e uma notificação é disparada.
+
+---
+
+## Schema de banco de dados
+
+### Nova tabela `process_proposals`
+```sql
+CREATE TABLE process_proposals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  process_id UUID NOT NULL REFERENCES processes(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+
+  -- Itens e preços
+  items JSONB NOT NULL,
+  -- [{ "item_number": 1, "description": "...", "quantity": 32,
+  --    "unit": "veículo", "unit_price": 5150.00, "total": 164800.00 }]
+
+  total_value DECIMAL(15,2) NOT NULL,
+  validity_days INTEGER NOT NULL DEFAULT 60,
+  delivery_term TEXT,
+  observations TEXT,
+
+  -- Análise financeira
+  estimated_taxes_percent DECIMAL(5,2),
+  declared_cost DECIMAL(15,2), -- opcional, uso interno
+  calculated_margin DECIMAL(5,2), -- uso interno
+
+  -- Documento gerado
+  docx_path TEXT,
+  signed_docx_path TEXT,
+  generated_at TIMESTAMP DEFAULT NOW(),
+  signed_uploaded_at TIMESTAMP,
+
+  -- Status
+  status VARCHAR(30) DEFAULT 'draft',
+  -- 'draft' | 'generated' | 'signed' | 'submitted'
+
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### Nova tabela `market_price_research`
+```sql
+CREATE TABLE market_price_research (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  process_id UUID NOT NULL REFERENCES processes(id) ON DELETE CASCADE,
+  search_terms TEXT[],
+  results JSONB,
+  -- [{ "contract_number": "...", "organ": "...", "value": ...,
+  --    "date": "...", "unit_price": ..., "quantity": ... }]
+  avg_price DECIMAL(15,2),
+  min_price DECIMAL(15,2),
+  max_price DECIMAL(15,2),
+  price_insight TEXT,
+  suggested_bid_min DECIMAL(15,2),
+  suggested_bid_max DECIMAL(15,2),
+  fetched_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### Alteração na tabela `processes`
+```sql
+ALTER TABLE processes
+ADD COLUMN proposal_status VARCHAR(30) DEFAULT 'not_started';
+-- 'not_started' | 'in_progress' | 'generated' | 'signed' | 'submitted'
+```
+
+---
+
+## Lógica de pesquisa de preço via IA + PNCP
+
+```javascript
+// 1. Extrair palavras-chave do objeto
+const keywordsPrompt = `
+Extraia 2-3 palavras-chave principais do objeto de licitação abaixo para usar em busca de preços.
+Retorne apenas um array JSON de strings, sem texto adicional.
+Objeto: "${process.object}"
+// Exemplo de retorno: ["seguro veículos", "frota", "apólice"]
+`;
+
+// 2. Buscar no PNCP
+const pncpResults = await fetchPNCPContracts(keywords, uf);
+
+// 3. Analisar resultados com IA
+const insightPrompt = `
+Analise estes contratos públicos similares e forneça:
+1. Padrão de preço identificado (em 1-2 frases)
+2. Sugestão de faixa de lance competitivo
+
+Retorne JSON: {
+  "insight": "texto",
+  "suggested_min": 0,
+  "suggested_max": 0
+}
+
+Contratos: ${JSON.stringify(pncpResults)}
+Estimativa do órgão: R$ ${process.estimated_value}
+`;
+```
+
+---
+
+## Cálculo de impostos por regime tributário
+
+```javascript
+function calculateTaxes(company, proposalValue) {
+  const rates = {
+    'simples_nacional': {
+      'comercio': 0.04,     // Anexo I — até R$ 180k/ano
+      'servicos': 0.06,     // Anexo III — até R$ 180k/ano
+      'industria': 0.045
+    },
+    'lucro_presumido': {
+      'padrao': 0.1175      // PIS + COFINS + CSLL + IRPJ estimado
+    },
+    'lucro_real': {
+      'padrao': 0.1350
+    },
+    'mei': {
+      'padrao': 0.05        // DAS MEI — valor fixo, aqui % aproximado
+    }
+  };
+
+  const regime = company.tax_regime;     // campo já existente
+  const activity = company.activity_type; // 'comercio' | 'servicos' | 'industria'
+
+  return proposalValue * (rates[regime]?.[activity] ?? rates[regime]?.padrao ?? 0.06);
+}
+```
+
+---
+
+## Fluxo completo do usuário
+
+```
+1. Usuário chega na aba "Proposta" vindo do checklist de habilitação completo
+2. Sub-seção 1: vê referências de preço do PNCP automaticamente carregadas
+3. Sub-seção 2: preenche preços na tabela de itens
+   → Painel lateral atualiza em tempo real (total, impostos, margem, empate ficto)
+   → Alerta aparece se preço ultrapassar estimativa do órgão
+4. Preenche validade e prazo de entrega
+5. Sub-seção 3: clica "Gerar proposta" → baixa o .docx
+6. Assina o documento (fora do sistema)
+7. Faz upload da proposta assinada
+8. Checklist final aparece → todos os itens ✅
+9. Status do processo muda para "Pronto para envio"
+10. Usuário acessa portal pelo link e faz o envio
+```
+
+---
+
+## Critério de conclusão
+
+Esta etapa está concluída quando:
+1. ✅ Sub-seção de pesquisa de preço busca e exibe referências do PNCP
+2. ✅ Tabela de itens editável com cálculo em tempo real
+3. ✅ Painel financeiro mostra total, impostos, margem e teto do empate ficto
+4. ✅ Alerta de desclassificação aparece quando proposta ultrapassa estimativa
+5. ✅ Gerador produz arquivo .docx formatado e completo
+6. ✅ Checklist final consolida habilitação + proposta + acesso ao portal
+7. ✅ Status do processo avança para "Pronto para envio" quando tudo estiver ok

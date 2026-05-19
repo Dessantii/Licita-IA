@@ -25,3 +25,5 @@ export * from "./user-opportunity-prefs";
 export * from "./process-analysis";
 export * from "./generated-declarations";
 export * from "./document-alerts";
+export * from "./process-proposals";
+export * from "./market-price-research";

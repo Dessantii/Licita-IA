@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ProcessAnalysisTab } from "./ProcessAnalysisTab";
 import { DocumentosTab } from "./DocumentosTab";
+import { PropostaTab } from "./PropostaTab";
 import { getToken } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useRoute, useLocation } from "wouter";
@@ -190,7 +191,7 @@ export function ProcessDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"resumo" | "analise" | "documentos" | "verificacao">("resumo");
+  const [activeTab, setActiveTab] = useState<"resumo" | "analise" | "documentos" | "proposta" | "verificacao">("resumo");
   const [companyData, setCompanyData] = useState<any>(null);
 
   const token = getToken();
@@ -435,10 +436,11 @@ export function ProcessDetailPage() {
 
         {/* ── Tab navigation ─────────────────────────────────────────────── */}
         {(() => {
-          const tabs: { id: "resumo" | "analise" | "documentos" | "verificacao"; label: string; locked: boolean }[] = [
+          const tabs: { id: "resumo" | "analise" | "documentos" | "proposta" | "verificacao"; label: string; locked: boolean }[] = [
             { id: "resumo", label: "Resumo", locked: false },
             { id: "analise", label: "Análise IA", locked: !process.editalFile },
             { id: "documentos", label: "Documentos", locked: !hasRequirements && !isInConference },
+            { id: "proposta", label: "Proposta", locked: false },
             { id: "verificacao", label: "Verificação", locked: !isInConference },
           ];
           return (
@@ -582,7 +584,12 @@ export function ProcessDetailPage() {
           />
         )}
 
-        {/* ── ETAPA 3: Envie sua proposta ───────────────────────────────── */}
+        {/* ── ETAPA 4: Proposta Comercial ───────────────────────────────── */}
+        {activeTab === "proposta" && (
+          <PropostaTab process={process} companyData={companyData} />
+        )}
+
+        {/* ── ETAPA 3: Verificação ──────────────────────────────────────── */}
         {activeTab === "verificacao" && <div>
           <div className="flex items-center gap-3 mb-4">
             <div
