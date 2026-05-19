@@ -1,0 +1,159 @@
+# Prompt — Reestruturação do Módulo de Licitações (LicitaIA)
+
+## Contexto do Produto
+
+Você está redesenhando o módulo de **Licitações** do **LicitaIA**, uma plataforma SaaS voltada para **MEIs e microempresas** que querem participar de processos licitatórios (pregões, concorrências, dispensas) sem conhecimento técnico prévio em licitações públicas.
+
+O público-alvo é um **empreendedor sem formação jurídica**, que provavelmente está fazendo a primeira licitação da vida. Ele não sabe o que é "habilitação", "score de prontidão" ou "requisito extraído por IA" — ele só quer saber: **"Consigo participar dessa licitação?"** e **"O que eu preciso fazer agora?"**
+
+A versão atual do módulo é funcional, mas muito técnica e voltada para especialistas. A nova versão deve ser **guiada, empática e orientada a ação**, como um assistente pessoal que conduz o usuário passo a passo.
+
+---
+
+## Problema a Resolver
+
+A versão atual tem os seguintes problemas que devem ser eliminados:
+
+1. **Lista de processos** sem hierarquia visual clara — todos os cards parecem iguais, não fica óbvio o que precisa de atenção imediata
+2. **Detalhe do processo** exibe termos técnicos (score de prontidão, documentos identificados, itens de verificação) sem explicar o que significam
+3. O **fluxo não guia** — o usuário chega numa tela cheia de abas e não sabe por onde começar
+4. O **status dos documentos** é apresentado como lista técnica, sem mostrar o impacto real (ex: "você não pode participar ainda porque faltam 3 documentos")
+5. Não há **sensação de progresso** — o usuário não sabe se está perto ou longe de conseguir enviar a proposta
+
+---
+
+## Diretrizes de Design e UX
+
+### Linguagem
+- **Nunca use jargão jurídico sem explicação.** Substitua por linguagem simples:
+  - "Habilitação" → "Documentos que comprovam que sua empresa existe e está em dia"
+  - "Score de prontidão" → "Você está pronto para participar?"
+  - "Requisito extraído" → "O edital pede isso:"
+  - "Prazo encerrado" → "Essa licitação já fechou — mas você pode usar como referência"
+- Use **segunda pessoa direta**: "Você precisa enviar...", "Falta pouco!", "Você está pronto!"
+- Mensagens de erro/pendência devem ser **encorajadoras**, nunca punitivas
+
+### Estrutura de Navegação
+
+O módulo deve ter **2 páginas principais**:
+
+#### Página 1 — Lista de Processos (`/processes`)
+- Reorganizar visualmente por **urgência e status de prontidão**, não só por data
+- Cada card deve comunicar em 2 segundos: **o que é, quando fecha, e se o usuário está pronto**
+- Adicionar um **banner de destaque** no topo para o processo mais urgente que ainda tem chance
+- Separar visualmente processos ativos de encerrados
+- Substituir badges técnicos ("Documentos identificados") por linguagem de progresso ("3 de 8 documentos prontos")
+
+#### Página 2 — Detalhe do Processo (`/processes/:id`)
+
+Transformar em uma experiência de **wizard guiado em 3 etapas visíveis**, com progresso claro:
+
+**Etapa 1 — Entenda o edital**
+- Resumo em linguagem simples do que a licitação pede
+- Cards visuais para: O que você vai fornecer / Valor estimado / Quando fecha / Como será julgado
+- Botão claro: "Quero participar desta licitação →"
+
+**Etapa 2 — Prepare seus documentos**
+- Lista de documentos agrupada em categorias simples (ex: "Documentos da empresa", "Certidões fiscais", "Documentos técnicos")
+- Cada item com status visual: ✅ Pronto / ⚠️ Vencido / ❌ Faltando / 📤 Enviar agora
+- Barra de progresso total com texto encorajador ("Você completou 6 de 8 documentos!")
+- Call-to-action contextual: quando todos prontos → "Gerar relatório de prontidão"
+
+**Etapa 3 — Envie sua proposta**
+- Checklist final de confirmação antes do envio
+- Botão de exportar relatório
+- Orientações sobre onde enviar (link para o portal)
+
+---
+
+## Especificações Técnicas
+
+- **Stack**: React com Tailwind CSS (classes utilitárias padrão, sem customizações de compilador)
+- **Componentes disponíveis**: shadcn/ui (`@/components/ui/...`) — use Badge, Card, Progress, Button, Tabs, Alert, Tooltip
+- **Ícones**: lucide-react
+- **Estado**: useState/useReducer para gerenciar etapa ativa, documentos e status
+- **Dados mockados**: crie dados realistas simulando 3–4 processos e pelo menos 10 documentos com status variados
+- **Responsividade**: desktop-first, mas funcional em tablet
+- **Sem chamadas de API reais** — tudo mockado no frontend
+
+---
+
+## Dados de Exemplo para Mock
+
+Use estes processos mockados:
+
+```json
+[
+  {
+    "id": "proc-001",
+    "titulo": "Aquisição de Seguro de Veículos",
+    "orgao": "Universidade Estadual do Oeste do Paraná",
+    "modalidade": "Pregão Eletrônico",
+    "edital": "53/2026",
+    "prazo": "2026-05-28T11:29:00",
+    "valor_estimado": 330196.92,
+    "status": "em_andamento",
+    "documentos_prontos": 5,
+    "documentos_total": 8,
+    "etapa_atual": 2
+  },
+  {
+    "id": "proc-002",
+    "titulo": "Fornecimento de Material de Escritório",
+    "orgao": "Prefeitura Municipal de Palotina",
+    "modalidade": "Pregão Eletrônico",
+    "edital": "12/2026",
+    "prazo": "2026-06-10T14:00:00",
+    "valor_estimado": 48000.00,
+    "status": "em_andamento",
+    "documentos_prontos": 8,
+    "documentos_total": 8,
+    "etapa_atual": 3
+  },
+  {
+    "id": "proc-003",
+    "titulo": "Contratação de Serviços de Limpeza",
+    "orgao": "Câmara Municipal de Cascavel",
+    "modalidade": "Dispensa",
+    "edital": "07/2026",
+    "prazo": "2026-04-30T17:00:00",
+    "valor_estimado": 18000.00,
+    "status": "encerrado",
+    "documentos_prontos": 3,
+    "documentos_total": 6,
+    "etapa_atual": 1
+  }
+]
+```
+
+Documentos mockados para o proc-001:
+- Contrato Social — ✅ Válido
+- Cartão CNPJ — ✅ Válido
+- Certidão Federal — ⚠️ Vencendo em 5 dias
+- Certidão Estadual — ❌ Não enviado
+- Certidão Municipal — ❌ Não enviado
+- FGTS — ✅ Válido
+- INSS — ✅ Válido
+- Atestado de Capacidade Técnica — ❌ Não enviado
+
+---
+
+## Entregável Esperado
+
+Um **único componente React** (arquivo `.jsx`) que contenha:
+
+1. A **página de lista** (`ProcessList`) com os cards redesenhados
+2. A **página de detalhe** (`ProcessDetail`) com o wizard guiado em 3 etapas
+3. Navegação entre lista e detalhe dentro do próprio componente (sem router)
+4. Estado gerenciado localmente com `useState`
+5. Visual **limpo, moderno e encorajador** — cores primárias em azul/índigo, sem excesso de vermelho/laranja que cause ansiedade
+6. Export default do componente raiz
+
+---
+
+## Critério de Sucesso
+
+O redesign estará correto se um usuário que nunca fez licitação conseguir, ao olhar para a tela por 10 segundos:
+1. Entender qual processo precisa de atenção agora
+2. Saber exatamente o que falta para poder participar
+3. Sentir que é **possível** completar o processo — não assustador

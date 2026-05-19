@@ -3,17 +3,11 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useRoute, useLocation } from "wouter";
 import { useGetProcess, useDeleteProcess, ProcessStatus, getListProcessesQueryKey } from "@workspace/api-client-react";
 import { useAppActions } from "@/hooks/use-app-actions";
-import { ProcessStatusBadge } from "@/components/processes/ProcessStatusBadge";
-import { NextActionBanner } from "@/components/NextActionBanner";
-import { computeProcessNextAction } from "@/lib/next-action";
-import { ReadinessScore } from "@/components/ReadinessScore";
-import { computeLicitacaoReadiness } from "@/lib/readiness-score";
-import { ValidationStatusBadge } from "@/components/processes/ValidationStatusBadge";
 import { RequirementsReviewPanel } from "@/components/processes/RequirementsReviewPanel";
 import { EditProcessDialog } from "@/components/processes/EditProcessDialog";
 import { FileUploadZone, FileListItem } from "@/components/files/FileUploadZone";
+import { ValidationStatusBadge } from "@/components/processes/ValidationStatusBadge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,15 +32,22 @@ import {
   ArrowRight,
   Loader2,
   Play,
-  FolderOpen,
   CalendarDays,
   ChevronRight,
   Upload,
-  Lock,
   MoreHorizontal,
   Pencil,
   Trash2,
   FileDown,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Clock,
+  Sparkles,
+  Building2,
+  Lock,
+  FolderOpen,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -55,7 +56,123 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { notify } from "@/lib/feedback";
 
-type Tab = "documentos" | "analise" | "conferencia";
+// ── Wizard step detection ─────────────────────────────────────────────────
+
+function getWizardStep(status: string): 1 | 2 | 3 {
+  if (
+    status === ProcessStatus.concluido ||
+    status === ProcessStatus.pronto_para_revisao
+  ) return 3;
+  if (
+    status === ProcessStatus.em_conferencia ||
+    status === ProcessStatus.pendencias_encontradas ||
+    status === ProcessStatus.documentos_enviados ||
+    status === ProcessStatus.aguardando_documentos
+  ) return 2;
+  return 1;
+}
+
+function getReadinessPercent(status: string): number {
+  switch (status) {
+    case ProcessStatus.criado: return 5;
+    case ProcessStatus.edital_enviado: return 20;
+    case ProcessStatus.edital_processando: return 30;
+    case ProcessStatus.exigencias_extraidas: return 40;
+    case ProcessStatus.aguardando_documentos: return 45;
+    case ProcessStatus.documentos_enviados: return 60;
+    case ProcessStatus.em_conferencia: return 70;
+    case ProcessStatus.pendencias_encontradas: return 55;
+    case ProcessStatus.pronto_para_revisao: return 90;
+    case ProcessStatus.concluido: return 100;
+    default: return 0;
+  }
+}
+
+function getReadinessMessage(percent: number): { msg: string; color: string } {
+  if (percent === 100) return { msg: "Processo concluído! ✓", color: "#059669" };
+  if (percent >= 85) return { msg: "Falta pouco! Você está quase pronto.", color: "#059669" };
+  if (percent >= 60) return { msg: "Bom progresso! Continue assim.", color: "#0066FF" };
+  if (percent >= 30) return { msg: "Você já começou! Vamos continuar.", color: "#D97706" };
+  return { msg: "Vamos começar! Siga as etapas abaixo.", color: "#64748b" };
+}
+
+// ── Validation icon helper ───────────────────────────────────────────────
+
+function ValidationIcon({ status }: { status: string }) {
+  if (status === "ok") return <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />;
+  if (status === "vencido") return <Clock className="w-4 h-4 text-orange-500 flex-shrink-0" />;
+  if (status === "faltando") return <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />;
+  if (status === "divergente") return <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />;
+  return <AlertTriangle className="w-4 h-4 text-violet-400 flex-shrink-0" />;
+}
+
+function ValidationLabel({ status }: { status: string }) {
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    ok: { label: "Tudo certo", color: "#059669", bg: "#F0FDF4" },
+    faltando: { label: "Não enviado", color: "#DC2626", bg: "#FEF2F2" },
+    vencido: { label: "Vencendo", color: "#EA580C", bg: "#FFF7ED" },
+    divergente: { label: "Conferir", color: "#D97706", bg: "#FFFBEB" },
+    revisar: { label: "Revisar", color: "#7C3AED", bg: "#F5F3FF" },
+  };
+  const s = map[status] ?? { label: status, color: "#64748b", bg: "#f8fafc" };
+  return (
+    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: s.color, background: s.bg }}>
+      {s.label}
+    </span>
+  );
+}
+
+// ── Step indicator ───────────────────────────────────────────────────────
+
+function WizardSteps({ current, step2Locked, step3Locked }: {
+  current: 1 | 2 | 3;
+  step2Locked: boolean;
+  step3Locked: boolean;
+}) {
+  const steps = [
+    { n: 1, label: "Entenda o edital", locked: false },
+    { n: 2, label: "Prepare os documentos", locked: step2Locked },
+    { n: 3, label: "Envie a proposta", locked: step3Locked },
+  ];
+
+  return (
+    <div className="flex items-center gap-0 mb-8">
+      {steps.map((s, i) => {
+        const isDone = s.n < current;
+        const isActive = s.n === current;
+        const isLocked = s.locked && !isDone;
+        return (
+          <div key={s.n} className="flex items-center flex-1 min-w-0">
+            <div className={cn("flex items-center gap-2 flex-shrink-0", isLocked && "opacity-40")}>
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all"
+                style={{
+                  background: isDone ? '#059669' : isActive ? '#0066FF' : '#E2E8F0',
+                  color: isDone || isActive ? 'white' : '#94a3b8',
+                }}
+              >
+                {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.n}
+              </div>
+              <div className="hidden sm:block">
+                <p className={cn("text-xs font-semibold whitespace-nowrap", isActive ? "text-slate-900" : "text-slate-400")}>
+                  {s.label}
+                </p>
+              </div>
+            </div>
+            {i < steps.length - 1 && (
+              <div
+                className="flex-1 h-[2px] mx-3"
+                style={{ background: s.n < current ? '#059669' : '#E2E8F0' }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────────────────
 
 export function ProcessDetailPage() {
   const [, params] = useRoute("/processes/:id");
@@ -71,16 +188,6 @@ export function ProcessDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const hasRequirements = (process?.requirements?.length ?? 0) > 0;
-  const isInConference =
-    process?.status === ProcessStatus.em_conferencia ||
-    process?.status === ProcessStatus.pendencias_encontradas ||
-    process?.status === ProcessStatus.pronto_para_revisao ||
-    process?.status === ProcessStatus.concluido;
-
-  const defaultTab: Tab = isInConference ? "conferencia" : hasRequirements ? "analise" : "documentos";
-  const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
-
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync({ id });
@@ -94,7 +201,6 @@ export function ProcessDetailPage() {
 
   const handleGenerateReport = () => {
     if (!process) return;
-
     const stats = {
       ok: process.validationItems.filter(v => v.status === "ok").length,
       faltando: process.validationItems.filter(v => v.status === "faltando").length,
@@ -102,15 +208,12 @@ export function ProcessDetailPage() {
       divergente: process.validationItems.filter(v => v.status === "divergente").length,
       revisar: process.validationItems.filter(v => v.status === "revisar").length,
     };
-
     const rows = process.validationItems.map(item => `
       <tr>
         <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${item.requirement?.title ?? "—"}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-transform:uppercase;font-size:11px;font-weight:700;color:${
-          item.status === "ok" ? "#16a34a" :
-          item.status === "faltando" ? "#dc2626" :
-          item.status === "vencido" ? "#ea580c" :
-          item.status === "divergente" ? "#d97706" : "#6366f1"
+          item.status === "ok" ? "#16a34a" : item.status === "faltando" ? "#dc2626" :
+          item.status === "vencido" ? "#ea580c" : item.status === "divergente" ? "#d97706" : "#6366f1"
         }">${item.status}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b">${item.notes ?? "—"}</td>
       </tr>
@@ -118,35 +221,30 @@ export function ProcessDetailPage() {
 
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Relatório de Conferência — ${process.title}</title>
+<head><meta charset="UTF-8"><title>Relatório — ${process.title}</title>
 <style>
-  body { font-family: Arial, sans-serif; margin: 0; padding: 32px; color: #1e293b; }
-  .header { border-bottom: 3px solid #3b82f6; padding-bottom: 16px; margin-bottom: 24px; }
-  .header h1 { margin: 0 0 4px; font-size: 20px; }
-  .meta { color: #64748b; font-size: 13px; }
-  .stats { display: flex; gap: 16px; margin-bottom: 24px; }
-  .stat { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
-  .stat .num { font-size: 24px; font-weight: 700; }
-  .stat .lbl { font-size: 11px; text-transform: uppercase; color: #64748b; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  thead { background: #f8fafc; }
-  th { padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; }
-  @media print { .no-print { display: none; } }
-</style>
-</head>
+  body{font-family:Arial,sans-serif;margin:0;padding:32px;color:#1e293b}
+  .header{border-bottom:3px solid #0066FF;padding-bottom:16px;margin-bottom:24px}
+  .header h1{margin:0 0 4px;font-size:20px}.meta{color:#64748b;font-size:13px}
+  .stats{display:flex;gap:16px;margin-bottom:24px}
+  .stat{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center}
+  .stat .num{font-size:24px;font-weight:700}.stat .lbl{font-size:11px;text-transform:uppercase;color:#64748b;margin-top:2px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead{background:#f8fafc}
+  th{padding:10px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:#64748b;border-bottom:2px solid #e2e8f0}
+  @media print{.no-print{display:none}}
+</style></head>
 <body>
 <div class="no-print" style="margin-bottom:16px">
-  <button onclick="window.print()" style="background:#3b82f6;color:white;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px">Imprimir / Salvar PDF</button>
+  <button onclick="window.print()" style="background:#0066FF;color:white;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px">Imprimir / Salvar PDF</button>
 </div>
 <div class="header">
-  <div style="color:#3b82f6;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">LicitaIA — Relatório de Conferência</div>
+  <div style="color:#0066FF;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">LicitaIA — Relatório de Prontidão</div>
   <h1>${process.title}</h1>
   <div class="meta">
     ${process.agency} &nbsp;•&nbsp; ${process.modality}
     ${process.editalNumber ? `&nbsp;•&nbsp; Edital ${process.editalNumber}` : ""}
-    ${process.deadline ? `&nbsp;•&nbsp; Abertura: ${format(new Date(process.deadline), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}` : ""}
+    ${process.deadline ? `&nbsp;•&nbsp; Prazo: ${format(new Date(process.deadline), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}` : ""}
     &nbsp;•&nbsp; Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
   </div>
 </div>
@@ -154,41 +252,41 @@ export function ProcessDetailPage() {
   <div class="stat" style="border-color:#bbf7d0"><div class="num" style="color:#16a34a">${stats.ok}</div><div class="lbl">Tudo certo</div></div>
   <div class="stat" style="border-color:#fecaca"><div class="num" style="color:#dc2626">${stats.faltando}</div><div class="lbl">Faltando</div></div>
   <div class="stat" style="border-color:#fed7aa"><div class="num" style="color:#ea580c">${stats.vencido}</div><div class="lbl">Prazo vencido</div></div>
-  <div class="stat" style="border-color:#fde68a"><div class="num" style="color:#d97706">${stats.divergente}</div><div class="lbl">Parece diferente</div></div>
-  <div class="stat" style="border-color:#c7d2fe"><div class="num" style="color:#6366f1">${stats.revisar}</div><div class="lbl">Conferir</div></div>
+  <div class="stat" style="border-color:#fde68a"><div class="num" style="color:#d97706">${stats.divergente}</div><div class="lbl">Conferir</div></div>
+  <div class="stat" style="border-color:#c7d2fe"><div class="num" style="color:#6366f1">${stats.revisar}</div><div class="lbl">Revisar</div></div>
 </div>
 <table>
-  <thead>
-    <tr>
-      <th>Documento / Exigência</th>
-      <th>Status</th>
-      <th>Observações</th>
-    </tr>
-  </thead>
+  <thead><tr><th>Documento / Exigência</th><th>Status</th><th>Observações</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
-</body>
-</html>`;
+</body></html>`;
 
     const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
+    window.open(URL.createObjectURL(blob), "_blank");
   };
 
   if (isLoading)
     return (
       <AppLayout>
-        <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-7 h-7 animate-spin text-blue-500" />
         </div>
       </AppLayout>
     );
+
   if (!process)
     return (
       <AppLayout>
-        <div className="text-center py-16 text-slate-500">Processo não encontrado</div>
+        <div className="text-center py-20 text-slate-500">Processo não encontrado.</div>
       </AppLayout>
     );
+
+  const hasRequirements = (process.requirements?.length ?? 0) > 0;
+  const isInConference =
+    process.status === ProcessStatus.em_conferencia ||
+    process.status === ProcessStatus.pendencias_encontradas ||
+    process.status === ProcessStatus.pronto_para_revisao ||
+    process.status === ProcessStatus.concluido;
 
   const handleEditalUpload = async (file: Blob) => {
     await uploadEdital.mutateAsync({ id, data: { file } });
@@ -208,433 +306,478 @@ export function ProcessDetailPage() {
       process.status === ProcessStatus.aguardando_documentos ||
       process.status === ProcessStatus.exigencias_extraidas);
 
-  const docReqCount = process.requirements.filter((r) => r.category !== "informacao_principal").length;
+  const docReqCount = process.requirements.filter(r => r.category !== "informacao_principal").length;
+  const infoReqs = process.requirements.filter(r => r.category === "informacao_principal");
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType; badge?: string | number; locked?: boolean }[] = [
-    {
-      key: "documentos",
-      label: "Documentos",
-      icon: Upload,
-      badge: process.editalFile ? process.documentFiles.length + 1 : undefined,
-    },
-    {
-      key: "analise",
-      label: "O que o edital pede",
-      icon: BrainCircuit,
-      badge: hasRequirements ? docReqCount : undefined,
-      locked: !hasRequirements,
-    },
-    {
-      key: "conferencia",
-      label: "Verificação",
-      icon: CheckSquare,
-      badge: isInConference ? process.validationItems.length : undefined,
-      locked: !isInConference,
-    },
-  ];
+  const wizardStep = getWizardStep(process.status);
+  const readiness = getReadinessPercent(process.status);
+  const readinessMsg = getReadinessMessage(readiness);
+
+  const step2Locked = !hasRequirements && !isInConference;
+  const step3Locked = !isInConference;
+
+  // Validation stats
+  const valStats = {
+    ok: process.validationItems.filter(v => v.status === "ok").length,
+    faltando: process.validationItems.filter(v => v.status === "faltando").length,
+    vencido: process.validationItems.filter(v => v.status === "vencido").length,
+    divergente: process.validationItems.filter(v => v.status === "divergente").length,
+    revisar: process.validationItems.filter(v => v.status === "revisar").length,
+    total: process.validationItems.length,
+  };
 
   return (
     <AppLayout>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-4 font-medium">
-          <Link href="/processes" className="hover:text-primary transition-colors">
-            Processos
-          </Link>
-          <ChevronRight className="w-4 h-4" />
-          <span className="text-slate-900 truncate max-w-xs">{process.title}</span>
+      <div className="px-6 lg:px-8 py-8 max-w-5xl">
+
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1 text-xs text-slate-400 mb-6 font-medium">
+          <Link href="/processes" className="hover:text-blue-600 transition-colors">Licitações</Link>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-slate-600 truncate max-w-xs">{process.title}</span>
         </div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <ProcessStatusBadge status={process.status} />
-              <span className="text-sm font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                {process.modality}
-              </span>
-              {process.editalNumber && (
-                <span className="text-sm font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                  Edital: {process.editalNumber}
+        {/* Process header */}
+        <div className="bg-white rounded-2xl p-6 mb-6" style={{ border: '1px solid #E8EFF6', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              {/* Tags */}
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <span className="text-xs font-semibold bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-md">
+                  {process.modality}
                 </span>
-              )}
-            </div>
-            <h1 className="text-2xl lg:text-3xl font-display font-bold text-slate-900 mb-1 truncate">
-              {process.title}
-            </h1>
-            <div className="flex flex-wrap items-center gap-3 text-slate-500 text-sm">
-              <span className="font-medium">{process.agency}</span>
-              {process.companyName && (
-                <>
-                  <span className="text-slate-300">•</span>
-                  <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-xs font-semibold">
+                {process.editalNumber && (
+                  <span className="text-xs font-semibold bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-md">
+                    Edital {process.editalNumber}
+                  </span>
+                )}
+                {process.companyName && (
+                  <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-md">
                     {process.companyName}
                   </span>
-                </>
-              )}
-              {process.deadline && (
-                <>
-                  <span className="text-slate-300">•</span>
+                )}
+              </div>
+
+              <h1 className="text-xl font-bold text-slate-900 leading-tight mb-3">
+                {process.title}
+              </h1>
+
+              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-slate-400" />
+                  {process.agency}
+                </span>
+                {process.deadline && (
                   <span className="flex items-center gap-1.5">
-                    <CalendarDays className="w-3.5 h-3.5" />
-                    {format(new Date(process.deadline), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    <CalendarDays className="w-4 h-4 text-slate-400" />
+                    Fecha em {format(new Date(process.deadline), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
                   </span>
-                </>
-              )}
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                    <Pencil className="w-4 h-4 mr-2" /> Editar processo
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive focus:text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" /> Excluir processo
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {isInConference && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGenerateReport}
-                className="gap-2"
-              >
-                <FileDown className="w-4 h-4" />
-                Relatório PDF
-              </Button>
-            )}
-            {isInConference && (
-              <Link href={`/processes/${id}/checklist`}>
-                <Button size="sm" className="shadow-md shadow-primary/20 gap-2">
-                  <CheckSquare className="w-4 h-4" />
-                  Checklist
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Button>
-              </Link>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Editar Processo
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setDeleteOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir Processo
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {/* Progress bar */}
+          <div className="mt-5 pt-5" style={{ borderTop: '1px solid #E8EFF6' }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium" style={{ color: readinessMsg.color }}>
+                {readinessMsg.msg}
+              </p>
+              <span className="text-sm font-bold" style={{ color: readinessMsg.color }}>
+                {readiness}%
+              </span>
+            </div>
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${readiness}%`, background: readinessMsg.color }}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Score de Prontidão */}
-      <ReadinessScore
-        result={computeLicitacaoReadiness(process.status, process.validationItems)}
-        className="mb-3"
-      />
+        {/* Wizard steps */}
+        <WizardSteps current={wizardStep} step2Locked={step2Locked} step3Locked={step3Locked} />
 
-      {/* Próxima Ação */}
-      {(() => {
-        const nextAction = computeProcessNextAction({
-          status: process.status,
-          requirements: process.requirements,
-          validationItems: process.validationItems,
-        });
-        const handleNextAction = () => {
-          const dest = nextAction.targetId as Tab | undefined;
-          if (dest && tabs.some(t => t.key === dest && !t.locked)) {
-            setActiveTab(dest);
-          } else if (nextAction.targetId === "conferencia" && !isInConference) {
-            setActiveTab("documentos");
-          } else if (dest) {
-            const unlocked = tabs.find(t => t.key === dest);
-            if (!unlocked?.locked) setActiveTab(dest as Tab);
-          }
-        };
-        return (
-          <NextActionBanner
-            action={nextAction}
-            onAction={handleNextAction}
-            className="mb-6"
-          />
-        );
-      })()}
-
-      {/* Tab Bar */}
-      <div className="flex gap-1 border-b border-slate-200 mb-6">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => !tab.locked && setActiveTab(tab.key)}
-              disabled={tab.locked}
-              className={cn(
-                "relative flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors rounded-t-lg -mb-px border-b-2",
-                isActive
-                  ? "text-primary border-primary bg-white"
-                  : tab.locked
-                  ? "text-slate-300 border-transparent cursor-not-allowed"
-                  : "text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300"
-              )}
+        {/* ── ETAPA 1: Entenda o edital ─────────────────────────────────── */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+              style={{ background: wizardStep > 1 ? '#059669' : '#0066FF', color: 'white' }}
             >
-              {tab.locked ? (
-                <Lock className="w-4 h-4" />
-              ) : (
-                <Icon className="w-4 h-4" />
-              )}
-              {tab.label}
-              {tab.badge !== undefined && !tab.locked && (
-                <span
-                  className={cn(
-                    "text-xs font-bold px-1.5 py-0.5 rounded-full",
-                    isActive ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-500"
-                  )}
-                >
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Tab: Documentos */}
-      {activeTab === "documentos" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="overflow-hidden">
-            <div className="bg-slate-900 text-white p-4">
-              <h3 className="font-bold flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-400" />
-                1. Edital
-              </h3>
+              {wizardStep > 1 ? <CheckCircle2 className="w-4 h-4" /> : "1"}
             </div>
-            <div className="p-5 space-y-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Entenda o edital</h2>
+              <p className="text-xs text-slate-500">Envie o PDF do edital para a IA ler e explicar o que você precisa.</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #E8EFF6' }}>
+            {/* Edital upload */}
+            <div className="bg-white p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-4 h-4 text-blue-500" />
+                <p className="text-sm font-semibold text-slate-800">O edital da licitação</p>
+                <span className="text-xs text-slate-400 ml-auto">Passo 1 de 2</span>
+              </div>
+
               {process.editalFile ? (
-                <>
-                  <FileListItem
-                    file={process.editalFile}
-                    onDelete={(fid) => removeFile.mutate({ id: fid })}
-                  />
+                <div className="space-y-3">
+                  <FileListItem file={process.editalFile} onDelete={(fid) => removeFile.mutate({ id: fid })} />
+
                   {needsEditalAnalysis && (
-                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg">
-                      <p className="text-sm text-blue-800 font-medium mb-3">
-                        Edital enviado. Clique para extrair as exigências via IA.
-                      </p>
-                      <Button
-                        onClick={() => analyzeEdital.mutate({ id })}
-                        disabled={analyzeEdital.isPending}
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                      >
-                        {analyzeEdital.isPending ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <BrainCircuit className="w-4 h-4 mr-2" />
-                        )}
-                        {analyzeEdital.isPending ? "Analisando..." : "Extrair Exigências com IA"}
-                      </Button>
+                    <div className="rounded-xl p-4 flex items-start gap-4" style={{ background: '#EFF6FF', border: '1px solid #DBEAFE' }}>
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#E5F0FF' }}>
+                        <Sparkles className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-blue-900 mb-1">
+                          Edital enviado! Agora deixa a IA ler para você.
+                        </p>
+                        <p className="text-xs text-blue-700 mb-3">
+                          Em segundos, a IA vai identificar todos os documentos que você precisa apresentar.
+                        </p>
+                        <Button
+                          onClick={() => analyzeEdital.mutate({ id })}
+                          disabled={analyzeEdital.isPending}
+                          style={{ background: '#0066FF' }}
+                          className="hover:opacity-90 text-white"
+                        >
+                          {analyzeEdital.isPending
+                            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analisando...</>
+                            : <><BrainCircuit className="w-4 h-4 mr-2" /> Analisar edital com IA</>}
+                        </Button>
+                      </div>
                     </div>
                   )}
+
                   {hasRequirements && (
-                    <button
-                      onClick={() => setActiveTab("analise")}
-                      className="w-full flex items-center justify-between text-sm bg-green-50 border border-green-200 rounded-lg px-3 py-2.5 hover:bg-green-100 transition-colors group"
-                    >
-                      <span className="font-medium text-green-800">
-                        {docReqCount} exigências extraídas ✓
-                      </span>
-                      <span className="text-xs text-green-600 font-semibold flex items-center gap-1 group-hover:gap-2 transition-all">
-                        Ver análise <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
-                    </button>
+                    <div className="rounded-xl p-4 flex items-center gap-4" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                      <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-green-900">
+                          Edital analisado! {docReqCount} documentos identificados.
+                        </p>
+                        <p className="text-xs text-green-700 mt-0.5">
+                          A IA leu o edital e listou tudo o que você precisa apresentar.
+                        </p>
+                      </div>
+                    </div>
                   )}
-                </>
+                </div>
               ) : (
                 <FileUploadZone
                   onUpload={handleEditalUpload}
                   isUploading={uploadEdital.isPending}
-                  label="Anexar Edital (PDF)"
+                  label="Enviar PDF do edital"
                 />
               )}
             </div>
-          </Card>
 
-          <Card
-            className="overflow-hidden lg:col-span-2 transition-opacity duration-300"
-            style={{ opacity: process.editalFile ? 1 : 0.55 }}
-          >
-            <div className="bg-slate-50 border-b p-4 flex justify-between items-center">
-              <h3 className="font-bold flex items-center gap-2 text-slate-900">
-                <FolderOpen className="w-5 h-5 text-indigo-500" />
-                2. Documentos da Empresa
-              </h3>
-              <span className="text-sm font-medium text-slate-500">
-                {process.documentFiles.length} arquivo(s)
-              </span>
-            </div>
-            <div className="p-5">
-              {!process.editalFile ? (
-                <div className="text-center py-10 text-slate-400 text-sm">
-                  Envie o edital primeiro para liberar o upload de documentos.
+            {/* Requirements list */}
+            {hasRequirements && (
+              <div className="border-t p-5" style={{ borderColor: '#E8EFF6', background: '#FAFBFC' }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <BrainCircuit className="w-4 h-4 text-blue-500" />
+                  <p className="text-sm font-semibold text-slate-800">O que o edital pede</p>
                 </div>
-              ) : (
-                <div className="space-y-4">
+                <RequirementsReviewPanel requirements={process.requirements} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── ETAPA 2: Prepare seus documentos ─────────────────────────── */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all"
+              style={{
+                background: step2Locked ? '#E2E8F0' : wizardStep > 2 ? '#059669' : wizardStep === 2 ? '#0066FF' : '#E2E8F0',
+                color: step2Locked ? '#94a3b8' : 'white',
+              }}
+            >
+              {wizardStep > 2 ? <CheckCircle2 className="w-4 h-4" /> : step2Locked ? <Lock className="w-3.5 h-3.5" /> : "2"}
+            </div>
+            <div>
+              <h2 className={cn("text-base font-bold", step2Locked ? "text-slate-400" : "text-slate-900")}>
+                Prepare seus documentos
+              </h2>
+              <p className="text-xs text-slate-500">
+                {step2Locked
+                  ? "Disponível após a análise do edital."
+                  : "Envie os documentos da sua empresa e veja se está tudo certo."}
+              </p>
+            </div>
+            {isInConference && valStats.total > 0 && (
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-sm font-semibold" style={{ color: valStats.faltando > 0 ? '#DC2626' : '#059669' }}>
+                  {valStats.ok} de {valStats.total} ok
+                </span>
+              </div>
+            )}
+          </div>
+
+          {!step2Locked && (
+            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #E8EFF6' }}>
+
+              {/* Document upload area */}
+              <div className="bg-white p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <FolderOpen className="w-4 h-4 text-indigo-500" />
+                  <p className="text-sm font-semibold text-slate-800">Documentos da sua empresa</p>
+                  <span className="text-xs text-slate-400 ml-auto">
+                    {process.documentFiles.length} arquivo(s) enviado(s)
+                  </span>
+                </div>
+
+                <div className="space-y-3">
                   {process.documentFiles.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {process.documentFiles.map((file) => (
+                      {process.documentFiles.map(file => (
                         <FileListItem
                           key={file.id}
                           file={file}
-                          onDelete={(fid) => removeFile.mutate ({ id: fid })}
+                          onDelete={(fid) => removeFile.mutate({ id: fid })}
                         />
                       ))}
                     </div>
                   )}
+
                   <FileUploadZone
                     onUpload={handleDocUpload}
                     isUploading={uploadDocument.isPending}
-                    label="Adicionar Documentos"
+                    label="Adicionar documento"
                   />
+
                   {needsDocAnalysis && (
-                    <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-lg flex items-center justify-between flex-wrap gap-4">
-                      <div>
-                        <h4 className="font-bold text-indigo-900 text-sm">Pronto para conferência</h4>
-                        <p className="text-xs text-indigo-700 mt-1">
-                          A IA cruzará os documentos enviados com as {docReqCount} exigências do edital.
-                        </p>
+                    <div className="rounded-xl p-4 flex items-start gap-4" style={{ background: '#F5F3FF', border: '1px solid #DDD6FE' }}>
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#EDE9FE' }}>
+                        <Sparkles className="w-4 h-4 text-violet-600" />
                       </div>
-                      <Button
-                        onClick={() => analyzeDocs.mutate({ id })}
-                        disabled={analyzeDocs.isPending}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 shadow-md shadow-indigo-200"
-                      >
-                        {analyzeDocs.isPending ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Play className="w-4 h-4 mr-2" />
-                        )}
-                        {analyzeDocs.isPending ? "Conferindo..." : "Iniciar Conferência"}
-                      </Button>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-violet-900 mb-1">
+                          Documentos enviados! Vamos conferir tudo.
+                        </p>
+                        <p className="text-xs text-violet-700 mb-3">
+                          A IA vai comparar seus documentos com as {docReqCount} exigências do edital e te dizer o que está ok e o que falta.
+                        </p>
+                        <Button
+                          onClick={() => analyzeDocs.mutate({ id })}
+                          disabled={analyzeDocs.isPending}
+                          className="bg-violet-600 hover:bg-violet-700 text-white"
+                        >
+                          {analyzeDocs.isPending
+                            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Conferindo...</>
+                            : <><Play className="w-4 h-4 mr-2" /> Conferir documentos com IA</>}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Validation results */}
+              {isInConference && valStats.total > 0 && (
+                <div className="border-t" style={{ borderColor: '#E8EFF6' }}>
+                  {/* Stats row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0" style={{ borderColor: '#E8EFF6' }}>
+                    {[
+                      { label: "Tudo certo", count: valStats.ok, color: "#059669", bg: "#F0FDF4" },
+                      { label: "Faltando", count: valStats.faltando, color: "#DC2626", bg: "#FEF2F2" },
+                      { label: "Vencendo", count: valStats.vencido, color: "#EA580C", bg: "#FFF7ED" },
+                      { label: "Conferir", count: valStats.divergente + valStats.revisar, color: "#D97706", bg: "#FFFBEB" },
+                    ].map(s => (
+                      <div key={s.label} className="p-4 text-center" style={{ background: s.bg }}>
+                        <p className="text-2xl font-bold" style={{ color: s.color }}>{s.count}</p>
+                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Validation item list */}
+                  <div className="bg-white divide-y" style={{ borderColor: '#E8EFF6' }}>
+                    {process.validationItems.slice(0, 8).map(item => (
+                      <div key={item.id} className="px-5 py-3 flex items-center gap-3">
+                        <ValidationIcon status={item.status} />
+                        <p className="flex-1 text-sm text-slate-700 truncate">{item.requirement?.title ?? "—"}</p>
+                        <ValidationLabel status={item.status} />
+                      </div>
+                    ))}
+                    {process.validationItems.length > 8 && (
+                      <div className="px-5 py-3">
+                        <Link href={`/processes/${id}/checklist`} className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                          Ver todos os {process.validationItems.length} itens
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+
+                  {valStats.faltando > 0 && (
+                    <div className="p-4" style={{ background: '#FEF2F2', borderTop: '1px solid #FECACA' }}>
+                      <p className="text-sm font-semibold text-red-800">
+                        Você precisa enviar mais {valStats.faltando} documento{valStats.faltando !== 1 ? "s" : ""} para participar desta licitação.
+                      </p>
+                      <p className="text-xs text-red-600 mt-0.5">Adicione os documentos acima e refaça a conferência.</p>
                     </div>
                   )}
                 </div>
               )}
             </div>
-          </Card>
-        </div>
-      )}
+          )}
 
-      {/* Tab: Análise do Edital */}
-      {activeTab === "analise" && hasRequirements && (
-        <Card className="overflow-hidden">
-          <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <BrainCircuit className="w-5 h-5 text-primary" />
-              <div>
-                <h3 className="font-bold text-base">Análise do Edital</h3>
-                <p className="text-slate-400 text-xs mt-0.5">
-                  Extraído por IA — revise e confirme antes de prosseguir
-                </p>
-              </div>
+          {step2Locked && (
+            <div className="rounded-2xl p-6 text-center" style={{ border: '2px dashed #E2E8F0', background: '#FAFBFC' }}>
+              <Lock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">Complete a etapa 1 primeiro.</p>
             </div>
-            {isInConference && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
-                onClick={() => setActiveTab("conferencia")}
-              >
-                Ver Conferência
-                <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-              </Button>
-            )}
-          </div>
-          <div className="p-6">
-            <RequirementsReviewPanel requirements={process.requirements} />
-          </div>
-        </Card>
-      )}
-
-      {/* Tab: Conferência */}
-      {activeTab === "conferencia" && isInConference && (
-        <div className="space-y-4">
-          {process.validationItems.length > 0 && (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                {[
-                  { label: "OK", status: "ok", color: "text-green-700 bg-green-50 border-green-200" },
-                  { label: "Faltando", status: "faltando", color: "text-red-700 bg-red-50 border-red-200" },
-                  { label: "Vencido", status: "vencido", color: "text-orange-700 bg-orange-50 border-orange-200" },
-                  { label: "Divergente", status: "divergente", color: "text-amber-700 bg-amber-50 border-amber-200" },
-                  { label: "Revisar", status: "revisar", color: "text-violet-700 bg-violet-50 border-violet-200" },
-                ].map((s) => {
-                  const count = process.validationItems.filter((v) => v.status === s.status).length;
-                  return (
-                    <div key={s.status} className={cn("border rounded-xl p-4 text-center", s.color)}>
-                      <p className="text-2xl font-bold">{count}</p>
-                      <p className="text-xs font-semibold mt-0.5 uppercase tracking-wide opacity-80">{s.label}</p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <Card>
-                <div className="p-4 border-b flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900">Todos os itens</h3>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleGenerateReport}
-                      className="text-sm font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1"
-                    >
-                      <FileDown className="w-3.5 h-3.5" />
-                      Exportar PDF
-                    </button>
-                    <Link
-                      href={`/processes/${id}/checklist`}
-                      className="text-sm font-semibold text-primary hover:underline flex items-center gap-1"
-                    >
-                      Ver checklist completo <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-                <div>
-                  <table className="w-full text-sm text-left">
-                    <tbody>
-                      {process.validationItems.map((item) => (
-                        <tr key={item.id} className={cn("border-t first:border-t-0")}>
-                          <td className="p-3 pl-4 font-medium text-slate-800">{item.requirement?.title ?? "—"}</td>
-                          <td className="p-3 pr-4 text-right">
-                            <ValidationStatusBadge status={item.status} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </>
           )}
         </div>
-      )}
 
-      {/* Edit Dialog */}
-      <EditProcessDialog
-        process={process}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-      />
+        {/* ── ETAPA 3: Envie sua proposta ───────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all"
+              style={{
+                background: step3Locked ? '#E2E8F0' : wizardStep === 3 ? '#0066FF' : '#E2E8F0',
+                color: step3Locked ? '#94a3b8' : 'white',
+              }}
+            >
+              {step3Locked ? <Lock className="w-3.5 h-3.5" /> : "3"}
+            </div>
+            <div>
+              <h2 className={cn("text-base font-bold", step3Locked ? "text-slate-400" : "text-slate-900")}>
+                Envie sua proposta
+              </h2>
+              <p className="text-xs text-slate-500">
+                {step3Locked
+                  ? "Disponível quando todos os documentos estiverem conferidos."
+                  : "Você está quase lá! Gere o relatório e envie sua proposta."}
+              </p>
+            </div>
+          </div>
 
-      {/* Delete Confirmation */}
+          {!step3Locked ? (
+            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #E8EFF6' }}>
+
+              {/* Ready state */}
+              {valStats.faltando === 0 && valStats.vencido === 0 ? (
+                <div className="p-6" style={{ background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)' }}>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#BBF7D0' }}>
+                      <CheckCircle2 className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-green-900 mb-1">
+                        Você está pronto para participar! 🎉
+                      </p>
+                      <p className="text-sm text-green-700">
+                        Todos os documentos foram verificados. Gere o relatório de prontidão e envie sua proposta no portal da licitação.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-5" style={{ background: '#FFFBEB', borderBottom: '1px solid #FDE68A' }}>
+                  <p className="text-sm font-semibold text-amber-900">
+                    Ainda há {valStats.faltando + valStats.vencido} pendência(s) — mas você pode prosseguir com cautela.
+                  </p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Revise os documentos faltando antes de enviar a proposta.
+                  </p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="bg-white p-5 flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={handleGenerateReport}
+                  variant="outline"
+                  className="gap-2 border-slate-200"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Gerar relatório PDF
+                </Button>
+
+                <Link href={`/processes/${id}/checklist`}>
+                  <Button className="gap-2" style={{ background: '#0066FF' }}>
+                    <CheckSquare className="w-4 h-4" />
+                    Ver checklist completo
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </Link>
+
+                {process.sourceUrl && (
+                  <a href={process.sourceUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" className="gap-2 border-slate-200">
+                      <ExternalLink className="w-4 h-4" />
+                      Ir para o portal
+                    </Button>
+                  </a>
+                )}
+              </div>
+
+              {/* Checklist confirmation */}
+              <div className="border-t p-5" style={{ borderColor: '#E8EFF6', background: '#FAFBFC' }}>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Antes de enviar, confirme:</p>
+                <div className="space-y-2">
+                  {[
+                    "Revisei todos os documentos verificados pela IA",
+                    "Conferi o prazo de abertura das propostas",
+                    "Tenho acesso ao portal onde a proposta deve ser enviada",
+                    "Meu representante legal está disponível para assinar",
+                  ].map((item, i) => (
+                    <label key={i} className="flex items-start gap-3 cursor-pointer group">
+                      <input type="checkbox" className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                      <span className="text-sm text-slate-600">{item}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl p-6 text-center" style={{ border: '2px dashed #E2E8F0', background: '#FAFBFC' }}>
+              <Lock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">Complete as etapas anteriores primeiro.</p>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Dialogs */}
+      <EditProcessDialog process={process} open={editOpen} onOpenChange={setEditOpen} />
+
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir processo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação é irreversível. O processo <strong>"{process.title}"</strong>, junto com todos os documentos, análises e conferências associadas, será permanentemente excluído.
+              Todos os arquivos e análises deste processo serão removidos permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -643,12 +786,7 @@ export function ProcessDetailPage() {
               onClick={handleDelete}
               className="bg-destructive hover:bg-destructive/90"
             >
-              {deleteMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              Excluir permanentemente
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
