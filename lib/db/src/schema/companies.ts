@@ -51,6 +51,8 @@ export const companiesTable = pgTable("companies", {
   indicesLiquidezGeral: text("indices_liquidez_geral"),
   indicesSolvenciaGeral: text("indices_solvencia_geral"),
 
+  biddingProfile: jsonb("bidding_profile").default({}),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

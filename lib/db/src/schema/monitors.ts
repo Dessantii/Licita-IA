@@ -11,6 +11,11 @@ export const monitorsTable = pgTable("monitors", {
   municipio: text("municipio"),
   isActive: boolean("is_active").notNull().default(true),
   lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+
+  useBiddingProfile: boolean("use_bidding_profile").default(true),
+  minScoreForAlert: integer("min_score_for_alert").default(0),
+  mepppOnly: boolean("meppp_only").default(false),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

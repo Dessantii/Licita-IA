@@ -13,7 +13,7 @@ import {
 import {
   Building2, ChevronLeft, ChevronRight, Mail, Phone, MapPin, FileText, BookOpen,
   Pencil, Trash2, Loader2, Hash, Globe, User, ShieldCheck, Award, BarChart3,
-  RefreshCw, AlertTriangle, CheckCircle2, Search, Save, X,
+  RefreshCw, AlertTriangle, CheckCircle2, Search, Save, X, Target,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -45,7 +45,7 @@ const CALL_STATUS: Record<string, { label: string; color: string }> = {
   concluido: { label: "Concluído", color: "bg-green-100 text-green-700" },
 };
 
-type TabId = "dados" | "regularidade" | "certificado" | "financeiro" | "processos" | "chamamentos";
+type TabId = "dados" | "regularidade" | "certificado" | "financeiro" | "processos" | "chamamentos" | "perfil";
 
 interface Certidao { validade?: string; url?: string }
 interface Certidoes {
@@ -136,6 +136,8 @@ export function EmpresaDetailPage() {
   const [verifyingSicaf, setVerifyingSicaf] = useState(false);
   const [form, setForm] = useState<Partial<CompanyFull>>({});
   const [certidoes, setCertidoes] = useState<Certidoes>({});
+  const [biddingProfile, setBiddingProfile] = useState<Record<string, any>>({});
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const token = getToken();
 
@@ -148,6 +150,7 @@ export function EmpresaDetailPage() {
       setCompany(data);
       setForm(data);
       setCertidoes((data.certidoes as Certidoes) ?? {});
+      setBiddingProfile((data.biddingProfile as Record<string, any>) ?? {});
     } catch {
       notify(toast, "load_error");
     } finally {
@@ -259,7 +262,47 @@ export function EmpresaDetailPage() {
     { id: "financeiro", label: "Financeiro", icon: BarChart3 },
     { id: "processos", label: "Licitações", icon: FileText, badge: company.processes.length },
     { id: "chamamentos", label: "Chamamentos", icon: BookOpen, badge: company.callNotices.length },
+    { id: "perfil", label: "Perfil Licitatório", icon: Target },
   ];
+
+  async function handleSaveBiddingProfile() {
+    setSavingProfile(true);
+    try {
+      const res = await fetch(`/api/companies/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ biddingProfile }),
+      });
+      if (!res.ok) throw new Error();
+      notify(toast, "company_updated");
+      load();
+    } catch {
+      notify(toast, "company_update_error");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  const SUPPLY_CATEGORIES = [
+    { value: "ti", label: "Tecnologia (TI)" },
+    { value: "alimentacao", label: "Alimentação" },
+    { value: "limpeza", label: "Limpeza e Conservação" },
+    { value: "saude", label: "Saúde" },
+    { value: "construcao", label: "Construção e Obras" },
+    { value: "transporte", label: "Transporte" },
+    { value: "educacao", label: "Educação e Treinamento" },
+    { value: "escritorio", label: "Material de Escritório" },
+    { value: "seguranca", label: "Segurança" },
+    { value: "outros", label: "Outros" },
+  ];
+
+  function toggleCategory(value: string) {
+    const current: string[] = biddingProfile.categories ?? [];
+    const updated = current.includes(value)
+      ? current.filter(c => c !== value)
+      : [...current, value];
+    setBiddingProfile(p => ({ ...p, categories: updated }));
+  }
 
   const certidaoTypes: { key: keyof Certidoes; label: string }[] = [
     { key: "federal", label: "Certidão Federal (Receita / PGFN)" },
@@ -757,6 +800,137 @@ export function EmpresaDetailPage() {
             })}
           </div>
         )
+      )}
+
+      {/* ── TAB: PERFIL LICITATÓRIO ──────────────────────────────── */}
+      {tab === "perfil" && (
+        <div className="space-y-6">
+          {/* Intro card */}
+          <div className="rounded-2xl p-5 flex items-start gap-4" style={{ background: 'linear-gradient(135deg, #EFF6FF 0%, #F0F4FF 100%)', border: '1px solid #DBEAFE' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#E5F0FF' }}>
+              <Target className="w-5 h-5" style={{ color: '#0066FF' }} />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800 text-sm mb-1">Perfil de oportunidades ideal</p>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Configure quais segmentos e características de licitações combinam com sua empresa. O LicitaIA usa esses dados para rankear automaticamente as oportunidades na aba Oportunidades.
+              </p>
+            </div>
+          </div>
+
+          {/* Categorias */}
+          <Card className="p-5">
+            <h3 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <Target className="w-4 h-4 text-slate-400" />
+              Categorias que você fornece
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">Marque todos os segmentos em que sua empresa tem experiência ou interesse.</p>
+            <div className="flex flex-wrap gap-2">
+              {SUPPLY_CATEGORIES.map(cat => {
+                const selected = (biddingProfile.categories ?? []).includes(cat.value);
+                return (
+                  <button
+                    key={cat.value}
+                    onClick={() => toggleCategory(cat.value)}
+                    className={cn(
+                      "px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                      selected
+                        ? "text-white shadow-sm"
+                        : "bg-slate-50 border border-slate-200 text-slate-600 hover:border-slate-400"
+                    )}
+                    style={selected ? { background: '#0066FF' } : {}}
+                  >
+                    {cat.label}
+                    {selected && <span className="ml-1.5">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Raio de atuação */}
+          <Card className="p-5">
+            <h3 className="font-bold text-slate-900 mb-1">Raio de atuação</h3>
+            <p className="text-xs text-slate-500 mb-4">Onde você pode prestar serviços ou entregar produtos?</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {[
+                { value: "municipio", label: "Só no meu município", description: "Atendo apenas localmente" },
+                { value: "estado", label: "No meu estado", description: "Atendo no estado inteiro" },
+                { value: "nacional", label: "Nacional", description: "Atendo em qualquer lugar do Brasil" },
+              ].map(opt => {
+                const selected = (biddingProfile.operationRadius ?? "nacional") === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setBiddingProfile(p => ({ ...p, operationRadius: opt.value }))}
+                    className={cn(
+                      "p-4 rounded-xl text-left transition-all",
+                      selected ? "text-white shadow-sm" : "bg-slate-50 border border-slate-200 hover:border-slate-400"
+                    )}
+                    style={selected ? { background: '#0066FF' } : {}}
+                  >
+                    <p className={cn("font-semibold text-sm", selected ? "text-white" : "text-slate-800")}>{opt.label}</p>
+                    <p className={cn("text-xs mt-0.5", selected ? "text-blue-100" : "text-slate-500")}>{opt.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Valor máximo */}
+          <Card className="p-5">
+            <h3 className="font-bold text-slate-900 mb-1">Valor máximo por contrato</h3>
+            <p className="text-xs text-slate-500 mb-4">Qual o maior contrato que sua empresa consegue executar? Deixe em branco para não filtrar por valor.</p>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-500 shrink-0">R$</span>
+              <input
+                type="number"
+                value={biddingProfile.maxContractValue ?? ""}
+                onChange={e => setBiddingProfile(p => ({ ...p, maxContractValue: e.target.value ? Number(e.target.value) : undefined }))}
+                placeholder="Ex: 500000"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 max-w-xs w-full"
+              />
+            </div>
+          </Card>
+
+          {/* Experiência prévia */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 mb-0.5">Experiência prévia em licitações</h3>
+                <p className="text-xs text-slate-500">Sua empresa já ganhou algum processo licitatório antes?</p>
+              </div>
+              <button
+                onClick={() => setBiddingProfile(p => ({ ...p, hasPriorExperience: !p.hasPriorExperience }))}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  biddingProfile.hasPriorExperience ? "" : "bg-slate-200"
+                )}
+                style={biddingProfile.hasPriorExperience ? { background: '#0066FF' } : {}}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform",
+                    biddingProfile.hasPriorExperience ? "translate-x-5" : "translate-x-0.5"
+                  )}
+                />
+              </button>
+            </div>
+          </Card>
+
+          {/* Save button */}
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSaveBiddingProfile}
+              disabled={savingProfile}
+              style={{ background: '#0066FF' }}
+              className="text-white hover:opacity-90 gap-2"
+            >
+              {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Salvar Perfil Licitatório
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Save bar when editing and in regulatory/cert/financial tabs */}

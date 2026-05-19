@@ -1,0 +1,237 @@
+# Prompt 01 — Descoberta Inteligente de Oportunidades
+
+## Contexto do sistema
+
+Você está evoluindo o módulo de **Monitoramento/Descoberta** do LicitaIA, plataforma SaaS para MEIs e microempresas participarem de licitações públicas.
+
+**O que já existe e deve ser preservado:**
+- Job em background que consulta o PNCP por novos editais
+- Filtros por UF, município e palavras-chave definidos pelo usuário
+- Sino de notificações na barra superior com novos editais encontrados
+- Tabela `monitoring_configs` com as configurações de monitoramento por empresa
+- Tabela `opportunities` com os editais encontrados
+
+**O que este prompt constrói em cima disso:**
+Transformar o monitoramento genérico em um sistema de **descoberta inteligente** que ranqueia e pontua cada oportunidade de acordo com o perfil real da empresa — CNAE, porte, localização e histórico.
+
+---
+
+## O problema a resolver
+
+Hoje o monitor traz todos os editais que batem com os filtros geográficos e palavras-chave. O usuário recebe uma lista plana sem saber quais valem seu tempo. Resultado: excesso de ruído, baixo engajamento com as oportunidades.
+
+A nova versão deve responder automaticamente à pergunta do usuário: **"Essa licitação é pra mim?"**
+
+---
+
+## O que construir
+
+### 1. Enriquecer o perfil da empresa com dados para o match
+
+Na tela de perfil da empresa (`/companies/:id`), adicionar uma nova seção chamada **"Perfil Licitatório"** com os seguintes campos:
+
+```
+- CNAEs principais (multi-select, carregados da Receita Federal se já sincronizado)
+- Categorias de fornecimento preferidas (ex: TI, Alimentação, Limpeza, Saúde...)
+  → lista fixa de categorias mapeadas para grupos de CNAEs
+- Raio máximo de atuação (ex: só município, só estado, nacional)
+- Capacidade máxima de contrato (R$) → serve para filtrar editais fora do porte
+- Já participou de licitações antes? (sim/não) → afeta sugestões iniciais
+```
+
+Esses dados são salvos em uma nova coluna `bidding_profile` (JSONB) na tabela `companies`.
+
+---
+
+### 2. Score de oportunidade (calculado no backend)
+
+Cada edital recuperado pelo monitor deve receber um **score de 0 a 100** calculado automaticamente com base nos seguintes critérios:
+
+| Critério | Peso | Lógica |
+|---|---|---|
+| Match de CNAE/categoria | 35 pts | CNAE da empresa bate com o objeto do edital (IA classifica o objeto) |
+| Localização | 20 pts | Mesmo município = 20, mesmo estado = 12, nacional = 5 |
+| Porte do contrato | 20 pts | Valor dentro da capacidade declarada da empresa = 20, até 2x = 10, acima = 0 |
+| Prazo disponível | 15 pts | Mais de 10 dias até fechamento = 15, 5–10 dias = 8, menos de 5 = 3 |
+| Histórico de sucesso | 10 pts | A empresa já ganhou em categoria similar antes = +10 |
+
+**Classificação final:**
+- 75–100 → 🟢 **Excelente** — "Muito alinhado com seu perfil"
+- 50–74 → 🟡 **Bom** — "Vale avaliar"
+- 25–49 → 🟠 **Baixo** — "Fora do seu perfil habitual"
+- 0–24 → 🔴 **Descartável** — "Pouco relevante para você"
+
+O score é recalculado sempre que o perfil licitatório da empresa é atualizado.
+
+---
+
+### 3. Nova tela de Oportunidades (`/opportunities`)
+
+Substituir ou complementar a listagem atual de alertas por uma tela dedicada de oportunidades com UX orientada a decisão rápida.
+
+**Layout:**
+
+**Topo — Resumo do dia:**
+```
+Cards horizontais com: 
+[ X novas hoje ] [ Y excelentes para você ] [ Z encerrando esta semana ]
+```
+
+**Filtros rápidos (pills clicáveis):**
+```
+[ Todas ] [ Excelentes 🟢 ] [ Boas 🟡 ] [ Encerrando em breve ] [ Abaixo de R$ 80k ]
+```
+
+**Lista de oportunidades:**
+
+Cada card de oportunidade deve mostrar:
+- Badge colorido do score (Excelente / Bom / Baixo)
+- Título do objeto (truncado em 2 linhas)
+- Órgão + Município/UF
+- Valor estimado
+- Prazo de fechamento com contagem regressiva em dias
+- Tag de modalidade (Pregão / Dispensa / Concorrência)
+- Tag especial se aplicável: `⭐ Exclusivo ME/EPP` ou `📦 Cota reservada`
+- Dois botões: **"Ver edital"** → abre no PNCP | **"Iniciar processo"** → cria processo no módulo de Licitações
+
+**Ordenação padrão:** score decrescente, com opção de ordenar por prazo.
+
+---
+
+### 4. Verificação automática ME/EPP no card
+
+Ao exibir cada oportunidade, o sistema deve verificar e exibir automaticamente:
+
+- **Item exclusivo ME/EPP:** valor estimado ≤ R$ 80.000 E empresa é ME/EPP → exibir badge `⭐ Exclusivo ME`
+- **Cota reservada:** lotes/itens com cota de 25% reservada para ME/EPP (identificar via IA no texto do edital quando disponível)
+- **Empate ficto aplicável:** empresa é ME/EPP → sempre aplicável, exibir ícone de info com tooltip explicando o benefício
+
+A verificação do porte (ME/EPP) vem do campo `company_type` já existente na tabela `companies`.
+
+---
+
+### 5. Painel de configuração do monitor (melhorias em `/settings` ou modal)
+
+Adicionar ao painel de configuração do monitoramento existente:
+
+- Toggle: **"Usar perfil licitatório para filtrar resultados"** (padrão: ativo)
+- Slider: **"Score mínimo para notificação"** (padrão: 50)
+- Toggle: **"Notificar apenas oportunidades ME/EPP exclusivas"**
+- Preview em tempo real: "Com essas configurações, você teria recebido X alertas nos últimos 30 dias"
+
+---
+
+## Schema de banco de dados
+
+### Alteração na tabela `companies`
+```sql
+ALTER TABLE companies 
+ADD COLUMN bidding_profile JSONB DEFAULT '{}';
+
+-- Estrutura do JSONB:
+-- {
+--   "cnaes": ["47.11-3-02", "56.11-2-01"],
+--   "categories": ["alimentacao", "limpeza"],
+--   "max_contract_value": 500000,
+--   "operation_radius": "estado", -- "municipio" | "estado" | "nacional"
+--   "has_prior_experience": true
+-- }
+```
+
+### Nova tabela `opportunity_scores`
+```sql
+CREATE TABLE opportunity_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  opportunity_id UUID NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  score INTEGER NOT NULL CHECK (score BETWEEN 0 AND 100),
+  score_breakdown JSONB, -- detalhe por critério
+  classification VARCHAR(20), -- 'excellent' | 'good' | 'low' | 'discard'
+  is_meppp_exclusive BOOLEAN DEFAULT FALSE,
+  has_reserved_quota BOOLEAN DEFAULT FALSE,
+  calculated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(opportunity_id, company_id)
+);
+```
+
+### Alteração na tabela `monitoring_configs`
+```sql
+ALTER TABLE monitoring_configs
+ADD COLUMN use_bidding_profile BOOLEAN DEFAULT TRUE,
+ADD COLUMN min_score_for_alert INTEGER DEFAULT 50,
+ADD COLUMN meppp_only BOOLEAN DEFAULT FALSE;
+```
+
+---
+
+## Lógica de classificação por IA (OpenAI)
+
+Ao processar cada novo edital, o job de background deve chamar a OpenAI para classificar o objeto em uma das categorias de fornecimento:
+
+```javascript
+// Prompt para classificação de categoria
+const prompt = `
+Classifique o objeto desta licitação em UMA das categorias abaixo.
+Responda APENAS com o slug da categoria, sem mais texto.
+
+Categorias disponíveis:
+- ti (tecnologia da informação, software, internet, equipamentos de informática)
+- alimentacao (alimentos, refeições, gêneros alimentícios, coffee break)
+- limpeza (serviços de limpeza, conservação, higiene)
+- saude (medicamentos, equipamentos médicos, serviços de saúde)
+- construcao (obras, reformas, manutenção predial)
+- transporte (veículos, combustível, frete, seguro de veículos)
+- educacao (materiais didáticos, treinamentos, serviços educacionais)
+- escritorio (material de escritório, mobiliário, impressoras)
+- seguranca (vigilância, monitoramento, EPI)
+- outros (não se encaixa nas categorias acima)
+
+Objeto da licitação: "${objeto}"
+`;
+```
+
+---
+
+## Fluxo completo do usuário
+
+```
+1. Usuário cadastra empresa → preenche Perfil Licitatório
+2. Monitor roda em background → encontra novos editais no PNCP
+3. Para cada edital encontrado:
+   a. IA classifica a categoria do objeto
+   b. Score é calculado cruzando com o perfil da empresa
+   c. Verifica benefícios ME/EPP aplicáveis
+   d. Salva em opportunity_scores
+4. Se score ≥ min_score_for_alert → dispara notificação
+5. Usuário acessa /opportunities → vê lista ranqueada
+6. Clica em "Iniciar processo" → cria registro em /processes com dados pré-preenchidos
+```
+
+---
+
+## UX — Onboarding do Perfil Licitatório
+
+Se a empresa ainda não preencheu o `bidding_profile`, exibir um **banner de onboarding** na tela de oportunidades:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🎯 Receba só o que é relevante para você                    │
+│ Configure o perfil licitatório da sua empresa e o LicitaIA  │
+│ filtra automaticamente as melhores oportunidades.           │
+│                              [Configurar agora →]           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+O banner some após o preenchimento e nunca mais aparece.
+
+---
+
+## Critério de conclusão
+
+Esta etapa está concluída quando:
+1. ✅ Campo `bidding_profile` existe na empresa e pode ser preenchido
+2. ✅ Cada oportunidade recebe um score 0–100 calculado automaticamente
+3. ✅ Tela `/opportunities` exibe cards ranqueados com badge de score
+4. ✅ Benefícios ME/EPP são identificados e exibidos nos cards
+5. ✅ Botão "Iniciar processo" cria o processo em `/processes` com dados pré-preenchidos
+6. ✅ Configuração do monitor tem controle de score mínimo para alerta

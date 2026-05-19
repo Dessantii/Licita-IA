@@ -83,6 +83,7 @@ const createCompanySchema = z.object({
   indicesLiquidezCorrente: z.string().nullish(),
   indicesLiquidezGeral: z.string().nullish(),
   indicesSolvenciaGeral: z.string().nullish(),
+  biddingProfile: z.any().nullish(),
 });
 
 const updateCompanySchema = createCompanySchema.partial();

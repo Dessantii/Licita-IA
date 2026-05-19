@@ -32,6 +32,7 @@ import { FundingNoticesPage } from "@/pages/FundingNoticesPage";
 import { FundingProjectsPage } from "@/pages/FundingProjectsPage";
 import { FundingProjectEditorPage } from "@/pages/FundingProjectEditorPage";
 import { OportunidadesPage } from "@/pages/OportunidadesPage";
+import { DescobertaPage } from "@/pages/DescobertaPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -103,6 +104,9 @@ function Router() {
 
       {/* Opportunities & Funding */}
       <Route path="/oportunidades">
+        {() => <ProtectedRoute component={DescobertaPage} />}
+      </Route>
+      <Route path="/captacao">
         {() => <ProtectedRoute component={OportunidadesPage} />}
       </Route>
       <Route path="/funding-notices">
