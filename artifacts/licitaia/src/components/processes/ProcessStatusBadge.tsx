@@ -2,15 +2,15 @@ import { Badge } from "@/components/ui/badge";
 import { ProcessStatus } from "@workspace/api-client-react";
 
 const statusLabels: Record<ProcessStatus, string> = {
-  [ProcessStatus.criado]: "Criado",
-  [ProcessStatus.edital_enviado]: "Edital Enviado",
-  [ProcessStatus.edital_processando]: "Processando Edital",
-  [ProcessStatus.exigencias_extraidas]: "Exigências Extraídas",
-  [ProcessStatus.aguardando_documentos]: "Aguardando Docs",
-  [ProcessStatus.documentos_enviados]: "Documentos Enviados",
-  [ProcessStatus.em_conferencia]: "Em Conferência",
-  [ProcessStatus.pendencias_encontradas]: "Pendências",
-  [ProcessStatus.pronto_para_revisao]: "Pronto para Revisão",
+  [ProcessStatus.criado]: "Iniciado",
+  [ProcessStatus.edital_enviado]: "Edital recebido",
+  [ProcessStatus.edital_processando]: "Lendo o edital...",
+  [ProcessStatus.exigencias_extraidas]: "Documentos identificados",
+  [ProcessStatus.aguardando_documentos]: "Aguardando documentos",
+  [ProcessStatus.documentos_enviados]: "Documentos enviados",
+  [ProcessStatus.em_conferencia]: "Verificando documentos",
+  [ProcessStatus.pendencias_encontradas]: "Tem algo para resolver",
+  [ProcessStatus.pronto_para_revisao]: "Pronto para revisar",
   [ProcessStatus.concluido]: "Concluído",
 };
 

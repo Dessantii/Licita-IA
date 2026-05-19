@@ -39,8 +39,8 @@ export const MESSAGES = {
   },
   edital_analyzed: {
     type: "success",
-    title: "Exigências extraídas",
-    description: "Envie os documentos da empresa para iniciar a conferência.",
+    title: "Identificamos o que você precisa preparar",
+    description: "Agora envie os documentos da sua empresa para verificarmos tudo.",
   },
   edital_analyze_error: {
     type: "error",
@@ -71,19 +71,19 @@ export const MESSAGES = {
   docs_checked: {
     type: "success",
     title: "Conferência concluída",
-    description: "Verifique as pendências no checklist e resolva antes do protocolo.",
+    description: "Veja os itens que precisam de atenção antes de enviar.",
   },
   docs_check_error: {
     type: "error",
-    title: "Falha na conferência de documentos",
-    description: "Verifique se os documentos estão legíveis e tente novamente.",
+    title: "Não foi possível verificar os documentos",
+    description: "Confira se os arquivos estão legíveis e tente novamente.",
   },
 
   // ── Licitações — Processo CRUD ───────────────────────────────────────────
   process_created: {
     type: "success",
     title: "Processo criado",
-    description: "Envie o edital para começar a extração de exigências.",
+    description: "Agora envie o edital para sabermos o que você precisa preparar.",
   },
   process_create_error: {
     type: "error",
@@ -113,7 +113,7 @@ export const MESSAGES = {
   chamamento_edital_uploaded: {
     type: "success",
     title: "Edital do chamamento recebido",
-    description: "Clique em \"Analisar Edital\" para extrair os requisitos da OSC.",
+    description: "Clique em \"Analisar Edital\" para saber o que a organização precisa preparar.",
   },
   chamamento_edital_upload_error: {
     type: "error",
@@ -141,23 +141,23 @@ export const MESSAGES = {
   },
   chamamento_analyzed: {
     type: "success",
-    title: "Requisitos extraídos",
-    description: "Envie os documentos da OSC para iniciar a conferência.",
+    title: "Identificamos o que a organização precisa preparar",
+    description: "Agora envie os documentos para verificarmos tudo.",
   },
   chamamento_analyze_error: {
     type: "error",
     title: "Não foi possível analisar o edital",
-    description: "Verifique se o arquivo está legível e tente novamente.",
+    description: "Confira se o arquivo está legível e tente novamente.",
   },
   chamamento_docs_checked: {
     type: "success",
-    title: "Conferência da OSC concluída",
-    description: "Acesse o checklist para ver pendências e preparar a submissão.",
+    title: "Conferência concluída",
+    description: "Veja os itens que precisam de atenção antes de enviar.",
   },
   chamamento_docs_check_error: {
     type: "error",
-    title: "Falha na conferência de documentos",
-    description: "Verifique os documentos enviados e tente novamente.",
+    title: "Não foi possível verificar os documentos",
+    description: "Confira os arquivos enviados e tente novamente.",
   },
   chamamento_deleted: {
     type: "success",
@@ -441,7 +441,7 @@ export const MESSAGES = {
   funding_notice_processed: {
     type: "success",
     title: "Edital processado com sucesso",
-    description: "Os requisitos foram extraídos e estão disponíveis para conferência.",
+    description: "Identificamos o que você precisa preparar para este edital.",
   },
   funding_notice_process_error: {
     type: "error",
@@ -475,7 +475,7 @@ export const MESSAGES = {
   sicaf_found: {
     type: "success",
     title: "Empresa encontrada no SICAF",
-    description: "Os dados de regularidade foram atualizados.",
+    description: "Atualizamos a situação da empresa no sistema.",
   },
   sicaf_not_found: {
     type: "warning",

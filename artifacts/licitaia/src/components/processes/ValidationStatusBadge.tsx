@@ -3,11 +3,11 @@ import { ValidationItemStatus } from "@workspace/api-client-react";
 import { CheckCircle2, XCircle, AlertCircle, Clock, Info } from "lucide-react";
 
 const config: Record<ValidationItemStatus, { label: string, icon: any }> = {
-  [ValidationItemStatus.ok]: { label: "Conforme", icon: CheckCircle2 },
-  [ValidationItemStatus.faltando]: { label: "Faltando", icon: XCircle },
-  [ValidationItemStatus.vencido]: { label: "Vencido", icon: Clock },
-  [ValidationItemStatus.divergente]: { label: "Divergente", icon: AlertCircle },
-  [ValidationItemStatus.revisar]: { label: "Revisar", icon: Info },
+  [ValidationItemStatus.ok]: { label: "Tudo certo", icon: CheckCircle2 },
+  [ValidationItemStatus.faltando]: { label: "Falta este documento", icon: XCircle },
+  [ValidationItemStatus.vencido]: { label: "Prazo vencido", icon: Clock },
+  [ValidationItemStatus.divergente]: { label: "Parece diferente", icon: AlertCircle },
+  [ValidationItemStatus.revisar]: { label: "Conferir", icon: Info },
 };
 
 export function ValidationStatusBadge({ status }: { status: ValidationItemStatus }) {

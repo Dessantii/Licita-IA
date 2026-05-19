@@ -431,7 +431,7 @@ export function MonitoramentosPage() {
             )}
           >
             <LayoutGrid className="w-4 h-4" />
-            Portal
+            Editais
             {portalData && <span className="bg-primary/10 text-primary text-xs font-semibold px-1.5 py-0.5 rounded-full">{portalData.total}</span>}
           </button>
           <button
@@ -442,7 +442,7 @@ export function MonitoramentosPage() {
             )}
           >
             <Settings2 className="w-4 h-4" />
-            Monitores
+            Meus alertas
             {monitors.length > 0 && (
               <span className="bg-slate-200 text-slate-600 text-xs font-semibold px-1.5 py-0.5 rounded-full">{monitors.length}</span>
             )}

@@ -151,11 +151,11 @@ export function ProcessDetailPage() {
   </div>
 </div>
 <div class="stats">
-  <div class="stat" style="border-color:#bbf7d0"><div class="num" style="color:#16a34a">${stats.ok}</div><div class="lbl">OK</div></div>
+  <div class="stat" style="border-color:#bbf7d0"><div class="num" style="color:#16a34a">${stats.ok}</div><div class="lbl">Tudo certo</div></div>
   <div class="stat" style="border-color:#fecaca"><div class="num" style="color:#dc2626">${stats.faltando}</div><div class="lbl">Faltando</div></div>
-  <div class="stat" style="border-color:#fed7aa"><div class="num" style="color:#ea580c">${stats.vencido}</div><div class="lbl">Vencido</div></div>
-  <div class="stat" style="border-color:#fde68a"><div class="num" style="color:#d97706">${stats.divergente}</div><div class="lbl">Divergente</div></div>
-  <div class="stat" style="border-color:#c7d2fe"><div class="num" style="color:#6366f1">${stats.revisar}</div><div class="lbl">Revisar</div></div>
+  <div class="stat" style="border-color:#fed7aa"><div class="num" style="color:#ea580c">${stats.vencido}</div><div class="lbl">Prazo vencido</div></div>
+  <div class="stat" style="border-color:#fde68a"><div class="num" style="color:#d97706">${stats.divergente}</div><div class="lbl">Parece diferente</div></div>
+  <div class="stat" style="border-color:#c7d2fe"><div class="num" style="color:#6366f1">${stats.revisar}</div><div class="lbl">Conferir</div></div>
 </div>
 <table>
   <thead>
@@ -219,14 +219,14 @@ export function ProcessDetailPage() {
     },
     {
       key: "analise",
-      label: "Análise do Edital",
+      label: "O que o edital pede",
       icon: BrainCircuit,
       badge: hasRequirements ? docReqCount : undefined,
       locked: !hasRequirements,
     },
     {
       key: "conferencia",
-      label: "Conferência",
+      label: "Verificação",
       icon: CheckSquare,
       badge: isInConference ? process.validationItems.length : undefined,
       locked: !isInConference,

@@ -38,10 +38,10 @@ export function computeProcessNextAction(process: ProcessForAction): NextAction 
   // 1. Processo sem edital
   if (status === "criado") {
     return {
-      title: "Enviar o edital do processo",
-      description: "Faça o upload do PDF do edital para que a IA extraia os requisitos automaticamente.",
+      title: "Envie o edital para começar",
+      description: "Faça o upload do PDF do edital para sabermos o que você precisa preparar.",
       urgency: "alta",
-      actionLabel: "Ir para Documentos",
+      actionLabel: "Enviar edital",
       targetId: "documentos",
     };
   }
@@ -49,8 +49,8 @@ export function computeProcessNextAction(process: ProcessForAction): NextAction 
   // 2. Edital enviado — aguardando análise
   if (status === "edital_enviado") {
     return {
-      title: "Analisar edital com IA",
-      description: "O edital foi recebido. Clique em \"Analisar Edital\" para extrair os requisitos documentais.",
+      title: "Analisar o edital",
+      description: "O edital foi recebido. Clique em \"Analisar Edital\" para identificarmos os documentos que você precisa.",
       urgency: "alta",
       actionLabel: "Analisar edital",
       targetId: "analise",
@@ -59,32 +59,32 @@ export function computeProcessNextAction(process: ProcessForAction): NextAction 
 
   if (status === "edital_processando") {
     return {
-      title: "Processando edital…",
-      description: "A IA está extraindo os requisitos. Aguarde alguns instantes.",
+      title: "Lendo o edital…",
+      description: "Estamos identificando o que você precisa preparar. Aguarde alguns instantes.",
       urgency: "baixa",
-      actionLabel: "Ver análise",
+      actionLabel: "Ver resultado",
       targetId: "analise",
     };
   }
 
-  // 3. Exigências extraídas — enviar documentos
+  // 3. Documentos identificados — enviar documentos
   if (status === "exigencias_extraidas" || status === "aguardando_documentos") {
     return {
-      title: "Enviar documentos da empresa",
-      description: `${requirements.length} ${requirements.length === 1 ? "exigência identificada" : "exigências identificadas"}. Envie os documentos para iniciar a conferência.`,
+      title: "Enviar seus documentos",
+      description: `Identificamos ${requirements.length} ${requirements.length === 1 ? "documento necessário" : "documentos necessários"}. Envie-os para verificarmos tudo.`,
       urgency: "alta",
       actionLabel: "Enviar documentos",
       targetId: "documentos",
     };
   }
 
-  // 4. Documentos enviados — iniciar conferência
+  // 4. Documentos enviados — iniciar verificação
   if (status === "documentos_enviados") {
     return {
-      title: "Iniciar conferência documental",
-      description: "Documentos recebidos. Execute a conferência automática para verificar pendências.",
+      title: "Verificar os documentos",
+      description: "Documentos recebidos. Clique em verificar para sabermos se está tudo certo.",
       urgency: "alta",
-      actionLabel: "Conferir documentos",
+      actionLabel: "Verificar agora",
       targetId: "documentos",
     };
   }
@@ -105,10 +105,10 @@ export function computeProcessNextAction(process: ProcessForAction): NextAction 
     if (faltando.length > 0) {
       const first = faltando.find((v) => v.requirement?.mandatory) ?? faltando[0];
       return {
-        title: `Documento ausente: ${first.requirement?.title ?? "item obrigatório"}`,
-        description: `${plural(faltando.length, "documento faltando", "documentos faltando")}. Resolva antes do protocolo.`,
+        title: `Falta um documento: ${first.requirement?.title ?? "documento obrigatório"}`,
+        description: `${plural(faltando.length, "documento faltando", "documentos faltando")}. Resolva antes de enviar.`,
         urgency: "alta",
-        actionLabel: "Ver checklist",
+        actionLabel: "Ver lista",
         targetId: "conferencia",
       };
     }
@@ -117,10 +117,10 @@ export function computeProcessNextAction(process: ProcessForAction): NextAction 
     if (vencido.length > 0) {
       const first = vencido[0];
       return {
-        title: `Documento vencido: ${first.requirement?.title ?? "certidão"}`,
-        description: `${plural(vencido.length, "documento vencido", "documentos vencidos")}. Renove e reenvie antes do protocolo.`,
+        title: `Prazo vencido: ${first.requirement?.title ?? "certidão"}`,
+        description: `${plural(vencido.length, "documento com prazo vencido", "documentos com prazo vencido")}. Renove e reenvie antes de participar.`,
         urgency: "alta",
-        actionLabel: "Ver checklist",
+        actionLabel: "Ver lista",
         targetId: "conferencia",
       };
     }
@@ -128,10 +128,10 @@ export function computeProcessNextAction(process: ProcessForAction): NextAction 
     // Prioridade 3 — divergências
     if (divergente.length > 0) {
       return {
-        title: "Verificar divergência documental",
-        description: `${plural(divergente.length, "documento com dados inconsistentes", "documentos com dados inconsistentes")}.`,
+        title: "Documento parece diferente do solicitado",
+        description: `${plural(divergente.length, "documento com informação diferente do pedido", "documentos com informação diferente do pedido")}.`,
         urgency: "media",
-        actionLabel: "Ver checklist",
+        actionLabel: "Ver lista",
         targetId: "conferencia",
       };
     }
@@ -139,18 +139,18 @@ export function computeProcessNextAction(process: ProcessForAction): NextAction 
     // Prioridade 4 — revisão manual
     if (revisar.length > 0) {
       return {
-        title: `Revisão manual necessária`,
-        description: `${plural(revisar.length, "item marcado para revisão humana", "itens marcados para revisão humana")}.`,
+        title: `Precisamos que você confira`,
+        description: `${plural(revisar.length, "item que precisa de uma olhada sua", "itens que precisam de uma olhada sua")}.`,
         urgency: "baixa",
-        actionLabel: "Revisar itens",
+        actionLabel: "Conferir itens",
         targetId: "conferencia",
       };
     }
 
     // Prioridade 5 — tudo ok
     return {
-      title: "Processo pronto para protocolo",
-      description: "Todos os documentos foram conferidos. Gere o relatório e protocole.",
+      title: "Tudo certo — pronto para enviar",
+      description: "Todos os documentos estão em ordem. Gere o relatório e envie ao órgão.",
       urgency: "concluido",
       actionLabel: "Gerar relatório",
       targetId: "conferencia",
@@ -195,8 +195,8 @@ export function computeChamamentoNextAction(notice: ChamamentoForAction): NextAc
 
   if (status === "edital_enviado") {
     return {
-      title: "Analisar edital com IA",
-      description: "O edital foi recebido. Clique em \"Analisar Edital\" para extrair os requisitos da OSC.",
+      title: "Analisar o edital",
+      description: "O edital foi recebido. Clique em \"Analisar Edital\" para saber o que a organização precisa preparar.",
       urgency: "alta",
       actionLabel: "Analisar edital",
       targetId: "requisitos",
@@ -205,18 +205,18 @@ export function computeChamamentoNextAction(notice: ChamamentoForAction): NextAc
 
   if (status === "edital_processando") {
     return {
-      title: "Processando edital…",
-      description: "A IA está extraindo os requisitos do chamamento. Aguarde.",
+      title: "Lendo o edital…",
+      description: "Estamos identificando o que precisa ser preparado. Aguarde.",
       urgency: "baixa",
-      actionLabel: "Aguardar",
+      actionLabel: "Ver resultado",
       targetId: "requisitos",
     };
   }
 
   if (status === "requisitos_extraidos" || status === "aguardando_documentos") {
     return {
-      title: "Enviar documentos da OSC",
-      description: `${requirements.length} ${requirements.length === 1 ? "requisito identificado" : "requisitos identificados"}. Envie os documentos para conferência.`,
+      title: "Enviar os documentos",
+      description: `Identificamos ${requirements.length} ${requirements.length === 1 ? "documento necessário" : "documentos necessários"}. Envie-os para verificarmos tudo.`,
       urgency: "alta",
       actionLabel: "Enviar documentos",
       targetId: "documentos",
@@ -225,10 +225,10 @@ export function computeChamamentoNextAction(notice: ChamamentoForAction): NextAc
 
   if (status === "documentos_enviados") {
     return {
-      title: "Conferir documentos da OSC",
-      description: "Documentos recebidos. Execute a conferência automática.",
+      title: "Verificar os documentos",
+      description: "Documentos recebidos. Clique em verificar para sabermos se está tudo certo.",
       urgency: "alta",
-      actionLabel: "Conferir agora",
+      actionLabel: "Verificar agora",
       targetId: "documentos",
     };
   }
@@ -248,56 +248,56 @@ export function computeChamamentoNextAction(notice: ChamamentoForAction): NextAc
     if (pendente.length > 0) {
       const first = pendente[0];
       return {
-        title: `Documento pendente: ${first.requirement?.title ?? "item obrigatório"}`,
-        description: `${plural(pendente.length, "requisito sem documento", "requisitos sem documento")}.`,
+        title: `Falta um documento: ${first.requirement?.title ?? "documento obrigatório"}`,
+        description: `${plural(pendente.length, "documento faltando", "documentos faltando")}.`,
         urgency: "alta",
-        actionLabel: "Ver checklist",
+        actionLabel: "Ver lista",
         targetId: "checklist",
       };
     }
     if (vencido.length > 0) {
       const first = vencido[0];
       return {
-        title: `Documento vencido: ${first.requirement?.title ?? "certidão"}`,
-        description: `${plural(vencido.length, "documento com prazo expirado", "documentos com prazo expirado")}.`,
+        title: `Prazo vencido: ${first.requirement?.title ?? "certidão"}`,
+        description: `${plural(vencido.length, "documento com prazo vencido", "documentos com prazo vencido")}.`,
         urgency: "alta",
-        actionLabel: "Ver checklist",
+        actionLabel: "Ver lista",
         targetId: "checklist",
       };
     }
     if (incompleto.length > 0) {
       return {
-        title: "Completar documentação parcial",
-        description: `${plural(incompleto.length, "documento enviado incompleto", "documentos enviados incompletos")}.`,
+        title: "Documento enviado incompleto",
+        description: `${plural(incompleto.length, "documento incompleto", "documentos incompletos")}. Reenvie a versão completa.`,
         urgency: "media",
-        actionLabel: "Ver checklist",
+        actionLabel: "Ver lista",
         targetId: "checklist",
       };
     }
     if (divergente.length > 0) {
       return {
-        title: "Verificar divergência nos documentos",
-        description: `${plural(divergente.length, "documento com dados inconsistentes", "documentos com dados inconsistentes")}.`,
+        title: "Documento parece diferente do solicitado",
+        description: `${plural(divergente.length, "documento com informação diferente do pedido", "documentos com informação diferente do pedido")}.`,
         urgency: "media",
-        actionLabel: "Ver checklist",
+        actionLabel: "Ver lista",
         targetId: "checklist",
       };
     }
     if (revisar.length > 0) {
       return {
-        title: "Revisão manual necessária",
-        description: `${plural(revisar.length, "item requer verificação humana", "itens requerem verificação humana")}.`,
+        title: "Precisamos que você confira",
+        description: `${plural(revisar.length, "item que precisa de uma olhada sua", "itens que precisam de uma olhada sua")}.`,
         urgency: "baixa",
-        actionLabel: "Revisar itens",
+        actionLabel: "Conferir itens",
         targetId: "checklist",
       };
     }
 
     return {
-      title: "Documentação completa — pronta para submissão",
-      description: "Todos os requisitos foram atendidos. Submeta a proposta ao órgão.",
+      title: "Tudo certo — pronto para enviar",
+      description: "Todos os documentos estão em ordem. Envie a proposta ao órgão.",
       urgency: "concluido",
-      actionLabel: "Ver conferência",
+      actionLabel: "Ver verificação",
       targetId: "checklist",
     };
   }

@@ -20,28 +20,28 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 const PROCESS_STATUS: Record<string, { label: string; color: string }> = {
-  criado: { label: "Criado", color: "bg-slate-100 text-slate-600" },
-  edital_enviado: { label: "Edital Enviado", color: "bg-blue-100 text-blue-700" },
-  edital_processando: { label: "Processando", color: "bg-blue-100 text-blue-700" },
-  exigencias_extraidas: { label: "Exigências Extraídas", color: "bg-indigo-100 text-indigo-700" },
-  aguardando_documentos: { label: "Aguardando Docs", color: "bg-yellow-100 text-yellow-700" },
-  documentos_enviados: { label: "Docs Enviados", color: "bg-orange-100 text-orange-700" },
-  em_conferencia: { label: "Em Conferência", color: "bg-purple-100 text-purple-700" },
-  pendencias_encontradas: { label: "Com Pendências", color: "bg-red-100 text-red-700" },
-  pronto_para_revisao: { label: "Pronto p/ Revisão", color: "bg-emerald-100 text-emerald-700" },
+  criado: { label: "Iniciado", color: "bg-slate-100 text-slate-600" },
+  edital_enviado: { label: "Edital recebido", color: "bg-blue-100 text-blue-700" },
+  edital_processando: { label: "Lendo o edital...", color: "bg-blue-100 text-blue-700" },
+  exigencias_extraidas: { label: "Documentos identificados", color: "bg-indigo-100 text-indigo-700" },
+  aguardando_documentos: { label: "Aguardando documentos", color: "bg-yellow-100 text-yellow-700" },
+  documentos_enviados: { label: "Documentos enviados", color: "bg-orange-100 text-orange-700" },
+  em_conferencia: { label: "Verificando documentos", color: "bg-purple-100 text-purple-700" },
+  pendencias_encontradas: { label: "Tem algo para resolver", color: "bg-red-100 text-red-700" },
+  pronto_para_revisao: { label: "Pronto para revisar", color: "bg-emerald-100 text-emerald-700" },
   concluido: { label: "Concluído", color: "bg-green-100 text-green-700" },
 };
 
 const CALL_STATUS: Record<string, { label: string; color: string }> = {
-  criado: { label: "Criado", color: "bg-slate-100 text-slate-600" },
-  edital_enviado: { label: "Edital Enviado", color: "bg-blue-100 text-blue-700" },
-  edital_processando: { label: "Processando", color: "bg-blue-100 text-blue-700" },
-  requisitos_extraidos: { label: "Requisitos Extraídos", color: "bg-indigo-100 text-indigo-700" },
-  aguardando_documentos: { label: "Aguardando Docs", color: "bg-yellow-100 text-yellow-700" },
-  documentos_enviados: { label: "Docs Enviados", color: "bg-orange-100 text-orange-700" },
-  em_conferencia: { label: "Em Conferência", color: "bg-purple-100 text-purple-700" },
-  pendencias_encontradas: { label: "Com Pendências", color: "bg-red-100 text-red-700" },
-  pronto_para_submissao: { label: "Pronto p/ Submissão", color: "bg-emerald-100 text-emerald-700" },
+  criado: { label: "Iniciado", color: "bg-slate-100 text-slate-600" },
+  edital_enviado: { label: "Edital recebido", color: "bg-blue-100 text-blue-700" },
+  edital_processando: { label: "Lendo o edital...", color: "bg-blue-100 text-blue-700" },
+  requisitos_extraidos: { label: "Documentos identificados", color: "bg-indigo-100 text-indigo-700" },
+  aguardando_documentos: { label: "Aguardando documentos", color: "bg-yellow-100 text-yellow-700" },
+  documentos_enviados: { label: "Documentos enviados", color: "bg-orange-100 text-orange-700" },
+  em_conferencia: { label: "Verificando documentos", color: "bg-purple-100 text-purple-700" },
+  pendencias_encontradas: { label: "Tem algo para resolver", color: "bg-red-100 text-red-700" },
+  pronto_para_submissao: { label: "Pronto para enviar", color: "bg-emerald-100 text-emerald-700" },
   concluido: { label: "Concluído", color: "bg-green-100 text-green-700" },
 };
 
@@ -254,7 +254,7 @@ export function EmpresaDetailPage() {
 
   const tabs: { id: TabId; label: string; icon: any; badge?: number | string }[] = [
     { id: "dados", label: "Dados", icon: Building2 },
-    { id: "regularidade", label: "Regularidade", icon: ShieldCheck, badge: hasExpiring ? "!" : undefined },
+    { id: "regularidade", label: "Certidões", icon: ShieldCheck, badge: hasExpiring ? "!" : undefined },
     { id: "certificado", label: "Certificado Digital", icon: Award },
     { id: "financeiro", label: "Financeiro", icon: BarChart3 },
     { id: "processos", label: "Licitações", icon: FileText, badge: company.processes.length },
@@ -342,7 +342,7 @@ export function EmpresaDetailPage() {
           />
         </div>
         {completeness < 100 && (
-          <p className="text-xs text-slate-400 mt-1.5">Complete os dados de regularidade, endereço e financeiro para habilitar a empresa para licitações.</p>
+          <p className="text-xs text-slate-400 mt-1.5">Complete o endereço, as certidões e os dados financeiros para estar pronto para participar de editais.</p>
         )}
       </div>
 
@@ -393,7 +393,7 @@ export function EmpresaDetailPage() {
 
           {/* Dados jurídicos */}
           <Card className="p-5">
-            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 className="w-4 h-4 text-slate-400" />Dados Jurídicos</h3>
+            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 className="w-4 h-4 text-slate-400" />Dados da empresa</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Razão Social *" className="md:col-span-2">
                 {editing ? <input className={inputCls} value={form.razaoSocial ?? ""} onChange={e => setF("razaoSocial", e.target.value)} /> : <p className="text-sm text-slate-800 font-medium">{company.razaoSocial || "—"}</p>}

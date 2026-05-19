@@ -50,7 +50,7 @@ export function ProcessChecklistPage() {
         </Link>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900">Checklist e Conferência</h1>
+            <h1 className="text-3xl font-display font-bold text-slate-900">Lista de documentos</h1>
             <p className="text-slate-600 mt-1 font-medium">{process.title}</p>
           </div>
           {process.report && (
@@ -64,12 +64,12 @@ export function ProcessChecklistPage() {
 
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-6">
-        <StatCard label="Total" count={stats.total} color="bg-slate-100 text-slate-800" onClick={() => setFilter('all')} active={filter === 'all'} />
-        <StatCard label="Conforme" count={stats.ok} color="bg-emerald-100 text-emerald-800 border-emerald-200" onClick={() => setFilter(ValidationItemStatus.ok)} active={filter === ValidationItemStatus.ok} icon={CheckCircle2} />
-        <StatCard label="Faltando" count={stats.faltando} color="bg-red-100 text-red-800 border-red-200" onClick={() => setFilter(ValidationItemStatus.faltando)} active={filter === ValidationItemStatus.faltando} icon={XCircle} />
-        <StatCard label="Vencido" count={stats.vencido} color="bg-orange-100 text-orange-800 border-orange-200" onClick={() => setFilter(ValidationItemStatus.vencido)} active={filter === ValidationItemStatus.vencido} icon={Clock} />
-        <StatCard label="Divergente" count={stats.divergente} color="bg-amber-100 text-amber-800 border-amber-200" onClick={() => setFilter(ValidationItemStatus.divergente)} active={filter === ValidationItemStatus.divergente} icon={AlertCircle} />
-        <StatCard label="Revisar" count={stats.revisar} color="bg-blue-100 text-blue-800 border-blue-200" onClick={() => setFilter(ValidationItemStatus.revisar)} active={filter === ValidationItemStatus.revisar} icon={Info} />
+        <StatCard label="Todos" count={stats.total} color="bg-slate-100 text-slate-800" onClick={() => setFilter('all')} active={filter === 'all'} />
+        <StatCard label="Tudo certo" count={stats.ok} color="bg-emerald-100 text-emerald-800 border-emerald-200" onClick={() => setFilter(ValidationItemStatus.ok)} active={filter === ValidationItemStatus.ok} icon={CheckCircle2} />
+        <StatCard label="Falta enviar" count={stats.faltando} color="bg-red-100 text-red-800 border-red-200" onClick={() => setFilter(ValidationItemStatus.faltando)} active={filter === ValidationItemStatus.faltando} icon={XCircle} />
+        <StatCard label="Prazo vencido" count={stats.vencido} color="bg-orange-100 text-orange-800 border-orange-200" onClick={() => setFilter(ValidationItemStatus.vencido)} active={filter === ValidationItemStatus.vencido} icon={Clock} />
+        <StatCard label="Parece diferente" count={stats.divergente} color="bg-amber-100 text-amber-800 border-amber-200" onClick={() => setFilter(ValidationItemStatus.divergente)} active={filter === ValidationItemStatus.divergente} icon={AlertCircle} />
+        <StatCard label="Conferir" count={stats.revisar} color="bg-blue-100 text-blue-800 border-blue-200" onClick={() => setFilter(ValidationItemStatus.revisar)} active={filter === ValidationItemStatus.revisar} icon={Info} />
       </div>
 
       <Card className="overflow-hidden">
@@ -78,7 +78,7 @@ export function ProcessChecklistPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Buscar exigência..." 
+              placeholder="Buscar documento..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
@@ -94,10 +94,10 @@ export function ProcessChecklistPage() {
           <table className="w-full text-sm text-left border-collapse">
             <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider text-xs border-b">
               <tr>
-                <th className="p-4">Status</th>
-                <th className="p-4 w-1/2">Exigência (Edital)</th>
-                <th className="p-4">Documento Apresentado</th>
-                <th className="p-4 text-center">Ação</th>
+                <th className="p-4">Situação</th>
+                <th className="p-4 w-1/2">O que o edital pede</th>
+                <th className="p-4">Documento enviado</th>
+                <th className="p-4 text-center">Ajustar</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -111,7 +111,7 @@ export function ProcessChecklistPage() {
                     </td>
                     <td className="p-4 align-top">
                       <div className="flex items-start gap-2">
-                        {item.requirement.mandatory && <span className="shrink-0 bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded">OBRIGATÓRIO</span>}
+                        {item.requirement.mandatory && <span className="shrink-0 bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded">NECESSÁRIO</span>}
                         <div>
                           <p className="font-bold text-slate-900 leading-snug">{item.requirement.title}</p>
                           {item.requirement.description && <p className="text-slate-600 mt-1 text-xs leading-relaxed">{item.requirement.description}</p>}

@@ -21,10 +21,10 @@ export interface ReadinessResult {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const CATEGORY_LABELS: Record<ReadinessCategory, string> = {
-  incompleto: "Incompleto",
-  em_andamento: "Em andamento",
-  quase_pronto: "Quase pronto",
-  pronto: "Pronto para envio",
+  incompleto: "Ainda falta bastante",
+  em_andamento: "Em progresso",
+  quase_pronto: "Quase lá",
+  pronto: "Pronto para participar",
 };
 
 function getCategory(score: number): ReadinessCategory {

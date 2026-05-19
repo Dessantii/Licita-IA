@@ -37,42 +37,42 @@ const CATEGORY_CONFIG: Record<
   { label: string; icon: React.ElementType; color: string; bgColor: string; borderColor: string }
 > = {
   habilitacao_juridica: {
-    label: "Habilitação Jurídica",
+    label: "Documentos da empresa",
     icon: Building2,
     color: "text-blue-700",
     bgColor: "bg-blue-50",
     borderColor: "border-blue-200",
   },
   habilitacao_fiscal: {
-    label: "Habilitação Fiscal e Trabalhista",
+    label: "Impostos e contribuições em dia",
     icon: Receipt,
     color: "text-orange-700",
     bgColor: "bg-orange-50",
     borderColor: "border-orange-200",
   },
   habilitacao_financeira: {
-    label: "Habilitação Econômico-Financeira",
+    label: "Situação financeira",
     icon: TrendingUp,
     color: "text-green-700",
     bgColor: "bg-green-50",
     borderColor: "border-green-200",
   },
   qualificacao_tecnica: {
-    label: "Qualificação Técnica",
+    label: "Experiência comprovada",
     icon: Wrench,
     color: "text-purple-700",
     bgColor: "bg-purple-50",
     borderColor: "border-purple-200",
   },
   documentacao_complementar: {
-    label: "Documentação Complementar",
+    label: "Documentos adicionais",
     icon: Paperclip,
     color: "text-slate-700",
     bgColor: "bg-slate-50",
     borderColor: "border-slate-200",
   },
   proposta: {
-    label: "Proposta Comercial",
+    label: "Proposta de preço",
     icon: FileText,
     color: "text-indigo-700",
     bgColor: "bg-indigo-50",
@@ -279,7 +279,7 @@ export function RequirementsReviewPanel({ requirements }: { requirements: Requir
           <div className="flex items-center gap-2 mb-3">
             <Info className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
-              Informações Principais
+              Resumo do edital
             </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -295,11 +295,11 @@ export function RequirementsReviewPanel({ requirements }: { requirements: Requir
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
-              Exigências Documentais
+              Documentos necessários
             </h3>
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <span className="bg-slate-100 px-2 py-0.5 rounded-full">{docRequirements.length} exigências</span>
+            <span className="bg-slate-100 px-2 py-0.5 rounded-full">{docRequirements.length} documentos</span>
             {totalReview > 0 && (
               <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
