@@ -55,6 +55,7 @@ interface PriceResearch {
   maxPrice: number | null;
   suggestedMin: number | null;
   suggestedMax: number | null;
+  aiSource?: boolean;
 }
 
 interface ProposalDraft {
@@ -184,6 +185,7 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
   const [section, setSection] = useState<"pesquisa" | "proposta" | "gerar">("pesquisa");
   const [searchLoading, setSearchLoading] = useState(false);
   const [research, setResearch] = useState<PriceResearch | null>(null);
+  const [customKeywords, setCustomKeywords] = useState("");
   const [draft, setDraft] = useState<ProposalDraft>({});
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -275,7 +277,7 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
       const res = await fetch(`${apiBase}/api/processes/${process.id}/proposal/search-prices`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ customKeywords: customKeywords.trim() || undefined }),
       });
       if (res.ok) {
         const data = await res.json() as PriceResearch;
@@ -288,7 +290,7 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
     } finally {
       setSearchLoading(false);
     }
-  }, [apiBase, process.id, token, toast]);
+  }, [apiBase, process.id, token, customKeywords, toast]);
 
   const handleSaveDraft = useCallback(async () => {
     setSaving(true);
@@ -422,17 +424,36 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
                     {showResearchExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* Keyword input — always visible */}
+            <div className="px-5 py-4" style={{ borderBottom: "1px solid #E8EFF6" }}>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                Termos de busca <span className="font-normal text-slate-400">(opcional — IA extrai automaticamente do título)</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customKeywords}
+                  onChange={e => setCustomKeywords(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !searchLoading) handleSearchPrices(); }}
+                  placeholder='Ex: "caneta esferográfica", "notebook i5", "vigilância armada"'
+                  className="flex-1 rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  style={{ borderColor: "#D1E3F6", background: "#F8FAFD" }}
+                />
                 <Button
                   onClick={handleSearchPrices}
                   disabled={searchLoading}
                   size="sm"
-                  className="gap-2 text-white"
+                  className="gap-2 text-white shrink-0"
                   style={{ background: "#0066FF" }}
                 >
-                  {searchLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  {research ? "Atualizar" : "Buscar preços"}
+                  {searchLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                  Buscar
                 </Button>
               </div>
+              <p className="text-xs text-slate-400 mt-1.5">Separe múltiplos termos com vírgula. Deixe vazio para deixar a IA decidir.</p>
             </div>
 
             {!research && !searchLoading && (
@@ -440,11 +461,8 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
                 <Search className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                 <p className="text-sm font-semibold text-slate-500 mb-1">Pesquise referências de preço no PNCP</p>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  O sistema busca contratos similares dos últimos 24 meses para você ter uma referência antes de definir seu preço.
+                  O sistema busca contratos similares dos últimos 12 meses para você ter uma referência antes de definir seu preço.
                 </p>
-                <Button onClick={handleSearchPrices} className="mt-4 gap-2 text-white" style={{ background: "#0066FF" }}>
-                  <Sparkles className="w-4 h-4" /> Buscar agora com IA
-                </Button>
               </div>
             )}
 
@@ -505,7 +523,11 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
                 <div className="rounded-xl p-5" style={{ background: "#F0F9FF", border: "1px solid #BAE6FD" }}>
                   <div className="flex items-center gap-2 mb-3">
                     <BarChart3 className="w-4 h-4 text-blue-600" />
-                    <p className="text-sm font-bold text-blue-900">Análise dos últimos 24 meses</p>
+                    <p className="text-sm font-bold text-blue-900">
+                      {research.aiSource !== false && research.results.length === 0
+                        ? "Estimativa IA — dados históricos de compras públicas"
+                        : "Análise — contratos dos últimos 12 meses (PNCP)"}
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     {[

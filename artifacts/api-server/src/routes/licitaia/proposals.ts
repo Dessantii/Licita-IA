@@ -51,21 +51,30 @@ function calculateTaxRate(porte: string | null | undefined): number {
 
 // ── PNCP price search ────────────────────────────────────────────────────────
 
+const PNCP_BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+  "Referer": "https://pncp.gov.br/",
+  "Origin": "https://pncp.gov.br",
+};
+
 async function searchPNCPContracts(keywords: string[], _uf?: string | null) {
+  // PNCP rejects ranges > 365 days — use last 12 months
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setFullYear(startDate.getFullYear() - 2);
+  startDate.setMonth(startDate.getMonth() - 12);
   const fmtDate = (d: Date) =>
     `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 
   const baseUrl = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao";
-  // codigoModalidadeContratacao: 6=Pregão Eletrônico, 8=Dispensa, 5=Concorrência, 4=RDC
+  // codigoModalidadeContratacao: 6=Pregão Eletrônico, 8=Dispensa, 5=Concorrência
   const modalities = ["6", "8", "5"];
-  const kw = keywords.map(k => k.toLowerCase());
+  const kw = keywords.map(k => k.toLowerCase().trim()).filter(Boolean);
   let allItems: unknown[] = [];
 
   for (const mod of modalities) {
-    if (allItems.length >= 20) break;
+    if (allItems.length >= 10) break;
     const params = new URLSearchParams({
       dataInicial: fmtDate(startDate),
       dataFinal: fmtDate(endDate),
@@ -78,18 +87,19 @@ async function searchPNCPContracts(keywords: string[], _uf?: string | null) {
     try {
       const res = await fetch(`${baseUrl}?${params}`, {
         signal: controller.signal,
-        headers: { "Accept": "application/json", "User-Agent": "LicitaIA/1.0" },
+        headers: PNCP_BROWSER_HEADERS,
       });
       clearTimeout(timeout);
       if (!res.ok) continue;
       const data = await res.json() as { data?: unknown[] };
       const items: unknown[] = Array.isArray(data?.data) ? data.data : [];
+      // Match any keyword using partial, case-insensitive search
       const filtered = items.filter((item: unknown) => {
         const i = item as Record<string, unknown>;
         const desc = String(i.objetoCompra ?? "").toLowerCase();
         return kw.some(k => desc.includes(k));
       });
-      allItems = allItems.concat(filtered.slice(0, 10));
+      allItems = allItems.concat(filtered);
     } catch {
       clearTimeout(timeout);
     }
@@ -226,25 +236,45 @@ router.post("/processes/:id/proposal/search-prices", async (req, res) => {
   }
 
   const title = process.title ?? "";
+  const notes = process.notes ?? "";
   const estimatedValue = (process as Record<string, unknown>).estimatedValue as string | null ?? null;
+  const { customKeywords } = req.body as { customKeywords?: string };
 
-  // 1. Extract keywords via AI
+  // 1. Extract keywords — user-supplied override takes priority
   let keywords: string[] = [];
-  try {
-    const kwCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{
-        role: "user",
-        content: `Extraia 2-3 palavras-chave principais do objeto de licitação abaixo para busca de preços de mercado. Retorne APENAS um array JSON de strings, sem texto adicional.\nObjeto: "${title}"`,
-      }],
-      temperature: 0.1,
-      max_tokens: 100,
-    });
-    const raw = kwCompletion.choices[0]?.message?.content?.trim() ?? "[]";
-    const match = raw.match(/\[.*?\]/s);
-    keywords = match ? JSON.parse(match[0]) : [title.split(" ").slice(0, 3).join(" ")];
-  } catch {
-    keywords = [title.split(" ").slice(0, 3).join(" ")];
+  if (customKeywords && customKeywords.trim()) {
+    // Split by comma or semicolon for multiple terms
+    keywords = customKeywords.split(/[,;]+/).map(k => k.trim()).filter(Boolean);
+  } else {
+    try {
+      const kwCompletion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{
+          role: "user",
+          content: `Você é um especialista em licitações públicas brasileiras.
+Analise o objeto de licitação abaixo e extraia 3-5 palavras-chave do produto ou serviço real que está sendo contratado.
+Foque no PRODUTO ou SERVIÇO concreto (ex: "caneta esferográfica", "notebook", "limpeza", "vigilância"), NÃO termos burocráticos como "aquisição", "contratação", "fornecimento".
+Retorne SOMENTE um array JSON de strings em português. Sem texto adicional.
+
+Título: "${title}"
+Descrição adicional: "${notes}"`,
+        }],
+        temperature: 0.1,
+        max_tokens: 120,
+      });
+      const raw = kwCompletion.choices[0]?.message?.content?.trim() ?? "[]";
+      const match = raw.match(/\[[\s\S]*?\]/);
+      keywords = match ? (JSON.parse(match[0]) as string[]).filter(k => typeof k === "string" && k.trim()) : [];
+    } catch {
+      // fallback: strip common bureaucratic words and use what's left
+    }
+    if (keywords.length === 0) {
+      const stopWords = new Set(["aquisição", "contratação", "fornecimento", "serviço", "de", "do", "da", "dos", "das", "e", "para", "com", "por", "pregão", "eletrônico", "dispensa"]);
+      keywords = title.split(/\s+/)
+        .map(w => w.toLowerCase().replace(/[^a-záéíóúâêîôûãõç]/gi, ""))
+        .filter(w => w.length > 3 && !stopWords.has(w))
+        .slice(0, 4);
+    }
   }
 
   // 2. Search PNCP
@@ -257,46 +287,68 @@ router.post("/processes/:id/proposal/search-prices", async (req, res) => {
   let avgPrice = null as number | null;
   let minPrice = null as number | null;
   let maxPrice = null as number | null;
+  let aiSource = false;
 
-  if (pncpResults.length > 0) {
-    try {
-      const analysisCompletion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{
-          role: "user",
-          content: `Analise estes contratos públicos similares e forneça insights de preço.
-Retorne JSON com exatamente estas chaves: { "insight": "texto em 1-2 frases", "suggested_min": número, "suggested_max": número, "avg_price": número, "min_price": número, "max_price": número }
-Se não conseguir calcular um valor, use null.
-Contratos encontrados: ${JSON.stringify(pncpResults.slice(0, 5))}
+  // 3. AI analysis — always runs, uses PNCP data when available, own knowledge otherwise
+  try {
+    const hasPncp = pncpResults.length > 0;
+    const pncpContext = hasPncp
+      ? `Contratos similares encontrados no PNCP:\n${JSON.stringify(pncpResults.slice(0, 5), null, 2)}\n`
+      : "Nenhum contrato similar foi recuperado do PNCP nesta consulta. Use seu conhecimento de compras públicas brasileiras.\n";
+
+    const analysisCompletion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "system",
+        content: "Você é um especialista em compras públicas brasileiras com amplo conhecimento dos preços praticados em licitações do governo federal, estadual e municipal. Você conhece os valores históricos de contratos publicados no PNCP, Comprasnet, BEC-SP e outros portais de transparência.",
+      }, {
+        role: "user",
+        content: `Analise o objeto de licitação abaixo e forneça estimativas de preço realistas para compras públicas no Brasil.
+
+Objeto da licitação: "${title}"
+${notes ? `Descrição adicional: "${notes}"\n` : ""}Termos de busca: ${keywords.join(", ")}
 Estimativa do órgão: R$ ${estimatedValue ?? "não informada"}
-Palavras-chave usadas: ${keywords.join(", ")}`,
-        }],
-        temperature: 0.2,
-        max_tokens: 400,
-      });
-      const raw = analysisCompletion.choices[0]?.message?.content?.trim() ?? "{}";
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) {
-        const parsed = JSON.parse(match[0]) as {
-          insight?: string;
-          suggested_min?: number | null;
-          suggested_max?: number | null;
-          avg_price?: number | null;
-          min_price?: number | null;
-          max_price?: number | null;
-        };
-        insight = parsed.insight ?? "";
-        suggestedMin = parsed.suggested_min ?? null;
-        suggestedMax = parsed.suggested_max ?? null;
-        avgPrice = parsed.avg_price ?? null;
-        minPrice = parsed.min_price ?? null;
-        maxPrice = parsed.max_price ?? null;
-      }
-    } catch {
-      insight = `Encontrados ${pncpResults.length} contratos similares. Analise os valores para definir seu lance.`;
+
+${pncpContext}
+Com base ${hasPncp ? "nos contratos acima e" : "no"} seu conhecimento de preços praticados em compras públicas brasileiras para este tipo de item/serviço, retorne APENAS um JSON com estas chaves:
+{
+  "insight": "análise em 2 frases sobre o mercado e preço recomendado",
+  "suggested_min": preço mínimo competitivo em reais (número),
+  "suggested_max": preço máximo razoável em reais (número),
+  "avg_price": preço médio de mercado em reais (número),
+  "min_price": menor valor encontrado/estimado (número),
+  "max_price": maior valor encontrado/estimado (número),
+  "source": "pncp" ou "ia"
+}
+Use null apenas se for absolutamente impossível estimar. Valores devem ser o total do contrato/lote, não unitários.`,
+      }],
+      temperature: 0.2,
+      max_tokens: 500,
+    });
+    const raw = analysisCompletion.choices[0]?.message?.content?.trim() ?? "{}";
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]) as {
+        insight?: string;
+        suggested_min?: number | null;
+        suggested_max?: number | null;
+        avg_price?: number | null;
+        min_price?: number | null;
+        max_price?: number | null;
+        source?: string;
+      };
+      insight = parsed.insight ?? "";
+      suggestedMin = parsed.suggested_min ?? null;
+      suggestedMax = parsed.suggested_max ?? null;
+      avgPrice = parsed.avg_price ?? null;
+      minPrice = parsed.min_price ?? null;
+      maxPrice = parsed.max_price ?? null;
+      aiSource = (parsed.source ?? "ia") !== "pncp";
     }
-  } else {
-    insight = "Nenhum contrato similar encontrado no PNCP para os termos pesquisados. Consulte o Painel de Preços do governo federal para referências de mercado.";
+  } catch {
+    insight = pncpResults.length > 0
+      ? `Encontrados ${pncpResults.length} contratos similares no PNCP. Analise os valores para definir seu preço.`
+      : "Não foi possível gerar análise de preços neste momento. Consulte o Painel de Preços do governo federal.";
   }
 
   // 4. Save research
@@ -324,6 +376,7 @@ Palavras-chave usadas: ${keywords.join(", ")}`,
     maxPrice,
     suggestedMin,
     suggestedMax,
+    aiSource,
     research,
   });
 });
