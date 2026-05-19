@@ -403,24 +403,45 @@ export function MonitoramentosPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-display font-bold text-slate-900">Portal de Licitações</h1>
-            <p className="text-slate-500 mt-1 text-sm">Editais monitorados via PNCP · Atualização automática a cada 2h</p>
+      <div className="px-8 py-8 space-y-6">
+
+        {/* Page Header */}
+        <div>
+          <div className="flex items-center gap-1 text-sm mb-2" style={{ color: '#94a3b8' }}>
+            LicitaIA <ChevronRight className="w-3.5 h-3.5" /> Alertas
           </div>
-          <div className="flex items-center gap-2">
-            {tab === "monitores" && (
-              <button
-                onClick={() => setShowForm(v => !v)}
-                className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition"
-              >
-                <Plus className="w-4 h-4" />
-                Novo monitor
-              </button>
-            )}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Alertas de Editais</h1>
+              <p className="text-sm text-slate-500 mt-1">Monitoramento automático via PNCP · Atualização a cada 2h</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {tab === "monitores" && (
+                <button
+                  onClick={() => setShowForm(v => !v)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition hover:opacity-90"
+                  style={{ backgroundColor: '#0066FF' }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Novo alerta
+                </button>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Contextual tip — no monitors yet */}
+        {monitors.length === 0 && tab === "monitores" && (
+          <div className="rounded-xl p-5 flex items-start gap-4" style={{ backgroundColor: '#F0F4FF', border: '1px solid #DDEAFF' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#E5F0FF' }}>
+              <Bell className="w-5 h-5" style={{ color: '#0066FF' }} />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">Configure seu primeiro alerta</p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">Diga palavras do seu negócio (ex: "tecnologia", "limpeza", "construção") e o sistema busca editais no Portal Nacional de Contratações Públicas automaticamente.</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
           <button
@@ -482,8 +503,8 @@ export function MonitoramentosPage() {
                   </div>
                 </div>
                 <div className="bg-white border border-border rounded-xl p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center">
-                    <Activity className="w-5 h-5 text-violet-600" />
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#E5F0FF' }}>
+                    <Activity className="w-5 h-5" style={{ color: '#0066FF' }} />
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-slate-900">{monitors.filter(m => m.isActive).length}</p>

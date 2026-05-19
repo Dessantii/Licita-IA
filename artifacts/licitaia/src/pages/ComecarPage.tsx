@@ -124,17 +124,17 @@ export function ComecarPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+      <div className="px-8 py-8 max-w-3xl">
 
         {/* Header */}
         <div className="mb-8">
-          <h1
-            className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2"
-            style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "-0.02em" }}
-          >
+          <div className="flex items-center gap-1 text-sm mb-2" style={{ color: '#94a3b8' }}>
+            LicitaIA <ChevronRight className="w-3.5 h-3.5" /> Começar
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mb-1">
             Por onde começar
           </h1>
-          <p className="text-slate-500 text-sm sm:text-base">
+          <p className="text-sm text-slate-500">
             Siga estes passos para estar pronto para participar de licitações.
           </p>
 
@@ -150,7 +150,7 @@ export function ComecarPage() {
                   className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${(completedCount / STEPS.length) * 100}%`,
-                    background: "linear-gradient(90deg, #2563eb, #3b82f6)",
+                    background: "#0066FF",
                   }}
                 />
               </div>

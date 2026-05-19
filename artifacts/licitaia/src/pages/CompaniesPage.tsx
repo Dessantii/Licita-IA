@@ -424,16 +424,37 @@ export function CompaniesPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-slate-900">Empresas</h1>
-          <p className="text-slate-500 mt-1">Gerencie a carteira de empresas e seus documentos.</p>
+      <div className="px-8 py-8">
+
+        {/* Page Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-1 text-sm mb-2" style={{ color: '#94a3b8' }}>
+            LicitaIA <ChevronRight className="w-3.5 h-3.5" /> Empresas
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Empresas</h1>
+              <p className="text-sm text-slate-500 mt-1">Gerencie as empresas e seus documentos</p>
+            </div>
+            <Button onClick={() => setShowCreateDialog(true)} className="shrink-0" style={{ backgroundColor: '#0066FF' }}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Empresa
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} className="shrink-0">
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Empresa
-        </Button>
-      </div>
+
+        {/* Contextual tip — empty state */}
+        {!isLoading && (!companies || companies.length === 0) && (
+          <div className="rounded-xl p-5 mb-7 flex items-start gap-4" style={{ backgroundColor: '#F0F4FF', border: '1px solid #DDEAFF' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#E5F0FF' }}>
+              <Building2 className="w-5 h-5" style={{ color: '#0066FF' }} />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">Cadastre sua empresa</p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">Para participar de licitações você precisa ter uma empresa cadastrada com CNPJ ativo. Com o cartão CNPJ, preenchemos os dados automaticamente.</p>
+            </div>
+          </div>
+        )}
 
       {stats && stats.total > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -585,6 +606,7 @@ export function CompaniesPage() {
       )}
 
       <CreateCompanyDialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)} />
+      </div>
     </AppLayout>
   );
 }

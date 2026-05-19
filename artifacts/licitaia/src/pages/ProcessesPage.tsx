@@ -102,13 +102,34 @@ export function ProcessesPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-slate-900">Processos Licitatórios</h1>
-          <p className="text-slate-500 mt-1">Gerencie conferências e editais.</p>
+      <div className="px-8 py-8">
+
+        {/* Page Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-1 text-sm mb-2" style={{ color: '#94a3b8' }}>
+            LicitaIA <ChevronRight className="w-3.5 h-3.5" /> Processos
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Processos Licitatórios</h1>
+              <p className="text-sm text-slate-500 mt-1">Acompanhe cada licitação do início à participação</p>
+            </div>
+            <CreateProcessDialog prefill={alertPrefill} defaultOpen={!!alertPrefill} />
+          </div>
         </div>
-        <CreateProcessDialog prefill={alertPrefill} defaultOpen={!!alertPrefill} />
-      </div>
+
+        {/* Contextual tip — empty state */}
+        {!isLoading && (!processes || processes.length === 0) && (
+          <div className="rounded-xl p-5 mb-7 flex items-start gap-4" style={{ backgroundColor: '#F0F4FF', border: '1px solid #DDEAFF' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#E5F0FF' }}>
+              <FolderKanban className="w-5 h-5" style={{ color: '#0066FF' }} />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">Como funciona</p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">Cada processo acompanha uma licitação que você vai participar. Registre o edital, organize os documentos e não perca o prazo.</p>
+            </div>
+          </div>
+        )}
 
       {/* Metric cards */}
       {stats && stats.total > 0 && (
@@ -348,6 +369,7 @@ export function ProcessesPage() {
           )}
         </>
       )}
+      </div>
     </AppLayout>
   );
 }

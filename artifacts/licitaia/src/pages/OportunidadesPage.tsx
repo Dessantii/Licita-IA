@@ -257,36 +257,36 @@ export function OportunidadesPage() {
 
   return (
     <AppLayout title="Oportunidades de Captação">
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="px-8 py-8 space-y-6">
 
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-violet-600" />
-              <h1 className="text-2xl font-bold text-zinc-900">Oportunidades de Captação</h1>
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 flex items-center gap-1">
-                <Radio className="w-3 h-3" /> Monitoramento Automático
-              </span>
-            </div>
-            <p className="text-sm text-zinc-500 mt-1">
-              Editais e chamadas coletados automaticamente de {stats?.fontes ?? "—"} fontes monitoradas
-            </p>
+        {/* Page Header */}
+        <div>
+          <div className="flex items-center gap-1 text-sm mb-2" style={{ color: '#94a3b8' }}>
+            LicitaIA <ChevronRight className="w-3.5 h-3.5" /> Oportunidades
           </div>
-          <button
-            onClick={handleCollect}
-            disabled={collecting}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
-          >
-            {collecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            {collecting ? "Coletando..." : "Executar coleta"}
-          </button>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Oportunidades de Captação</h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Editais e chamadas coletados de {stats?.fontes ?? "—"} fontes monitoradas automaticamente
+              </p>
+            </div>
+            <button
+              onClick={handleCollect}
+              disabled={collecting}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-60 shrink-0 hover:opacity-90"
+              style={{ backgroundColor: '#0066FF' }}
+            >
+              {collecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {collecting ? "Coletando..." : "Executar coleta"}
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { icon: TrendingUp, label: "Total de oportunidades", value: stats?.total ?? 0, color: "text-violet-600" },
+            { icon: TrendingUp, label: "Total de oportunidades", value: stats?.total ?? 0, color: "text-[#0066FF]" },
             { icon: Zap, label: "Novas (últimos 7 dias)", value: stats?.novas ?? 0, color: "text-amber-600" },
             { icon: CircleDot, label: "Fontes ativas", value: stats?.fontes ?? 0, color: "text-green-600" },
           ].map((s) => (
@@ -315,7 +315,7 @@ export function OportunidadesPage() {
               className={cn(
                 "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 tab === t.id
-                  ? "border-violet-600 text-violet-700"
+                  ? "border-[#0066FF] text-[#0066FF]"
                   : "border-transparent text-zinc-500 hover:text-zinc-800"
               )}
             >
@@ -524,7 +524,7 @@ export function OportunidadesPage() {
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-violet-600 hover:underline truncate block mt-0.5"
+                        className="text-xs text-[#0066FF] hover:underline truncate block mt-0.5"
                       >
                         {source.url.slice(0, 60)}{source.url.length > 60 ? "…" : ""}
                       </a>
@@ -638,7 +638,8 @@ export function OportunidadesPage() {
             <button
               onClick={handleSavePrefs}
               disabled={savingPrefs}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-60 hover:opacity-90"
+            style={{ backgroundColor: '#0066FF' }}
             >
               {savingPrefs ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {savingPrefs ? "Salvando..." : "Salvar preferências"}
