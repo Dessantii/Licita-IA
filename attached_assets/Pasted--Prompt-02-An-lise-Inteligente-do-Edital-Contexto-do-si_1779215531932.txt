@@ -1,0 +1,312 @@
+# Prompt 02 — Análise Inteligente do Edital
+
+## Contexto do sistema
+
+Você está evoluindo a **tela de detalhe do processo** (`/processes/:id`) do LicitaIA.
+
+**O que já existe e deve ser preservado:**
+- Upload do PDF do edital
+- Extração de requisitos por IA (objeto, valor, prazo, critério de julgamento)
+- Aba "O que o edital pede" com lista de documentos extraídos
+- Score de prontidão documental (0–100%) baseado nos documentos enviados
+- Aba "Documentos" para upload
+- Aba "Verificação" (relatório final)
+- Dados da empresa vinculada ao processo (`company_type`, CNAE, `bidding_profile` adicionado no Prompt 01)
+
+**O que este prompt constrói em cima disso:**
+Uma nova aba **"Análise"** na tela de detalhe do processo, exibida logo após o upload do edital e antes do checklist de documentos. É a etapa onde o usuário decide se vale a pena continuar — com dados reais, não intuição.
+
+---
+
+## O problema a resolver
+
+Hoje o usuário faz upload do edital e cai direto no checklist de documentos — um processo longo e trabalhoso. Ele não sabe antes de começar:
+- Se a empresa tem direito a benefícios ME/EPP neste edital específico
+- Se o preço estimado pelo órgão é compatível com o que ele consegue oferecer
+- Quais são os riscos e requisitos técnicos que podem inviabilizar a participação
+
+O resultado é que o usuário prepara documentação por horas e só descobre que não pode ou não deve participar no final. **A aba Análise resolve isso em minutos, antes de qualquer trabalho.**
+
+---
+
+## O que construir
+
+### Nova aba "Análise" na tela de detalhe do processo
+
+Inserir como **segunda aba**, entre o resumo do edital e o checklist de documentos:
+
+```
+[ Resumo ] [ Análise ← nova ] [ Documentos ] [ Verificação ]
+```
+
+A aba é gerada automaticamente pela IA após o upload do edital. Exibe um loading com progresso enquanto processa.
+
+---
+
+### Bloco 1 — Diagnóstico de viabilidade (topo da aba)
+
+Um painel de resultado visual com 3 possíveis estados:
+
+**Verde — Recomendado participar**
+```
+✅ Este edital é compatível com o perfil da sua empresa
+   Objeto alinhado com seu CNAE · Valor dentro da sua capacidade · Prazo adequado
+   [ Ver detalhes da análise ↓ ]
+```
+
+**Amarelo — Participar com atenção**
+```
+⚠️ Há pontos que merecem atenção antes de decidir
+   2 requisitos técnicos podem ser desafiadores · Prazo apertado
+   [ Ver detalhes da análise ↓ ]
+```
+
+**Vermelho — Não recomendado**
+```
+🚫 Este edital provavelmente não é adequado para sua empresa agora
+   Exige registro em conselho de classe que você não possui · Valor acima da sua capacidade
+   [ Entender o motivo ↓ ]  [ Ignorar e continuar mesmo assim ]
+```
+
+O diagnóstico é calculado pela IA com base nos dados do edital + `bidding_profile` da empresa.
+
+---
+
+### Bloco 2 — Benefícios ME/EPP aplicáveis
+
+Seção sempre visível se a empresa for ME/EPP. Exibir os benefícios que **se aplicam especificamente a este edital**, não de forma genérica:
+
+**Card: Empate ficto**
+```
+⭐ Empate ficto (Lei Complementar 123, Art. 44)
+Você pode cobrir qualquer proposta até 5% acima do menor lance.
+Neste edital: se o menor lance for R$ 100.000, você pode cobrir até R$ 105.000.
+[Como funciona →]  ← abre modal explicativo
+```
+
+**Card: Item exclusivo (se aplicável)**
+```
+🔒 Item exclusivo para ME/EPP
+O valor estimado deste edital é R$ 52.000, abaixo do limite de R$ 80.000.
+Somente empresas ME/EPP podem participar desta licitação.
+```
+
+**Card: Cota reservada (se detectada no edital)**
+```
+📦 Cota de 25% reservada
+O edital reserva 25% dos itens exclusivamente para ME/EPP.
+Lote reservado: itens 3, 4 e 7 (estimado R$ 18.500)
+```
+
+**Card: Regularização fiscal (sempre para ME/EPP)**
+```
+📋 Prazo para regularização fiscal
+Mesmo com certidões vencidas, você tem 5 dias úteis após ser declarada vencedora
+para regularizar sua situação fiscal antes da assinatura do contrato.
+```
+
+Se a empresa não for ME/EPP, ocultar esta seção completamente.
+
+---
+
+### Bloco 3 — Análise de requisitos técnicos
+
+Lista dos requisitos do edital que vão **além da documentação padrão**, classificados por nível de dificuldade:
+
+```
+Requisitos técnicos identificados pela IA:
+
+🟢 Fácil de atender
+   • Atestado de capacidade técnica — você pode obter com clientes anteriores
+   • Declaração de visita técnica — agendamento simples
+
+🟡 Requer atenção
+   • Comprovação de 3 anos de experiência na área — verifique se possui atestados suficientes
+   • Garantia contratual de 5% — reserva financeira necessária: R$ 16.509,85
+
+🔴 Pode inviabilizar
+   • Registro no CREA/CAU — verificar se sua empresa ou responsável técnico possui
+   • Certidão de acervo técnico (CAT) — emitida pelo CREA, pode levar 30+ dias
+```
+
+Cada item tem um botão "Como resolver →" que abre um drawer com orientações práticas.
+
+---
+
+### Bloco 4 — Calculadora de viabilidade financeira
+
+Widget interativo que ajuda o usuário a entender se o negócio fecha financeiramente.
+
+**Inputs (preenchidos automaticamente, editáveis pelo usuário):**
+```
+Valor estimado pelo órgão:     R$ [330.196,92]  ← vem do edital
+Sua margem mínima desejada:    [  15  ] %
+Impostos estimados (simples):  [   6  ] %  ← calculado pelo regime tributário da empresa
+Custo estimado do serviço/produto: R$ [________]  ← usuário preenche
+```
+
+**Output calculado em tempo real:**
+```
+┌─────────────────────────────────────────────────────────┐
+│  Para ser viável com 15% de margem:                     │
+│  Seu custo máximo deve ser:   R$ 248.957,88             │
+│                                                          │
+│  Preço sugerido para proposta: R$ [293.244,00]          │
+│  ← 11,2% abaixo do estimado (competitivo)               │
+│                                                          │
+│  ⚠️ Atenção: garantia contratual (5%) = R$ 14.662,20   │
+│  Você precisa ter este valor disponível como reserva.   │
+└─────────────────────────────────────────────────────────┘
+```
+
+Adicionar um toggle: **"Simular com empate ficto"** → recalcula mostrando o valor máximo que a empresa pode cobrir graças ao benefício ME/EPP.
+
+---
+
+### Bloco 5 — Linha do tempo do processo
+
+Visualização horizontal com os marcos importantes identificados no edital:
+
+```
+Hoje          Visita técnica    Entrega proposta   Sessão pregão    Contrato
+  │                │                  │                  │              │
+──●────────────────●──────────────────●──────────────────●──────────────●──
+19 mai           22 mai             28 mai             04 jun          18 jun
+  
+  [9 dias]        [3 dias]           [7 dias]           [14 dias]
+```
+
+Marcos que já passaram ficam em cinza. Marcos futuros com menos de 5 dias ficam em vermelho. Cada marco tem um botão "Adicionar ao calendário" (gera `.ics`).
+
+---
+
+### Bloco 6 — Análise de concorrência (simplificada)
+
+Buscar no PNCP histórico de licitações **similares** do mesmo órgão nos últimos 12 meses:
+
+```
+Histórico de licitações similares deste órgão:
+
+Pregão 41/2025 — Seguro de veículos
+Vencedor: Seguradora X · Lance vencedor: R$ 287.400 (13% abaixo do estimado)
+
+Pregão 28/2024 — Seguro de veículos  
+Vencedor: Seguradora Y · Lance vencedor: R$ 312.000 (5% abaixo do estimado)
+
+💡 Padrão identificado: lances vencedores costumam ser 8–13% abaixo do estimado.
+   Sugestão de lance inicial: R$ 297.000 – R$ 302.000
+```
+
+Se não houver histórico, exibir: "Não encontramos histórico de licitações similares neste órgão. Recomendamos pesquisar preços no painel de pesquisa de mercado."
+
+---
+
+## Schema de banco de dados
+
+### Nova tabela `process_analysis`
+```sql
+CREATE TABLE process_analysis (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  process_id UUID NOT NULL REFERENCES processes(id) ON DELETE CASCADE,
+  
+  -- Diagnóstico geral
+  viability_status VARCHAR(20) NOT NULL, -- 'recommended' | 'caution' | 'not_recommended'
+  viability_reasons JSONB, -- array de razões
+  
+  -- Benefícios ME/EPP
+  has_fictitious_tie BOOLEAN DEFAULT FALSE,
+  is_meppp_exclusive BOOLEAN DEFAULT FALSE,
+  has_reserved_quota BOOLEAN DEFAULT FALSE,
+  reserved_quota_items JSONB, -- itens com cota reservada
+  meppp_exclusive_value DECIMAL(15,2),
+  
+  -- Requisitos técnicos
+  technical_requirements JSONB,
+  -- [{ "description": "...", "difficulty": "easy|medium|hard", "how_to_solve": "..." }]
+  
+  -- Linha do tempo
+  timeline_events JSONB,
+  -- [{ "label": "...", "date": "...", "type": "deadline|session|visit|contract" }]
+  
+  -- Concorrência
+  similar_processes JSONB,
+  -- [{ "number": "...", "winner": "...", "winning_bid": ..., "estimated": ... }]
+  price_pattern_insight TEXT,
+  suggested_bid_min DECIMAL(15,2),
+  suggested_bid_max DECIMAL(15,2),
+  
+  -- Calculadora
+  estimated_taxes_percent DECIMAL(5,2),
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+## Prompt de IA para gerar a análise completa
+
+Ao fazer upload do edital, após extrair os dados básicos, disparar uma segunda chamada à OpenAI para gerar a análise:
+
+```javascript
+const analysisPrompt = `
+Você é um especialista em licitações públicas brasileiras analisando um edital para uma ${company.type} (${company.cnae_primary}).
+
+Edital: ${editalText} (primeiras 6000 tokens)
+Perfil da empresa: ${JSON.stringify(company.bidding_profile)}
+Valor estimado: R$ ${process.estimated_value}
+Empresa é ME/EPP: ${company.is_meppp}
+
+Retorne um JSON com a seguinte estrutura (sem texto adicional):
+{
+  "viability_status": "recommended | caution | not_recommended",
+  "viability_reasons": ["razão 1", "razão 2"],
+  "technical_requirements": [
+    {
+      "description": "descrição do requisito",
+      "difficulty": "easy | medium | hard",
+      "how_to_solve": "orientação prática em 2-3 frases"
+    }
+  ],
+  "has_reserved_quota": true | false,
+  "reserved_quota_items": ["item 3", "item 4"] | [],
+  "timeline_events": [
+    {
+      "label": "nome do marco",
+      "date": "YYYY-MM-DD",
+      "type": "deadline | session | visit | contract | other"
+    }
+  ],
+  "price_pattern_insight": "texto com padrão identificado ou null",
+  "suggested_bid_range": { "min": 0, "max": 0 } | null
+}
+`;
+```
+
+---
+
+## Fluxo completo do usuário
+
+```
+1. Usuário faz upload do edital → extração básica já existente roda
+2. Em paralelo, nova chamada de IA gera a análise completa
+3. Loading na aba "Análise": "Analisando benefícios, riscos e viabilidade..."
+4. Aba carrega com os 6 blocos preenchidos
+5. Usuário lê o diagnóstico → decide continuar ou descartar
+6. Se continuar → clica em "Ir para documentos →" → vai para a aba de checklist
+7. Calculadora fica acessível para revisitar antes de montar a proposta
+```
+
+---
+
+## Critério de conclusão
+
+Esta etapa está concluída quando:
+1. ✅ Aba "Análise" aparece automaticamente após upload do edital
+2. ✅ Diagnóstico de viabilidade (verde/amarelo/vermelho) é exibido
+3. ✅ Benefícios ME/EPP são identificados e explicados em linguagem simples
+4. ✅ Requisitos técnicos são classificados por dificuldade com orientações
+5. ✅ Calculadora financeira funciona com inputs editáveis e output em tempo real
+6. ✅ Linha do tempo dos marcos do edital é exibida visualmente
+7. ✅ Botão "Ir para documentos →" ao final da aba direciona o fluxo corretamente

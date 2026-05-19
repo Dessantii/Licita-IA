@@ -10,6 +10,8 @@ import {
   submittedDocumentsTable,
   validationItemsTable,
   finalReportsTable,
+  processAnalysisTable,
+  companiesTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
@@ -262,6 +264,9 @@ Responda APENAS com o JSON, sem texto adicional`;
     message: `Edital analisado. ${requirements.length} exigências identificadas.`,
     processStatus: "exigencias_extraidas",
   });
+
+  // Fire-and-forget: generate full analysis in background
+  void generateProcessAnalysis(id, editalText, req.log).catch(() => {});
 });
 
 router.post("/processes/:id/analyze-documents", async (req, res) => {
@@ -441,6 +446,149 @@ Responda APENAS com o JSON, sem texto adicional.`;
     message: `Conferência concluída. ${statusCounts["ok"] ?? 0} itens OK, ${statusCounts["faltando"] ?? 0} faltando.`,
     processStatus: newStatus,
   });
+});
+
+// ── Process Analysis Generation ──────────────────────────────────────────────
+
+async function generateProcessAnalysis(processId: number, editalText: string, logger: any) {
+  const [process] = await db.select().from(processesTable).where(eq(processesTable.id, processId));
+  if (!process) return null;
+
+  let companyData: any = null;
+  if (process.companyId) {
+    const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, process.companyId));
+    companyData = company;
+  }
+
+  const isMeppp = ["ME", "EPP", "MEI"].some(p => companyData?.porte?.toUpperCase?.()?.includes(p) ?? false);
+  const biddingProfile = companyData?.biddingProfile ?? {};
+  const textSample = editalText.slice(0, 8000);
+
+  const prompt = `Você é um especialista em licitações públicas brasileiras. Analise o edital abaixo para uma empresa ${companyData?.porte ?? "de pequeno porte"} (${companyData?.cnpj ?? "CNPJ não informado"}).
+
+EDITAL (primeiros 8.000 caracteres):
+${textSample}
+
+EMPRESA É ME/EPP: ${isMeppp}
+PERFIL DA EMPRESA: ${JSON.stringify(biddingProfile)}
+
+Retorne APENAS um JSON válido com a estrutura abaixo (sem markdown, sem texto extra):
+{
+  "viability_status": "recommended | caution | not_recommended",
+  "viability_reasons": ["razão 1", "razão 2"],
+  "estimated_value": 0,
+  "is_meppp_exclusive": false,
+  "has_reserved_quota": false,
+  "reserved_quota_items": [],
+  "technical_requirements": [
+    {
+      "description": "descrição curta do requisito técnico",
+      "difficulty": "easy | medium | hard",
+      "how_to_solve": "orientação prática em 2-3 frases"
+    }
+  ],
+  "timeline_events": [
+    {
+      "label": "nome do marco",
+      "date": "YYYY-MM-DD",
+      "type": "deadline | session | visit | contract | other"
+    }
+  ],
+  "similar_processes": [],
+  "price_pattern_insight": null,
+  "suggested_bid_range": null
+}
+
+INSTRUÇÕES:
+- viability_status: recomendado se objeto alinha com perfil, caution se há dúvidas, not_recommended se há requisitos inviáveis
+- estimated_value: valor estimado do contrato em reais (número, não string)
+- is_meppp_exclusive: true se valor estimado ≤ 80000
+- timeline_events: extraia TODAS as datas mencionadas no edital (visita técnica, entrega proposta, sessão pregão, assinatura contrato)
+- technical_requirements: apenas requisitos além da documentação padrão (atestados específicos, registros em conselhos, etc.)
+- Responda APENAS com o JSON, sem texto adicional`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    max_completion_tokens: 4096,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const content = completion.choices[0]?.message?.content ?? "{}";
+  const clean = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  const result = JSON.parse(clean);
+
+  const analysisData = {
+    processId,
+    viabilityStatus: (result.viability_status ?? "caution") as "recommended" | "caution" | "not_recommended",
+    viabilityReasons: result.viability_reasons ?? [],
+    hasFictitiousTie: isMeppp,
+    isMepppExclusive: result.is_meppp_exclusive ?? (parseFloat(result.estimated_value ?? "999999") <= 80000 && isMeppp),
+    hasReservedQuota: result.has_reserved_quota ?? false,
+    reservedQuotaItems: result.reserved_quota_items ?? [],
+    mepppExclusiveValue: result.is_meppp_exclusive ? String(result.estimated_value ?? "") : null,
+    technicalRequirements: result.technical_requirements ?? [],
+    timelineEvents: result.timeline_events ?? [],
+    similarProcesses: result.similar_processes ?? [],
+    pricePatternInsight: result.price_pattern_insight ?? null,
+    suggestedBidMin: result.suggested_bid_range?.min ? String(result.suggested_bid_range.min) : null,
+    suggestedBidMax: result.suggested_bid_range?.max ? String(result.suggested_bid_range.max) : null,
+    estimatedValue: result.estimated_value ? String(result.estimated_value) : null,
+    estimatedTaxesPercent: "6.00",
+    updatedAt: new Date(),
+  };
+
+  await db.insert(processAnalysisTable)
+    .values(analysisData)
+    .onConflictDoUpdate({
+      target: processAnalysisTable.processId,
+      set: analysisData,
+    });
+
+  const [saved] = await db.select().from(processAnalysisTable).where(eq(processAnalysisTable.processId, processId));
+  return saved;
+}
+
+router.get("/processes/:id/analysis", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [analysis] = await db.select().from(processAnalysisTable).where(eq(processAnalysisTable.processId, id));
+  if (!analysis) { res.status(404).json({ error: "Analysis not found" }); return; }
+
+  res.json(analysis);
+});
+
+router.post("/processes/:id/generate-analysis", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [process] = await db.select().from(processesTable).where(eq(processesTable.id, id));
+  if (!process) { res.status(404).json({ error: "Process not found" }); return; }
+
+  const [editalFile] = await db.select().from(uploadedFilesTable)
+    .where(eq(uploadedFilesTable.processId, id))
+    .limit(1);
+
+  if (!editalFile || editalFile.fileType !== "edital") {
+    res.status(400).json({ error: "No edital uploaded" });
+    return;
+  }
+
+  let editalText = "";
+  try {
+    editalText = await extractTextFromFile(editalFile.path, editalFile.mimeType);
+  } catch {
+    res.status(500).json({ error: "Failed to read edital file" });
+    return;
+  }
+
+  try {
+    const analysis = await generateProcessAnalysis(id, editalText, req.log);
+    res.json(analysis);
+  } catch (err) {
+    req.log.error({ err }, "Failed to generate process analysis");
+    res.status(500).json({ error: "Failed to generate analysis" });
+  }
 });
 
 router.patch("/validation/:id", async (req, res) => {

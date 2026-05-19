@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { ProcessAnalysisTab } from "./ProcessAnalysisTab";
+import { getToken } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useRoute, useLocation } from "wouter";
 import { useGetProcess, useDeleteProcess, ProcessStatus, getListProcessesQueryKey } from "@workspace/api-client-react";
@@ -187,6 +189,20 @@ export function ProcessDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"resumo" | "analise" | "documentos" | "verificacao">("resumo");
+  const [companyData, setCompanyData] = useState<any>(null);
+
+  const token = getToken();
+
+  useEffect(() => {
+    if (!process?.companyId || !token) return;
+    fetch(`${import.meta.env.VITE_API_URL ?? ""}/api/companies/${process.companyId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setCompanyData(data); })
+      .catch(() => {});
+  }, [process?.companyId, token]);
 
   const handleDelete = async () => {
     try {
@@ -416,11 +432,39 @@ export function ProcessDetailPage() {
           </div>
         </div>
 
-        {/* Wizard steps */}
-        <WizardSteps current={wizardStep} step2Locked={step2Locked} step3Locked={step3Locked} />
+        {/* ── Tab navigation ─────────────────────────────────────────────── */}
+        {(() => {
+          const tabs: { id: "resumo" | "analise" | "documentos" | "verificacao"; label: string; locked: boolean }[] = [
+            { id: "resumo", label: "Resumo", locked: false },
+            { id: "analise", label: "Análise IA", locked: !process.editalFile },
+            { id: "documentos", label: "Documentos", locked: !hasRequirements && !isInConference },
+            { id: "verificacao", label: "Verificação", locked: !isInConference },
+          ];
+          return (
+            <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: '#F1F5F9' }}>
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => { if (!tab.locked) setActiveTab(tab.id); }}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all",
+                    activeTab === tab.id
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : tab.locked
+                        ? "text-slate-300 cursor-not-allowed"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
+                  )}
+                >
+                  {tab.locked && <Lock className="w-3 h-3" />}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
 
-        {/* ── ETAPA 1: Entenda o edital ─────────────────────────────────── */}
-        <div className="mb-6">
+        {/* ── ETAPA 1: Entenda o edital (Resumo) ─────────────────────────── */}
+        {activeTab === "resumo" && <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
@@ -507,10 +551,20 @@ export function ProcessDetailPage() {
               </div>
             )}
           </div>
-        </div>
+        </div>}
+
+        {/* ── ETAPA: Análise IA ──────────────────────────────────────────── */}
+        {activeTab === "analise" && (
+          <ProcessAnalysisTab
+            processId={id}
+            process={process}
+            companyData={companyData}
+            onGoToDocuments={() => setActiveTab("documentos")}
+          />
+        )}
 
         {/* ── ETAPA 2: Prepare seus documentos ─────────────────────────── */}
-        <div className="mb-6">
+        {activeTab === "documentos" && <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all"
@@ -655,10 +709,10 @@ export function ProcessDetailPage() {
               <p className="text-sm text-slate-400">Complete a etapa 1 primeiro.</p>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* ── ETAPA 3: Envie sua proposta ───────────────────────────────── */}
-        <div>
+        {activeTab === "verificacao" && <div>
           <div className="flex items-center gap-3 mb-4">
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all"
@@ -765,7 +819,7 @@ export function ProcessDetailPage() {
               <p className="text-sm text-slate-400">Complete as etapas anteriores primeiro.</p>
             </div>
           )}
-        </div>
+        </div>}
 
       </div>
 

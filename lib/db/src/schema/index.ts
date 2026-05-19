@@ -22,3 +22,4 @@ export * from "./project-sections";
 export * from "./opportunity-sources";
 export * from "./opportunities";
 export * from "./user-opportunity-prefs";
+export * from "./process-analysis";
