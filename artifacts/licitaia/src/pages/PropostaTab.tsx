@@ -207,6 +207,7 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
   const [generating, setGenerating] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [generatedFilename, setGeneratedFilename] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const [signedUploading, setSignedUploading] = useState(false);
   const [signedDone, setSignedDone] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
@@ -421,6 +422,30 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
       setSubmitting(false);
     }
   }, [apiBase, process.id, token, toast]);
+
+  const handleDownload = useCallback(async () => {
+    if (!generatedUrl) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(generatedUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Falha ao baixar arquivo");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = generatedFilename ?? "proposta.docx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Erro ao baixar proposta", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  }, [generatedUrl, generatedFilename, token, toast]);
 
   // Detect platform on mount
   useEffect(() => {
@@ -1018,11 +1043,10 @@ export function PropostaTab({ process, companyData }: PropostaTabProps) {
                 {generating ? "Gerando..." : generatedUrl ? "✨ Regenerar proposta (.docx)" : "✨ Gerar proposta (.docx)"}
               </Button>
               {generatedUrl && (
-                <a href={generatedUrl} download className="block">
-                  <Button className="w-full gap-2" variant="outline">
-                    <FileDown className="w-4 h-4" /> Baixar proposta gerada
-                  </Button>
-                </a>
+                <Button className="w-full gap-2" variant="outline" onClick={handleDownload} disabled={downloading}>
+                  {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                  {downloading ? "Baixando..." : "Baixar proposta gerada"}
+                </Button>
               )}
             </div>
           </div>
