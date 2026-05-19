@@ -1,60 +1,49 @@
 import { useLocation } from "wouter";
-import { FolderKanban, BookOpen, Target, BarChart3, Building2, ArrowRight, LogOut, UserCircle } from "lucide-react";
+import { ArrowRight, LogOut, UserCircle, Building2, Gavel, Users, TrendingUp, ChevronRight } from "lucide-react";
 import { clearAuth, getUser } from "@/hooks/use-auth";
 import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
 
-const MODULES = [
+function getGreeting(name: string) {
+  const hour = new Date().getHours();
+  const first = name.split(" ")[0] ?? name;
+  if (hour < 12) return `Bom dia, ${first}.`;
+  if (hour < 18) return `Boa tarde, ${first}.`;
+  return `Boa noite, ${first}.`;
+}
+
+const ACTIONS = [
   {
     id: "licitacoes",
-    name: "Licitações",
-    description: "Gerencie processos licitatórios, confira documentos e monitore editais do PNCP em tempo real.",
-    icon: FolderKanban,
     href: "/processes",
-    gradient: "from-blue-600 to-blue-700",
-    bg: "bg-blue-50",
-    border: "border-blue-100",
-    iconBg: "bg-blue-600",
-    tag: "text-blue-600",
-    badge: "Conferência documental",
+    icon: Gavel,
+    color: "#2563eb",
+    lightBg: "#eff6ff",
+    label: "Participar de licitações",
+    description:
+      "Acompanhe processos licitatórios, organize documentos e confira tudo antes de enviar a proposta.",
+    cta: "Acessar processos",
   },
   {
     id: "chamamentos",
-    name: "Chamamentos",
-    description: "Parcerias com OSCs, chamamentos públicos e conferência de documentos para organizações da sociedade civil.",
-    icon: BookOpen,
     href: "/chamamentos",
-    gradient: "from-emerald-600 to-emerald-700",
-    bg: "bg-emerald-50",
-    border: "border-emerald-100",
-    iconBg: "bg-emerald-600",
-    tag: "text-emerald-600",
-    badge: "Parcerias OSC",
+    icon: Users,
+    color: "#059669",
+    lightBg: "#f0fdf4",
+    label: "Responder chamamentos públicos",
+    description:
+      "Parcerias e convênios com órgãos públicos — ideal para associações e organizações sociais.",
+    cta: "Ver chamamentos",
   },
   {
     id: "captacao",
-    name: "Captação de Recursos",
-    description: "Encontre editais de fomento, escreva projetos com IA, valide a aderência e exporte PDFs profissionais.",
-    icon: Target,
     href: "/funding-notices",
-    gradient: "from-violet-600 to-violet-700",
-    bg: "bg-violet-50",
-    border: "border-violet-100",
-    iconBg: "bg-violet-600",
-    tag: "text-violet-600",
-    badge: "Redação com IA",
-  },
-  {
-    id: "relatorios",
-    name: "Relatórios",
-    description: "Visão consolidada de processos, indicadores de desempenho, exportações e configurações do sistema.",
-    icon: BarChart3,
-    href: "/reports",
-    gradient: "from-amber-500 to-amber-600",
-    bg: "bg-amber-50",
-    border: "border-amber-100",
-    iconBg: "bg-amber-500",
-    tag: "text-amber-600",
-    badge: "Indicadores",
+    icon: TrendingUp,
+    color: "#7c3aed",
+    lightBg: "#f5f3ff",
+    label: "Buscar recursos e financiamentos",
+    description:
+      "Encontre editais de fomento, escreva projetos com apoio da IA e submeta com mais segurança.",
+    cta: "Explorar oportunidades",
   },
 ];
 
@@ -63,7 +52,12 @@ export function ModuleHubPage() {
   const user = getUser();
 
   const initials = user?.name
-    ? user.name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()
+    ? user.name
+        .split(" ")
+        .slice(0, 2)
+        .map((w: string) => w[0])
+        .join("")
+        .toUpperCase()
     : "?";
 
   function handleLogout() {
@@ -71,32 +65,32 @@ export function ModuleHubPage() {
     navigate("/login");
   }
 
-  function handleSelect(href: string) {
-    navigate(href);
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Top bar */}
-      <header className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6 flex-shrink-0">
+    <div className="min-h-screen flex flex-col" style={{ background: "#f8fafc" }}>
+      {/* ── Top bar ── */}
+      <header
+        className="h-14 flex items-center justify-between px-6 flex-shrink-0 bg-white"
+        style={{ borderBottom: "1px solid #f1f5f9" }}
+      >
         <LicitaIALogo variant="full" size="sm" theme="dark" />
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-              {initials}
-            </div>
-            <span className="font-medium hidden sm:block">{user?.name}</span>
-          </div>
+
+        <div className="flex items-center gap-1">
           <button
             onClick={() => navigate("/profile")}
-            className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-md hover:bg-slate-100"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors"
             title="Meu perfil"
           >
-            <UserCircle className="w-4 h-4" />
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+              style={{ background: "#2563eb" }}
+            >
+              {initials}
+            </div>
+            <span className="hidden sm:block font-medium text-slate-700">{user?.name}</span>
           </button>
           <button
             onClick={handleLogout}
-            className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-md hover:bg-slate-100"
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             title="Sair"
           >
             <LogOut className="w-4 h-4" />
@@ -104,73 +98,105 @@ export function ModuleHubPage() {
         </div>
       </header>
 
-      {/* Main */}
+      {/* ── Main ── */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-4xl">
-          {/* Heading */}
-          <div className="text-center mb-10">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">
-              Bem-vindo, {user?.name?.split(" ")[0] ?? "usuário"}
-            </p>
-            <h1 className="text-2xl font-bold text-slate-800">
-              Qual módulo deseja acessar?
-            </h1>
-            <p className="text-slate-500 mt-1.5 text-sm">
-              Selecione um módulo para entrar no seu ambiente dedicado.
-            </p>
-          </div>
+        <div className="w-full max-w-2xl">
 
-          {/* Module cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {MODULES.map((mod) => {
-              const Icon = mod.icon;
-              return (
-                <button
-                  key={mod.id}
-                  onClick={() => handleSelect(mod.href)}
-                  className={`group text-left rounded-2xl border ${mod.border} ${mod.bg} p-6 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`${mod.iconBg} w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <h2 className="text-base font-semibold text-slate-800">{mod.name}</h2>
-                        <ArrowRight className={`w-4 h-4 ${mod.tag} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`} />
-                      </div>
-                      <p className="text-sm text-slate-500 leading-relaxed">{mod.description}</p>
-                      <span className={`inline-block mt-3 text-xs font-medium ${mod.tag} bg-white border ${mod.border} px-2.5 py-0.5 rounded-full`}>
-                        {mod.badge}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Companies quick access */}
-          <div className="mt-4">
-            <button
-              onClick={() => navigate("/companies")}
-              className="group w-full text-left rounded-2xl border border-slate-200 bg-white p-5 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-4"
+          {/* Greeting */}
+          <div className="mb-10">
+            <h1
+              className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2"
+              style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "-0.02em" }}
             >
-              <div className="bg-slate-700 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
-                <Building2 className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800">Portfólio de Empresas</p>
-                <p className="text-xs text-slate-500 mt-0.5">Gerencie empresas e seus documentos habilitatórios</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-            </button>
+              {user?.name ? getGreeting(user.name) : "Olá!"}
+            </h1>
+            <p className="text-base text-slate-500">
+              O que você quer fazer hoje?
+            </p>
           </div>
+
+          {/* Main actions */}
+          <div className="space-y-3">
+            {ACTIONS.map(({ id, href, icon: Icon, color, lightBg, label, description, cta }) => (
+              <button
+                key={id}
+                onClick={() => navigate(href)}
+                className="group w-full text-left bg-white rounded-2xl flex items-center gap-5 p-5 transition-all duration-150 hover:shadow-md"
+                style={{
+                  border: "1px solid #e2e8f0",
+                  outline: "none",
+                }}
+                onFocus={(e) => (e.currentTarget.style.boxShadow = `0 0 0 2px ${color}33`)}
+                onBlur={(e) => (e.currentTarget.style.boxShadow = "")}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = `${color}50`;
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#e2e8f0";
+                }}
+              >
+                {/* Icon */}
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
+                  style={{ background: lightBg }}
+                >
+                  <Icon className="w-5 h-5" style={{ color }} />
+                </div>
+
+                {/* Text */}
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-semibold text-slate-900 mb-0.5">{label}</p>
+                  <p className="text-sm text-slate-500 leading-relaxed">{description}</p>
+                </div>
+
+                {/* Arrow */}
+                <ChevronRight
+                  className="w-4 h-4 flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5"
+                  style={{ color: "#94a3b8" }}
+                />
+              </button>
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-slate-100" />
+            <span className="text-xs text-slate-400 font-medium">Dados da empresa</span>
+            <div className="flex-1 h-px bg-slate-100" />
+          </div>
+
+          {/* Company access */}
+          <button
+            onClick={() => navigate("/companies")}
+            className="group w-full text-left bg-white rounded-2xl flex items-center gap-4 px-5 py-4 transition-all duration-150 hover:shadow-sm"
+            style={{ border: "1px solid #e2e8f0" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#cbd5e1";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#e2e8f0";
+            }}
+          >
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-slate-100">
+              <Building2 className="w-4 h-4 text-slate-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-800">Minhas empresas e documentos</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Cadastros, certidões, habilitação e documentos de regularidade
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" />
+          </button>
+
         </div>
       </main>
 
-      <footer className="pb-6 text-center">
-        <p className="text-xs text-slate-400">LicitaIA · Conferência documental assistida por IA</p>
+      {/* ── Footer ── */}
+      <footer className="pb-8 text-center">
+        <p className="text-xs text-slate-400">
+          LicitaIA · O jeito mais simples de vender para o governo
+        </p>
       </footer>
     </div>
   );
