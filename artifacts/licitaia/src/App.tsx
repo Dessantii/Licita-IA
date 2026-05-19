@@ -9,7 +9,11 @@ import { getToken, isAuthenticated } from "@/hooks/use-auth";
 
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LoginPage } from "@/pages/LoginPage";
-import { ModuleHubPage } from "@/pages/ModuleHubPage";
+import { LandingPage } from "@/pages/LandingPage";
+import { InicioPage } from "@/pages/InicioPage";
+import { ComecarPage } from "@/pages/ComecarPage";
+import { GuiasPage } from "@/pages/GuiasPage";
+import { AjudaPage } from "@/pages/AjudaPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { ProcessesPage } from "@/pages/ProcessesPage";
 import { ProcessDetailPage } from "@/pages/ProcessDetailPage";
@@ -22,14 +26,11 @@ import { ChamamentosPage } from "@/pages/ChamamentosPage";
 import { ChamamentoDetailPage } from "@/pages/ChamamentoDetailPage";
 import { ChamamentoChecklistPage } from "@/pages/ChamamentoChecklistPage";
 import { CompaniesPage } from "@/pages/CompaniesPage";
-import { CompanyDetailPage } from "@/pages/CompanyDetailPage";
-import { EmpresasPage } from "@/pages/EmpresasPage";
 import { EmpresaDetailPage } from "@/pages/EmpresaDetailPage";
 import { FundingNoticesPage } from "@/pages/FundingNoticesPage";
 import { FundingProjectsPage } from "@/pages/FundingProjectsPage";
 import { FundingProjectEditorPage } from "@/pages/FundingProjectEditorPage";
 import { OportunidadesPage } from "@/pages/OportunidadesPage";
-import { LandingPage } from "@/pages/LandingPage";
 
 setAuthTokenGetter(() => getToken());
 
@@ -51,11 +52,25 @@ function ProtectedRoute({ component: Component }: { component: () => React.React
 function Router() {
   return (
     <Switch>
+      {/* Public */}
       <Route path="/">
-        {() => isAuthenticated() ? <ModuleHubPage /> : <LandingPage />}
+        {() => isAuthenticated() ? <InicioPage /> : <LandingPage />}
       </Route>
       <Route path="/landing" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
+
+      {/* New journey-based navigation */}
+      <Route path="/comecar">
+        {() => <ProtectedRoute component={ComecarPage} />}
+      </Route>
+      <Route path="/guias">
+        {() => <ProtectedRoute component={GuiasPage} />}
+      </Route>
+      <Route path="/ajuda">
+        {() => <ProtectedRoute component={AjudaPage} />}
+      </Route>
+
+      {/* Processes (Licitações) */}
       <Route path="/processes">
         {() => <ProtectedRoute component={ProcessesPage} />}
       </Route>
@@ -65,6 +80,8 @@ function Router() {
       <Route path="/processes/:id">
         {() => <ProtectedRoute component={ProcessDetailPage} />}
       </Route>
+
+      {/* Chamamentos */}
       <Route path="/chamamentos">
         {() => <ProtectedRoute component={ChamamentosPage} />}
       </Route>
@@ -74,30 +91,13 @@ function Router() {
       <Route path="/chamamentos/:id">
         {() => <ProtectedRoute component={ChamamentoDetailPage} />}
       </Route>
-      <Route path="/empresas">
-        {() => <Redirect to="/companies" />}
-      </Route>
+
+      {/* Monitoring */}
       <Route path="/monitors">
         {() => <ProtectedRoute component={MonitoramentosPage} />}
       </Route>
-      <Route path="/reports">
-        {() => <ProtectedRoute component={RelatóriosPage} />}
-      </Route>
-      <Route path="/profile">
-        {() => <ProtectedRoute component={ProfilePage} />}
-      </Route>
-      <Route path="/settings">
-        {() => <ProtectedRoute component={ConfiguraçõesPage} />}
-      </Route>
-      <Route path="/admin/users">
-        {() => <ProtectedRoute component={UsuáriosPage} />}
-      </Route>
-      <Route path="/companies">
-        {() => <ProtectedRoute component={CompaniesPage} />}
-      </Route>
-      <Route path="/companies/:id">
-        {() => <ProtectedRoute component={EmpresaDetailPage} />}
-      </Route>
+
+      {/* Opportunities & Funding */}
       <Route path="/oportunidades">
         {() => <ProtectedRoute component={OportunidadesPage} />}
       </Route>
@@ -110,6 +110,32 @@ function Router() {
       <Route path="/funding-projects/:id">
         {() => <ProtectedRoute component={FundingProjectEditorPage} />}
       </Route>
+
+      {/* Companies */}
+      <Route path="/empresas">
+        {() => <Redirect to="/companies" />}
+      </Route>
+      <Route path="/companies">
+        {() => <ProtectedRoute component={CompaniesPage} />}
+      </Route>
+      <Route path="/companies/:id">
+        {() => <ProtectedRoute component={EmpresaDetailPage} />}
+      </Route>
+
+      {/* Settings & Admin */}
+      <Route path="/reports">
+        {() => <ProtectedRoute component={RelatóriosPage} />}
+      </Route>
+      <Route path="/profile">
+        {() => <ProtectedRoute component={ProfilePage} />}
+      </Route>
+      <Route path="/settings">
+        {() => <ProtectedRoute component={ConfiguraçõesPage} />}
+      </Route>
+      <Route path="/admin/users">
+        {() => <ProtectedRoute component={UsuáriosPage} />}
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );
