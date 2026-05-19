@@ -1,0 +1,347 @@
+# Prompt 03 — Habilitação Automatizada
+
+## Contexto do sistema
+
+Você está evoluindo a etapa de **habilitação documental** do LicitaIA — a aba "Documentos" e o checklist da tela de detalhe do processo (`/processes/:id`).
+
+**O que já existe e deve ser preservado:**
+- Checklist de documentos extraídos do edital pela IA
+- Status por documento: OK / Faltando / Vencido
+- Upload manual de arquivos pelo usuário
+- Score de prontidão (%) calculado com base nos documentos enviados
+- Alerta de urgência "Enviar seus documentos" quando há pendências
+- Repositório de documentos da empresa no módulo `/companies`
+
+**O que este prompt constrói em cima disso:**
+Transformar o processo manual de coleta de documentos em um **fluxo semi-automatizado** — o sistema busca, gera e organiza o máximo possível, deixando para o usuário apenas o que é humanamente insubstituível.
+
+---
+
+## O problema a resolver
+
+Hoje o usuário precisa:
+1. Ver no checklist qual certidão está faltando
+2. Sair da plataforma
+3. Acessar o portal do governo correspondente
+4. Baixar manualmente
+5. Voltar ao LicitaIA
+6. Fazer upload
+7. Repetir para cada documento (são 5–10 certidões por licitação)
+
+Além disso, documentos como declarações obrigatórias precisam ser criados do zero no Word. O sistema já sabe exatamente quais declarações são necessárias e tem todos os dados da empresa — mas não gera nada.
+
+---
+
+## O que construir
+
+### 1. Redesign da aba "Documentos" — checklist em grupos
+
+Reorganizar o checklist atual em **grupos por categoria**, cada um com ações em lote:
+
+```
+┌─ Documentos da empresa ──────────────────── 2 de 3 prontos ──┐
+│  ✅ Contrato Social                        Válido · Enviado   │
+│  ✅ Cartão CNPJ                            Válido · Enviado   │
+│  ❌ Alvará de funcionamento                Não enviado        │
+│                                [Enviar alvará →]              │
+└───────────────────────────────────────────────────────────────┘
+
+┌─ Certidões fiscais ──────────────── [⬇ Buscar todas] ────────┐
+│  ✅ Certidão Negativa Federal (PGFN+RFB)   Válida até 12/jun  │
+│  ⚠️ Certidão Estadual (SEFAZ-PR)          Vence em 3 dias    │
+│  ❌ Certidão Municipal (Palotina)          Não enviada        │
+│  ✅ Certidão FGTS (CEF)                   Válida até 08/jul   │
+│  ✅ Certidão INSS/Débitos Trabalhistas    Válida até 15/jun   │
+│                         [⬇ Atualizar vencidas]               │
+└───────────────────────────────────────────────────────────────┘
+
+┌─ Declarações obrigatórias ────── [✨ Gerar todas com IA] ────┐
+│  ❌ Declaração de ME/EPP                  Não gerada          │
+│  ❌ Declaração de inexistência de fato    Não gerada          │
+│     impeditivo                                                │
+│  ❌ Declaração de não-empregar menor      Não gerada          │
+│  ❌ Declaração de elaboração independente Não gerada          │
+│     de proposta                                               │
+└───────────────────────────────────────────────────────────────┘
+
+┌─ Qualificação técnica ───────────────────── 0 de 1 pronto ───┐
+│  ❌ Atestado de capacidade técnica        Não enviado         │
+│  💡 Dica: solicite ao seu cliente um atestado das            │
+│     prestações de serviço realizadas.   [Como obter →]       │
+└───────────────────────────────────────────────────────────────┘
+```
+
+Grupos disponíveis (a IA decide quais aparecem com base no edital):
+- Documentos da empresa
+- Certidões fiscais
+- Certidões trabalhistas
+- Qualificação técnica
+- Qualificação econômico-financeira
+- Declarações obrigatórias
+- Documentos específicos do edital
+
+---
+
+### 2. Busca automática de certidões públicas
+
+Botão **"⬇ Buscar todas"** e **"⬇ Atualizar vencidas"** no grupo de certidões fiscais.
+
+Ao clicar, o sistema tenta buscar automaticamente as certidões via integração com os portais públicos. Para cada certidão, exibir o status em tempo real:
+
+```
+Buscando certidões... (pode levar até 30 segundos)
+
+✅ Certidão Federal (PGFN+RFB) — baixada com sucesso
+✅ Certidão FGTS — baixada com sucesso  
+⚠️ Certidão Estadual (SEFAZ-PR) — não foi possível buscar automaticamente
+   → Baixe manualmente: [Abrir portal SEFAZ-PR ↗]
+⚙️ Certidão Municipal (Palotina) — buscando...
+```
+
+**Certidões a buscar automaticamente:**
+
+| Certidão | Portal | Método |
+|---|---|---|
+| Certidão Negativa Federal (PGFN + RFB) | `https://solucoes.receita.fazenda.gov.br/Servicos/certidaointernet/PF/Emitir` | POST com CNPJ |
+| Certidão de Débitos Trabalhistas (TST) | `https://www.tst.jus.br/certidao` | POST com CNPJ |
+| Certidão FGTS (CEF) | `https://consulta-crf.caixa.gov.br` | POST com CNPJ |
+| SICAF — Situação do fornecedor | API PNCP/SICAF | CNPJ |
+
+**Importante:** Certidões Estaduais e Municipais variam por UF/município. Para esses casos, o sistema deve:
+1. Identificar o estado e município da empresa
+2. Exibir o link correto para o portal correspondente com o botão "Abrir portal ↗"
+3. Após o usuário baixar manualmente, oferecer upload direto no modal
+
+Todos os arquivos baixados automaticamente são salvos no repositório de documentos da empresa em `/companies` com a data de validade extraída pelo sistema (OCR simples no PDF).
+
+---
+
+### 3. Gerador de declarações obrigatórias
+
+Botão **"✨ Gerar todas com IA"** no grupo de declarações.
+
+O sistema gera automaticamente os documentos Word (.docx) com os dados da empresa já preenchidos. O usuário revisa, assina e faz upload.
+
+**Declarações a gerar (identificadas automaticamente pelo edital):**
+
+**a) Declaração de ME/EPP (Lei Complementar 123)**
+```
+DECLARAÇÃO
+
+[RAZÃO SOCIAL], inscrita no CNPJ sob o nº [CNPJ], sediada em [ENDEREÇO],
+por intermédio de seu representante legal, DECLARA, sob as penas da lei,
+que se enquadra como [Microempresa / Empresa de Pequeno Porte / MEI]
+nos termos da Lei Complementar nº 123, de 14 de dezembro de 2006,
+e que não possui nenhum dos impedimentos previstos no §4º do art. 3º
+da citada lei.
+
+[Cidade], [data por extenso].
+
+_________________________________
+[Nome do representante legal]
+[CPF do representante]
+[Cargo]
+```
+
+**b) Declaração de inexistência de fato impeditivo**
+**c) Declaração de não-empregar menor (Lei 9.854/99)**
+**d) Declaração de elaboração independente de proposta (IN SLTI 02/2009)**
+**e) Declaração de regularidade perante a Fazenda Municipal** (quando solicitada)
+**f) Declaração de vistoria / dispensa de vistoria** (quando o edital exigir)
+
+**Fluxo do gerador:**
+
+```
+1. Usuário clica "Gerar todas com IA"
+2. Modal abre com preview das declarações a serem geradas
+3. Confirmação: "Gerar com dados de [EMPRESA]?"
+4. IA gera os arquivos .docx com dados preenchidos
+5. Modal de resultado:
+   ┌─────────────────────────────────────────────┐
+   │ ✨ 4 declarações geradas                    │
+   │                                             │
+   │ 📄 Declaração ME/EPP          [Baixar] [✓] │
+   │ 📄 Inexistência de fato imp.  [Baixar] [✓] │
+   │ 📄 Não-empregar menor         [Baixar] [✓] │
+   │ 📄 Proposta independente      [Baixar] [✓] │
+   │                                             │
+   │ ⚠️ Revise, assine e faça upload de cada    │
+   │    documento antes de enviar sua proposta. │
+   │                                             │
+   │ [Baixar todas em ZIP]    [Fechar]          │
+   └─────────────────────────────────────────────┘
+6. Após upload de cada declaração assinada → status muda para ✅
+```
+
+**Geração das declarações via IA:**
+
+Usar a OpenAI para preencher os templates com os dados da empresa e do edital:
+
+```javascript
+const declarationPrompt = `
+Você é um assistente jurídico especializado em licitações públicas brasileiras.
+Gere a "${declarationType}" completa e correta para a empresa abaixo.
+Retorne APENAS o texto da declaração, sem explicações adicionais.
+Use linguagem formal e jurídica adequada.
+Adapte ao edital: ${editalNumber} — ${organName}.
+
+Dados da empresa:
+- Razão social: ${company.name}
+- CNPJ: ${company.cnpj}
+- Endereço completo: ${company.address}
+- Representante legal: ${company.legal_representative}
+- CPF do representante: ${company.representative_cpf}
+- Cargo: ${company.representative_role}
+- Tipo: ${company.type} (ME / EPP / MEI)
+
+Data de hoje: ${today}
+`;
+```
+
+---
+
+### 4. Sistema de alertas de vencimento proativo
+
+Criar um job em background que verifica diariamente os documentos de todas as empresas e dispara alertas nos seguintes momentos:
+
+| Antecedência | Alerta |
+|---|---|
+| 30 dias antes | Notificação no sino: "Certidão X vence em 30 dias" |
+| 15 dias antes | E-mail + notificação: "Certidão X vence em 15 dias — renove agora" |
+| 7 dias antes | E-mail + notificação com urgência alta |
+| 3 dias antes | E-mail diário + banner vermelho no dashboard |
+| Vencido | Banner de bloqueio nos processos que dependem desse documento |
+
+**Quando o documento está vinculado a um processo ativo**, adicionar urgência ao alerta:
+```
+🚨 Certidão Estadual vence em 3 dias
+   Este documento é exigido em 2 licitações ativas:
+   · Aquisição de Seguro de Veículos (prazo: 28 mai)
+   · Pregão 12/2026 (prazo: 10 jun)
+   [Renovar agora →]
+```
+
+**Nova seção no dashboard principal** — "Documentos que precisam de atenção":
+```
+┌─────────────────────────────────────────────────────┐
+│ 📋 Documentos vencendo em breve                     │
+│                                                     │
+│ ⚠️ Certidão Estadual          Vence em 3 dias      │
+│    Afeta: 2 processos ativos  [Renovar →]          │
+│                                                     │
+│ ℹ️ Certidão Federal           Vence em 18 dias     │
+│    [Ver →]                                         │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+### 5. Extração automática de validade dos documentos (OCR)
+
+Ao fazer upload de qualquer certidão (manual ou automático), o sistema deve:
+
+1. Usar a OpenAI Vision para ler o PDF/imagem
+2. Extrair a data de validade automaticamente
+3. Preencher o campo `expires_at` sem intervenção do usuário
+4. Se não encontrar data de validade → solicitar preenchimento manual com tooltip: "Não conseguimos identificar a validade. Consulte o documento e informe a data."
+
+```javascript
+const ocrPrompt = `
+Analise este documento e extraia APENAS a data de validade/vencimento.
+Retorne um JSON: { "expires_at": "YYYY-MM-DD" } ou { "expires_at": null } se não encontrar.
+Não inclua nenhum texto adicional.
+`;
+```
+
+---
+
+### 6. Indicador de completude com desbloqueio de etapa
+
+No topo da aba de documentos, substituir o score percentual por um indicador de desbloqueio mais claro:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Habilitação                                                │
+│                                                             │
+│  ████████████░░░░░░░░  6 de 10 documentos prontos         │
+│                                                             │
+│  ✅ Empresa  ✅ Fiscal  ⚠️ Trabalhista  ❌ Técnica  ❌ Declarações │
+│                                                             │
+│  Faltam 4 documentos para liberar o envio da proposta.     │
+│  [Ver o que falta →]                                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+O botão **"Ir para proposta →"** (próxima etapa) só é habilitado quando todos os documentos obrigatórios estão com status OK.
+
+Documentos marcados como "desejável" (não obrigatórios) não bloqueiam o avanço, mas exibem um aviso.
+
+---
+
+## Schema de banco de dados
+
+### Alterações na tabela `company_documents`
+```sql
+ALTER TABLE company_documents
+ADD COLUMN source VARCHAR(30) DEFAULT 'manual',
+-- 'manual' | 'auto_fetched' | 'ai_generated'
+ADD COLUMN fetched_at TIMESTAMP,
+ADD COLUMN ocr_extracted_expiry BOOLEAN DEFAULT FALSE;
+```
+
+### Nova tabela `document_alerts`
+```sql
+CREATE TABLE document_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  document_id UUID NOT NULL REFERENCES company_documents(id) ON DELETE CASCADE,
+  alert_type VARCHAR(30) NOT NULL, -- '30d' | '15d' | '7d' | '3d' | 'expired'
+  sent_at TIMESTAMP DEFAULT NOW(),
+  channel VARCHAR(20) NOT NULL -- 'in_app' | 'email'
+);
+```
+
+### Nova tabela `generated_declarations`
+```sql
+CREATE TABLE generated_declarations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  process_id UUID NOT NULL REFERENCES processes(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  declaration_type VARCHAR(60) NOT NULL,
+  file_path TEXT,
+  generated_at TIMESTAMP DEFAULT NOW(),
+  uploaded_signed_at TIMESTAMP -- preenchido quando usuário faz upload da versão assinada
+);
+```
+
+---
+
+## Fluxo completo do usuário
+
+```
+1. Usuário chega na aba "Documentos" vindo da aba "Análise"
+2. Vê o checklist reorganizado por grupos
+3. Clica "Buscar todas" no grupo de certidões fiscais
+   → Sistema busca automaticamente as disponíveis
+   → Para as que não conseguiu: exibe link direto ao portal correto
+4. Clica "Gerar todas com IA" no grupo de declarações
+   → Baixa os .docx, assina fisicamente ou digitalmente
+   → Faz upload das versões assinadas
+5. Documentos da empresa e qualificação técnica: upload manual normal
+6. Indicador de completude vai para 10/10
+7. Botão "Ir para proposta →" é desbloqueado
+8. Background job começa a monitorar vencimentos de todos os documentos
+```
+
+---
+
+## Critério de conclusão
+
+Esta etapa está concluída quando:
+1. ✅ Checklist reorganizado em grupos com ações em lote por grupo
+2. ✅ Busca automática de certidões federais e trabalhistas funcionando
+3. ✅ Links diretos aos portais estaduais/municipais corretos para certidões manuais
+4. ✅ Gerador de declarações produz .docx com dados da empresa preenchidos
+5. ✅ OCR extrai data de validade automaticamente no upload
+6. ✅ Alertas de vencimento são disparados no sino e por e-mail nos prazos corretos
+7. ✅ Botão "Ir para proposta →" só habilita quando habilitação está completa

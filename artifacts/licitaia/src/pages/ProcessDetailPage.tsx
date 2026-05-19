@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ProcessAnalysisTab } from "./ProcessAnalysisTab";
+import { DocumentosTab } from "./DocumentosTab";
 import { getToken } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useRoute, useLocation } from "wouter";
@@ -563,153 +564,23 @@ export function ProcessDetailPage() {
           />
         )}
 
-        {/* ── ETAPA 2: Prepare seus documentos ─────────────────────────── */}
-        {activeTab === "documentos" && <div className="mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all"
-              style={{
-                background: step2Locked ? '#E2E8F0' : wizardStep > 2 ? '#059669' : wizardStep === 2 ? '#0066FF' : '#E2E8F0',
-                color: step2Locked ? '#94a3b8' : 'white',
-              }}
-            >
-              {wizardStep > 2 ? <CheckCircle2 className="w-4 h-4" /> : step2Locked ? <Lock className="w-3.5 h-3.5" /> : "2"}
-            </div>
-            <div>
-              <h2 className={cn("text-base font-bold", step2Locked ? "text-slate-400" : "text-slate-900")}>
-                Prepare seus documentos
-              </h2>
-              <p className="text-xs text-slate-500">
-                {step2Locked
-                  ? "Disponível após a análise do edital."
-                  : "Envie os documentos da sua empresa e veja se está tudo certo."}
-              </p>
-            </div>
-            {isInConference && valStats.total > 0 && (
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-sm font-semibold" style={{ color: valStats.faltando > 0 ? '#DC2626' : '#059669' }}>
-                  {valStats.ok} de {valStats.total} ok
-                </span>
-              </div>
-            )}
-          </div>
-
-          {!step2Locked && (
-            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #E8EFF6' }}>
-
-              {/* Document upload area */}
-              <div className="bg-white p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <FolderOpen className="w-4 h-4 text-indigo-500" />
-                  <p className="text-sm font-semibold text-slate-800">Documentos da sua empresa</p>
-                  <span className="text-xs text-slate-400 ml-auto">
-                    {process.documentFiles.length} arquivo(s) enviado(s)
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {process.documentFiles.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {process.documentFiles.map(file => (
-                        <FileListItem
-                          key={file.id}
-                          file={file}
-                          onDelete={(fid) => removeFile.mutate({ id: fid })}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  <FileUploadZone
-                    onUpload={handleDocUpload}
-                    isUploading={uploadDocument.isPending}
-                    label="Adicionar documento"
-                  />
-
-                  {needsDocAnalysis && (
-                    <div className="rounded-xl p-4 flex items-start gap-4" style={{ background: '#F5F3FF', border: '1px solid #DDD6FE' }}>
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#EDE9FE' }}>
-                        <Sparkles className="w-4 h-4 text-violet-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-violet-900 mb-1">
-                          Documentos enviados! Vamos conferir tudo.
-                        </p>
-                        <p className="text-xs text-violet-700 mb-3">
-                          A IA vai comparar seus documentos com as {docReqCount} exigências do edital e te dizer o que está ok e o que falta.
-                        </p>
-                        <Button
-                          onClick={() => analyzeDocs.mutate({ id })}
-                          disabled={analyzeDocs.isPending}
-                          className="bg-violet-600 hover:bg-violet-700 text-white"
-                        >
-                          {analyzeDocs.isPending
-                            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Conferindo...</>
-                            : <><Play className="w-4 h-4 mr-2" /> Conferir documentos com IA</>}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Validation results */}
-              {isInConference && valStats.total > 0 && (
-                <div className="border-t" style={{ borderColor: '#E8EFF6' }}>
-                  {/* Stats row */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0" style={{ borderColor: '#E8EFF6' }}>
-                    {[
-                      { label: "Tudo certo", count: valStats.ok, color: "#059669", bg: "#F0FDF4" },
-                      { label: "Faltando", count: valStats.faltando, color: "#DC2626", bg: "#FEF2F2" },
-                      { label: "Vencendo", count: valStats.vencido, color: "#EA580C", bg: "#FFF7ED" },
-                      { label: "Conferir", count: valStats.divergente + valStats.revisar, color: "#D97706", bg: "#FFFBEB" },
-                    ].map(s => (
-                      <div key={s.label} className="p-4 text-center" style={{ background: s.bg }}>
-                        <p className="text-2xl font-bold" style={{ color: s.color }}>{s.count}</p>
-                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Validation item list */}
-                  <div className="bg-white divide-y" style={{ borderColor: '#E8EFF6' }}>
-                    {process.validationItems.slice(0, 8).map(item => (
-                      <div key={item.id} className="px-5 py-3 flex items-center gap-3">
-                        <ValidationIcon status={item.status} />
-                        <p className="flex-1 text-sm text-slate-700 truncate">{item.requirement?.title ?? "—"}</p>
-                        <ValidationLabel status={item.status} />
-                      </div>
-                    ))}
-                    {process.validationItems.length > 8 && (
-                      <div className="px-5 py-3">
-                        <Link href={`/processes/${id}/checklist`} className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
-                          Ver todos os {process.validationItems.length} itens
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-
-                  {valStats.faltando > 0 && (
-                    <div className="p-4" style={{ background: '#FEF2F2', borderTop: '1px solid #FECACA' }}>
-                      <p className="text-sm font-semibold text-red-800">
-                        Você precisa enviar mais {valStats.faltando} documento{valStats.faltando !== 1 ? "s" : ""} para participar desta licitação.
-                      </p>
-                      <p className="text-xs text-red-600 mt-0.5">Adicione os documentos acima e refaça a conferência.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {step2Locked && (
-            <div className="rounded-2xl p-6 text-center" style={{ border: '2px dashed #E2E8F0', background: '#FAFBFC' }}>
-              <Lock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">Complete a etapa 1 primeiro.</p>
-            </div>
-          )}
-        </div>}
+        {/* ── ETAPA 2: Documentos ───────────────────────────────────────── */}
+        {activeTab === "documentos" && (
+          <DocumentosTab
+            id={id}
+            process={process}
+            companyData={companyData}
+            step2Locked={step2Locked}
+            isInConference={isInConference}
+            needsDocAnalysis={needsDocAnalysis}
+            valStats={valStats}
+            docReqCount={docReqCount}
+            uploadDocument={uploadDocument}
+            handleDocUpload={handleDocUpload}
+            removeFile={removeFile}
+            analyzeDocs={analyzeDocs}
+          />
+        )}
 
         {/* ── ETAPA 3: Envie sua proposta ───────────────────────────────── */}
         {activeTab === "verificacao" && <div>

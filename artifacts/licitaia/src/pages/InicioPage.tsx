@@ -5,7 +5,7 @@ import { getUser, getToken } from "@/hooks/use-auth";
 import {
   Building2, FileText, Bell, ArrowRight, ChevronRight,
   CheckCircle2, AlertCircle, Circle, Sparkles,
-  Compass, Zap,
+  Compass, Zap, Clock,
 } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -20,7 +20,9 @@ interface Company {
 interface CompanyDoc {
   id: number;
   tipo: string;
-  validade: string | null;
+  titulo: string;
+  dataValidade: string | null;
+  validade?: string | null;
 }
 
 interface MonitorAlert {
@@ -39,6 +41,29 @@ interface HomeData {
   documents: CompanyDoc[];
   hasMonitor: boolean;
   alerts: MonitorAlert[];
+}
+
+// ── Expiry helpers ───────────────────────────────────────────────────────────
+
+function daysUntilExpiry(dateStr: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(dateStr);
+  return Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function expiryColor(days: number): { color: string; bg: string; border: string } {
+  if (days <= 0) return { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" };
+  if (days <= 3) return { color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" };
+  if (days <= 7) return { color: "#EA580C", bg: "#FFF7ED", border: "#FED7AA" };
+  if (days <= 15) return { color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" };
+  return { color: "#0891B2", bg: "#F0F9FF", border: "#BAE6FD" };
+}
+
+function expiryLabel(days: number): string {
+  if (days <= 0) return "Vencida";
+  if (days === 1) return "Vence amanhã";
+  return `Vence em ${days} dias`;
 }
 
 // ── Readiness ────────────────────────────────────────────────────────────────
@@ -140,6 +165,87 @@ function simplifyModalidade(m: string | null): string {
     "Leilão": "Leilão",
   };
   return map[m] ?? m;
+}
+
+// ── Doc expiry widget ─────────────────────────────────────────────────────────
+
+function DocExpiryWidget({
+  docs,
+  companyId,
+  onNavigate,
+}: {
+  docs: CompanyDoc[];
+  companyId: number;
+  onNavigate: (href: string) => void;
+}) {
+  const expiring = docs
+    .filter(d => d.dataValidade)
+    .map(d => ({ ...d, days: daysUntilExpiry(d.dataValidade!) }))
+    .filter(d => d.days <= 30)
+    .sort((a, b) => a.days - b.days);
+
+  if (expiring.length === 0) return null;
+
+  return (
+    <div className="mb-7">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4" style={{ color: "#EA580C" }} />
+          <h2 className="text-base font-bold text-slate-900">Documentos vencendo em breve</h2>
+        </div>
+        <button
+          onClick={() => onNavigate(`/companies/${companyId}`)}
+          className="text-sm font-medium flex items-center gap-1.5"
+          style={{ color: "#0066FF" }}
+        >
+          Ver todos <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div
+        className="bg-white rounded-xl overflow-hidden"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.07)" }}
+      >
+        {expiring.map((doc, i) => {
+          const { color, bg, border } = expiryColor(doc.days);
+          return (
+            <div
+              key={doc.id}
+              className="flex items-center gap-4 px-5 py-4"
+              style={{
+                borderBottom: i < expiring.length - 1 ? "1px solid #F1F5F9" : undefined,
+              }}
+            >
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: bg, border: `1px solid ${border}` }}
+              >
+                <Clock className="w-4 h-4" style={{ color }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800 truncate">
+                  {doc.titulo || doc.tipo}
+                </p>
+              </div>
+              <span
+                className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
+                style={{ color, background: bg }}
+              >
+                {expiryLabel(doc.days)}
+              </span>
+              <button
+                onClick={() => onNavigate(`/companies/${companyId}`)}
+                className="text-xs font-semibold flex-shrink-0"
+                style={{ color: "#0066FF" }}
+              >
+                Renovar →
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ── Progress ring SVG ────────────────────────────────────────────────────────
@@ -430,6 +536,15 @@ export function InicioPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Documentos vencendo ──────────────────────────────────────── */}
+        {!loading && data.companies.length > 0 && (
+          <DocExpiryWidget
+            docs={data.documents}
+            companyId={data.companies[0].id}
+            onNavigate={navigate}
+          />
+        )}
 
         {/* ── Oportunidades recentes ────────────────────────────────────── */}
         <div className="mb-7">

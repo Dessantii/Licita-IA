@@ -12,6 +12,7 @@ import {
   finalReportsTable,
   processAnalysisTable,
   companiesTable,
+  generatedDeclarationsTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
@@ -589,6 +590,150 @@ router.post("/processes/:id/generate-analysis", async (req, res) => {
     req.log.error({ err }, "Failed to generate process analysis");
     res.status(500).json({ error: "Failed to generate analysis" });
   }
+});
+
+// ── Declaration generation ────────────────────────────────────────────────────
+
+const DECLARATION_LABELS: Record<string, string> = {
+  declaracao_meppp: "Declaração de ME/EPP (Lei Complementar 123)",
+  declaracao_menor: "Declaração de Não-Emprego de Menor (Lei 9.854/99)",
+  declaracao_fato_impeditivo: "Declaração de Inexistência de Fato Impeditivo",
+  declaracao_proposta_independente: "Declaração de Elaboração Independente de Proposta",
+  declaracao_regularidade_fazenda: "Declaração de Regularidade perante a Fazenda Municipal",
+  declaracao_vistoria: "Declaração de Dispensa de Vistoria",
+};
+
+async function generateDeclarationText(
+  declType: string,
+  company: typeof companiesTable.$inferSelect | null,
+  process: typeof processesTable.$inferSelect,
+  today: string,
+): Promise<string> {
+  const humanLabel = DECLARATION_LABELS[declType] ?? declType;
+  const cidade = company?.municipio ?? "___________";
+  const uf = company?.uf ?? "";
+  const razaoSocial = company?.razaoSocial ?? "_______________";
+  const cnpj = company?.cnpj ?? "___.___.___/____-__";
+  const logradouro = [
+    company?.logradouro,
+    company?.numero ? `nº ${company.numero}` : null,
+    company?.bairro,
+    company?.municipio,
+    company?.uf,
+  ].filter(Boolean).join(", ") || "_______________";
+  const representante = company?.representanteLegal ?? company?.nomeResponsavel ?? "_______________";
+  const cpf = company?.cpfResponsavel ?? "___.___.___-__";
+  const porte = company?.porte ?? "ME/EPP";
+
+  const prompt = `Você é um assistente jurídico especializado em licitações públicas brasileiras.
+Gere a declaração "${humanLabel}" completa e juridicamente correta para a empresa abaixo.
+Retorne APENAS o texto da declaração, sem explicações adicionais.
+Use linguagem formal e jurídica adequada, conforme exigido pela legislação vigente.
+
+Dados da empresa:
+- Razão social: ${razaoSocial}
+- CNPJ: ${cnpj}
+- Endereço: ${logradouro}
+- Representante legal: ${representante}
+- CPF do representante: ${cpf}
+- Porte: ${porte}
+
+Processo licitatório: ${process.title}
+Órgão: ${process.agency}
+${process.editalNumber ? `Edital: ${process.editalNumber}` : ""}
+
+Data de hoje: ${today}
+Cidade/UF: ${cidade}/${uf}
+
+Inclua no texto:
+1. Título da declaração em destaque
+2. Identificação completa da empresa e representante
+3. Texto jurídico completo, com base legal correta
+4. Local, data e linha de assinatura (nome, CPF e cargo do representante)
+
+Retorne APENAS o texto completo da declaração.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.2,
+    max_tokens: 1500,
+  });
+
+  return completion.choices[0]?.message?.content?.trim() ?? `[Declaração ${humanLabel} — dados insuficientes para geração automática]`;
+}
+
+router.get("/processes/:id/declarations", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const decls = await db
+    .select()
+    .from(generatedDeclarationsTable)
+    .where(eq(generatedDeclarationsTable.processId, id));
+
+  res.json(
+    decls.map(d => ({
+      ...d,
+      generatedAt: d.generatedAt.toISOString(),
+      uploadedSignedAt: d.uploadedSignedAt?.toISOString() ?? null,
+      downloadUrl: d.filePath ? `/uploads/${d.filePath}` : null,
+    })),
+  );
+});
+
+router.post("/processes/:id/generate-declarations", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [process] = await db.select().from(processesTable).where(eq(processesTable.id, id));
+  if (!process) { res.status(404).json({ error: "Process not found" }); return; }
+
+  const { declarationTypes } = req.body as { declarationTypes?: string[] };
+  if (!declarationTypes?.length) {
+    res.status(400).json({ error: "declarationTypes required" });
+    return;
+  }
+
+  let company: typeof companiesTable.$inferSelect | null = null;
+  if (process.companyId) {
+    const [c] = await db.select().from(companiesTable).where(eq(companiesTable.id, process.companyId));
+    company = c ?? null;
+  }
+
+  const today = new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+  const generated = [];
+
+  for (const declType of declarationTypes) {
+    try {
+      const text = await generateDeclarationText(declType, company, process, today);
+      const safeType = declType.replace(/[^a-z0-9_]/g, "").slice(0, 30);
+      const filename = `decl-${id}-${safeType}-${Date.now()}.txt`;
+      const filepath = path.join(UPLOADS_DIR, filename);
+      fs.writeFileSync(filepath, text, "utf-8");
+
+      const [decl] = await db
+        .insert(generatedDeclarationsTable)
+        .values({
+          processId: id,
+          companyId: process.companyId ?? 0,
+          declarationType: declType,
+          declarationText: text,
+          filePath: filename,
+        })
+        .returning();
+
+      generated.push({
+        ...decl!,
+        generatedAt: decl!.generatedAt.toISOString(),
+        downloadUrl: `/uploads/${filename}`,
+      });
+    } catch (err) {
+      console.error(`Declaration generation error for ${declType}:`, err);
+    }
+  }
+
+  res.json({ generated });
 });
 
 router.patch("/validation/:id", async (req, res) => {
