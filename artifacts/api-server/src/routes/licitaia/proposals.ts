@@ -570,7 +570,7 @@ router.post("/processes/:id/proposal/generate-docx", async (req, res) => {
   if (existing) {
     await db
       .update(processProposalsTable)
-      .set({ docxPath: filename, generatedAt: new Date(), status: "generated", updatedAt: new Date() })
+      .set({ docxPath: filename, generatedAt: new Date(), status: "generated", proposalStep: Math.max(existing.proposalStep ?? 1, 2), updatedAt: new Date() })
       .where(eq(processProposalsTable.id, existing.id));
   } else {
     await db.insert(processProposalsTable).values({
@@ -583,6 +583,7 @@ router.post("/processes/:id/proposal/generate-docx", async (req, res) => {
       docxPath: filename,
       generatedAt: new Date(),
       status: "generated",
+      proposalStep: 2,
     });
   }
 
@@ -611,7 +612,7 @@ router.post("/processes/:id/proposal/upload-signed", signedUpload.single("file")
   if (existing) {
     await db
       .update(processProposalsTable)
-      .set({ signedDocxPath: filename, signedUploadedAt: new Date(), status: "signed", updatedAt: new Date() })
+      .set({ signedDocxPath: filename, signedUploadedAt: new Date(), status: "signed", proposalStep: 3, updatedAt: new Date() })
       .where(eq(processProposalsTable.id, existing.id));
   }
 
@@ -622,6 +623,108 @@ router.post("/processes/:id/proposal/upload-signed", signedUpload.single("file")
     .where(eq(processesTable.id, id));
 
   res.json({ filename, downloadUrl: `/uploads/${filename}`, status: "signed" });
+});
+
+// ── Platform detection helpers ────────────────────────────────────────────────
+
+const PLATFORMS: Array<{ name: string; url: string; keywords: string[] }> = [
+  { name: "ComprasNet", url: "https://www.gov.br/compras/pt-br", keywords: ["comprasnet", "compras.gov.br", "compras governamentais"] },
+  { name: "BLL", url: "https://bll.org.br", keywords: ["bll", "bll licitações", "bll.org"] },
+  { name: "Licitanet", url: "https://www.licitanet.com.br", keywords: ["licitanet"] },
+  { name: "BBMNET", url: "https://licitacoes.bbmnet.com.br", keywords: ["bbmnet"] },
+  { name: "Publicompras", url: "https://www.publicompras.com.br", keywords: ["publicompras"] },
+  { name: "Banrisul Licitações", url: "https://licitacoes.banrisul.com.br", keywords: ["banrisul"] },
+];
+
+function detectPlatformFromText(text: string): { name: string; url: string } | null {
+  const t = text.toLowerCase();
+  for (const p of PLATFORMS) {
+    if (p.keywords.some(k => t.includes(k))) return { name: p.name, url: p.url };
+  }
+  return null;
+}
+
+// ── GET /processes/:id/proposal/detect-platform ───────────────────────────────
+
+router.get("/processes/:id/proposal/detect-platform", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [process] = await db.select().from(processesTable).where(eq(processesTable.id, id));
+  if (!process) { res.status(404).json({ error: "Process not found" }); return; }
+
+  const searchText = [
+    process.title ?? "",
+    process.agency ?? "",
+    process.notes ?? "",
+    (process as Record<string, unknown>).sourceUrl as string ?? "",
+  ].join(" ");
+
+  const platform = detectPlatformFromText(searchText);
+  res.json({ platformName: platform?.name ?? null, platformUrl: platform?.url ?? null });
+});
+
+// ── PATCH /processes/:id/proposal/step ───────────────────────────────────────
+
+router.patch("/processes/:id/proposal/step", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const { step } = req.body as { step?: number };
+  if (!step || step < 1 || step > 3) { res.status(400).json({ error: "Invalid step" }); return; }
+
+  const [existing] = await db
+    .select()
+    .from(processProposalsTable)
+    .where(eq(processProposalsTable.processId, id))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(processProposalsTable)
+      .set({ proposalStep: step, updatedAt: new Date() })
+      .where(eq(processProposalsTable.id, existing.id));
+  }
+
+  res.json({ step });
+});
+
+// ── PATCH /processes/:id/proposal/submission ─────────────────────────────────
+
+router.patch("/processes/:id/proposal/submission", async (req, res) => {
+  const id = parseInt(req.params.id!);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const { platformName, platformSubmitted, platformProtocol } = req.body as {
+    platformName?: string;
+    platformSubmitted?: boolean;
+    platformProtocol?: string;
+  };
+
+  const [existing] = await db
+    .select()
+    .from(processProposalsTable)
+    .where(eq(processProposalsTable.processId, id))
+    .limit(1);
+
+  if (existing) {
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (platformName !== undefined) updateData.platformName = platformName;
+    if (platformProtocol !== undefined) updateData.platformProtocol = platformProtocol;
+    if (platformSubmitted !== undefined) {
+      updateData.platformSubmitted = platformSubmitted;
+      if (platformSubmitted) {
+        updateData.submittedAt = new Date();
+        updateData.status = "submitted";
+      }
+    }
+    await db
+      .update(processProposalsTable)
+      .set(updateData)
+      .where(eq(processProposalsTable.id, existing.id));
+  }
+
+  res.json({ ok: true });
 });
 
 export default router;

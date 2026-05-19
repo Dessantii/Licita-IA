@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, decimal, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, decimal, jsonb, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const processProposalsTable = pgTable("process_proposals", {
   id: serial("id").primaryKey(),
@@ -18,6 +18,12 @@ export const processProposalsTable = pgTable("process_proposals", {
   generatedAt: timestamp("generated_at"),
   signedUploadedAt: timestamp("signed_uploaded_at"),
   status: text("status").default("draft"),
+  // Signing flow
+  proposalStep: integer("proposal_step").notNull().default(1),
+  platformName: text("platform_name"),
+  platformSubmitted: boolean("platform_submitted").default(false),
+  platformProtocol: text("platform_protocol"),
+  submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

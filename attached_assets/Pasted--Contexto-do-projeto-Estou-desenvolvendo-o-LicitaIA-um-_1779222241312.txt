@@ -1,0 +1,139 @@
+## Contexto do projeto
+
+Estou desenvolvendo o LicitaIA, um SaaS brasileiro de gestão de licitações públicas 
+para MEI e microempresas. A stack é:
+
+- Frontend: React 19 + Vite, Tailwind CSS v4, Wouter, TanStack Query
+- Backend: Node.js + Express, Pino (logs)
+- Banco: PostgreSQL via Drizzle ORM
+- IA: OpenAI GPT-4o / GPT-4o-mini
+- Portas: API 8080, Frontend 24747
+
+## Estado atual — aba de Proposta (/processes/:id)
+
+A aba de Proposta já possui:
+- Pesquisa de preços via PNCP + estimativa por IA
+- Tabela de itens com cálculo de impostos e margem
+- Geração de .docx profissional da proposta
+- Campo de upload manual de proposta assinada
+- Tabela process_proposals no banco com os dados da proposta
+
+O fluxo atual termina assim: o usuário gera o .docx, sai do sistema, 
+assina manualmente, volta e faz upload do arquivo assinado. 
+É o único passo ainda fora do sistema.
+
+## O que precisa ser implementado
+
+### 1. Fluxo de assinatura digital guiada (via Assinador gov.br)
+
+Substituir o campo de upload simples por um fluxo em 3 etapas visuais dentro da aba 
+de Proposta:
+
+**Etapa 1 — Gerar proposta**
+- Botão "Gerar proposta (.docx)" (já existe, manter)
+- Quando o .docx for gerado, marcar etapa 1 como concluída e liberar etapa 2
+
+**Etapa 2 — Assinar digitalmente**
+- Card explicativo informando que a assinatura ICP-Brasil é exigida pela maioria 
+  das plataformas de licitação
+- Botão "Assinar no Assinador gov.br" que abre https://assinador.iti.br em nova aba
+- Instrução passo a passo em texto curto:
+  1. Faça upload do arquivo gerado no Assinador gov.br
+  2. Assine com seu certificado digital ou conta gov.br nível Prata/Ouro
+  3. Baixe o arquivo assinado (.pdf ou .docx)
+  4. Volte aqui e faça o upload do arquivo assinado
+- Campo de upload do arquivo assinado (aceitar .pdf e .docx)
+- Quando o upload for feito, marcar etapa 2 como concluída e liberar etapa 3
+
+**Etapa 3 — Submissão na plataforma**
+- Detectar automaticamente qual plataforma de licitação é usada no processo, 
+  baseado no campo de dados do edital já extraído pela IA (procurar por termos como 
+  "ComprasNet", "BLL", "Licitanet", "BBMNET", "Publicompras", "Banrisul Licitações" 
+  nos dados do processo)
+- Exibir card com:
+  - Nome da plataforma detectada (ou "Plataforma não identificada" com campo 
+    para o usuário informar manualmente)
+  - Botão "Acessar [nome da plataforma]" que abre a URL correspondente:
+    - ComprasNet → https://www.gov.br/compras/pt-br
+    - BLL → https://bll.org.br
+    - Licitanet → https://www.licitanet.com.br
+    - BBMNET → https://licitacoes.bbmnet.com.br
+    - Publicompras → https://www.publicompras.com.br
+    - Banrisul → https://licitacoes.banrisul.com.br
+  - Instrução: "Acesse a plataforma, localize o pregão pelo número 
+    [número do processo] e faça o upload da proposta assinada"
+  - Checkbox "Proposta submetida na plataforma" para o usuário confirmar
+  - Campo de texto opcional "Protocolo / número de confirmação"
+- Quando o checkbox for marcado, marcar etapa 3 como concluída
+
+### 2. Status visual do fluxo
+
+Adicionar no topo da aba de Proposta um stepper horizontal com as 3 etapas acima. 
+Cada etapa deve ter estado: pendente (cinza), em andamento (azul), concluída (verde).
+
+O stepper deve persistir o estado — ao reabrir o processo, mostrar em qual etapa 
+o usuário parou.
+
+### 3. Alterações no banco de dados
+
+Na tabela process_proposals, adicionar as colunas:
+- proposal_step: integer default 1 (etapa atual: 1, 2 ou 3)
+- signed_file_url: text (URL do arquivo assinado após upload)
+- signed_file_name: text
+- platform_name: text (plataforma detectada ou informada)
+- platform_submitted: boolean default false
+- platform_protocol: text (protocolo opcional)
+- submitted_at: timestamp
+
+Criar a migration necessária com Drizzle.
+
+### 4. Endpoints de API necessários
+
+Criar ou ajustar os seguintes endpoints em /api/processes/:id/proposal:
+
+- PATCH /api/processes/:id/proposal/step
+  Body: { step: number }
+  Atualiza proposal_step
+
+- POST /api/processes/:id/proposal/signed-upload
+  Recebe o arquivo assinado (multipart/form-data)
+  Salva o arquivo e atualiza signed_file_url e signed_file_name
+  Avança proposal_step para 3
+
+- PATCH /api/processes/:id/proposal/submission
+  Body: { platformName, platformSubmitted, platformProtocol }
+  Atualiza os campos de submissão
+
+### 5. Detecção da plataforma
+
+No carregamento da aba de Proposta, fazer uma chamada ao backend que:
+1. Busca os dados do processo (edital extraído, campos do processo)
+2. Roda uma função de detecção simples que procura palavras-chave 
+   nos campos de texto do processo (objeto, edital_url, extracted_text)
+3. Retorna { platformName: string | null, platformUrl: string | null }
+
+A detecção pode ser feita com match simples por string (sem IA) usando 
+o mapeamento listado no item 3 acima.
+
+### 6. UX e visual
+
+- Usar os componentes de UI já existentes no projeto (shadcn/ui, Tailwind)
+- O stepper deve ser responsivo
+- Cards de cada etapa devem ter aparência consistente com o restante da aba
+- Ícones: usar Lucide React (já instalado no projeto)
+  - Etapa 1: FileText
+  - Etapa 2: PenLine
+  - Etapa 3: Send
+- Etapas futuras (não concluídas) devem aparecer levemente opacas (opacity-50)
+- Ao concluir as 3 etapas, exibir um banner de sucesso: 
+  "Proposta submetida com sucesso! Acompanhe o processo na plataforma."
+
+### Observações importantes
+
+- Não remover nenhuma funcionalidade existente da aba de Proposta
+- O stepper deve ser adicionado acima do conteúdo atual da aba
+- Manter compatibilidade com processos que já têm proposta gerada 
+  (proposal_step deve começar em 2 se signed_file_url já existir, 
+  ou em 1 se não existir nada)
+- Todo texto da interface deve estar em português (pt-BR)
+- Tratar erros de upload com mensagem amigável ao usuário
