@@ -10,6 +10,7 @@ import { getToken, isAuthenticated } from "@/hooks/use-auth";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LoginPage } from "@/pages/LoginPage";
 import { LandingPage } from "@/pages/LandingPage";
+import { ModuleHubPage } from "@/pages/ModuleHubPage";
 import { InicioPage } from "@/pages/InicioPage";
 import { ComecarPage } from "@/pages/ComecarPage";
 import { GuiasPage } from "@/pages/GuiasPage";
@@ -54,7 +55,10 @@ function Router() {
     <Switch>
       {/* Public */}
       <Route path="/">
-        {() => isAuthenticated() ? <InicioPage /> : <LandingPage />}
+        {() => isAuthenticated() ? <ModuleHubPage /> : <LandingPage />}
+      </Route>
+      <Route path="/inicio">
+        {() => <ProtectedRoute component={InicioPage} />}
       </Route>
       <Route path="/landing" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
