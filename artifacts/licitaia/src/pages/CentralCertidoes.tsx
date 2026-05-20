@@ -249,9 +249,17 @@ function EmitirModal({
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
+      const data = await res.json();
       if (res.ok) {
         setUploadSuccess(true);
         onSuccess();
+      } else if (res.status === 422) {
+        setFailureData(prev => prev ? {
+          ...prev,
+          message: `O CNPJ da certidão (${data.cnpjExtraido}) não corresponde ao CNPJ da empresa (${data.cnpjEmpresa}). Verifique se baixou a certidão correta.`,
+        } : null);
+      } else {
+        setFailureData(prev => prev ? { ...prev, message: data.error ?? "Erro ao processar o PDF." } : null);
       }
     } finally {
       setUploading(false);

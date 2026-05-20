@@ -135,6 +135,11 @@ async function extractCertidaoData(pdfPath: string): Promise<Record<string, any>
   }
 }
 
+function normalizeCnpj(cnpj: string | null | undefined): string {
+  if (!cnpj) return "";
+  return cnpj.replace(/\D/g, "").slice(0, 14).padStart(14, "0");
+}
+
 function parseDateBR(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
   const [d, m, y] = dateStr.split("/");
@@ -274,6 +279,21 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
   try {
     const extracted = await extractCertidaoData(filePath);
 
+    // ── CNPJ validation ─────────────────────────────────────────────────────
+    if (extracted?.cnpj && company.cnpj) {
+      const extractedNorm = normalizeCnpj(extracted.cnpj);
+      const companyNorm = normalizeCnpj(company.cnpj);
+      if (extractedNorm && companyNorm && extractedNorm !== companyNorm) {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        res.status(422).json({
+          error: "CNPJ da certidão não corresponde ao CNPJ da empresa",
+          cnpjExtraido: extracted.cnpj,
+          cnpjEmpresa: company.cnpj,
+        });
+        return;
+      }
+    }
+
     const dataEmissao = extracted ? toISO(extracted.data_emissao) : null;
     const dataValidade = extracted ? toISO(extracted.data_validade) : null;
     const resultado = extracted?.resultado ?? "nao_identificado";
@@ -299,18 +319,17 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
       metadata: extracted ?? null,
     }).returning();
 
-    if (extracted && dataEmissao) {
-      await db.insert(certidaoHistoryTable).values({
-        companyId,
-        certidaoType: tipo,
-        resultado,
-        issuedAt: new Date(dataEmissao + "T12:00:00Z"),
-        expiresAt: dataValidade ? new Date(dataValidade + "T12:00:00Z") : null,
-        fileUrl: `/api/companies/${companyId}/documents/${doc!.id}/download`,
-        extractionData: extracted,
-        emissionMethod: "manual_upload",
-      });
-    }
+    // ── Always persist to certidao_history ──────────────────────────────────
+    await db.insert(certidaoHistoryTable).values({
+      companyId,
+      certidaoType: tipo,
+      resultado,
+      issuedAt: dataEmissao ? new Date(dataEmissao + "T12:00:00Z") : new Date(),
+      expiresAt: dataValidade ? new Date(dataValidade + "T12:00:00Z") : null,
+      fileUrl: `/api/companies/${companyId}/documents/${doc!.id}/download`,
+      extractionData: extracted ?? null,
+      emissionMethod: "manual_upload",
+    });
 
     res.json({
       success: true,

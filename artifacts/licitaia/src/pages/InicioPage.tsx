@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { getUser, getToken } from "@/hooks/use-auth";
@@ -181,6 +182,7 @@ function DocExpiryWidget({
   token: string;
   onNavigate: (href: string) => void;
 }) {
+  const { toast } = useToast();
   const [renewing, setRenewing] = React.useState<number | null>(null);
   const [renewed, setRenewed] = React.useState<Set<number>>(new Set());
 
@@ -203,11 +205,21 @@ function DocExpiryWidget({
       const data = await res.json();
       if (data.success) {
         setRenewed(r => new Set([...r, doc.id]));
+        toast({ title: "Certidão renovada!", description: `${doc.titulo || doc.tipo} foi renovada com sucesso.` });
       } else {
-        onNavigate(`/companies/${companyId}?tab=certidoes_central`);
+        toast({
+          title: "Emissão automática indisponível",
+          description: "Acesse a Central de Certidões para emitir manualmente e fazer o upload.",
+          variant: "destructive",
+        });
+        onNavigate(`/companies/${companyId}`);
       }
     } catch {
-      onNavigate(`/companies/${companyId}?tab=certidoes_central`);
+      toast({
+        title: "Erro de conexão",
+        description: "Não foi possível conectar ao servidor. Tente novamente.",
+        variant: "destructive",
+      });
     } finally {
       setRenewing(null);
     }

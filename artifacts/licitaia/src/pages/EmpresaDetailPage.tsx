@@ -46,7 +46,7 @@ const CALL_STATUS: Record<string, { label: string; color: string }> = {
   concluido: { label: "Concluído", color: "bg-green-100 text-green-700" },
 };
 
-type TabId = "dados" | "certidoes_central" | "regularidade" | "certificado" | "financeiro" | "processos" | "chamamentos" | "perfil";
+type TabId = "dados" | "regularidade" | "certificado" | "financeiro" | "processos" | "chamamentos" | "perfil";
 
 interface Certidao { validade?: string; url?: string }
 interface Certidoes {
@@ -258,8 +258,7 @@ export function EmpresaDetailPage() {
 
   const tabs: { id: TabId; label: string; icon: any; badge?: number | string }[] = [
     { id: "dados", label: "Dados", icon: Building2 },
-    { id: "certidoes_central", label: "Central de Certidões", icon: Scale },
-    { id: "regularidade", label: "Regularidade", icon: ShieldCheck, badge: hasExpiring ? "!" : undefined },
+    { id: "regularidade", label: "Certidões & Regularidade", icon: ShieldCheck, badge: hasExpiring ? "!" : undefined },
     { id: "certificado", label: "Certificado Digital", icon: Award },
     { id: "financeiro", label: "Financeiro", icon: BarChart3 },
     { id: "processos", label: "Licitações", icon: FileText, badge: company.processes.length },
@@ -553,17 +552,18 @@ export function EmpresaDetailPage() {
         </div>
       )}
 
-      {/* ── TAB: CENTRAL DE CERTIDÕES ───────────────────────────── */}
-      {tab === "certidoes_central" && (
-        <CentralCertidoes
-          companyId={id}
-          company={{ id, cnpj: company.cnpj, razaoSocial: company.razaoSocial }}
-        />
-      )}
-
       {/* ── TAB: REGULARIDADE ───────────────────────────────────── */}
       {tab === "regularidade" && (
         <div className="space-y-6">
+          {/* Central de Certidões — seção principal antes do cofre */}
+          <CentralCertidoes
+            companyId={id}
+            company={{ id, cnpj: company.cnpj ?? "", razaoSocial: company.razaoSocial }}
+          />
+
+          {/* Divisor */}
+          <div className="border-t border-slate-200 pt-2" />
+
           {/* SICAF */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-4">
