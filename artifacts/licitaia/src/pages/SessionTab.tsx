@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getGetProcessQueryKey } from "@workspace/api-client-react";
 import { getToken } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -301,6 +303,7 @@ export function SessionTab({ processId, process, companyData }: {
   companyData?: any;
 }) {
   const token = getToken();
+  const queryClient = useQueryClient();
   const [sessionDate, setSessionDate] = useState<string | null>(process.sessionDate ?? null);
   const [alertsEnabled, setAlertsEnabled] = useState(process.sessionAlertsEnabled ?? false);
   const [checklist, setChecklist] = useState<Record<string, boolean>>(
@@ -357,6 +360,7 @@ export function SessionTab({ processId, process, companyData }: {
     });
     setSessionDate(iso);
     setEditingDate(false);
+    queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(processId) });
   };
 
   const handleChecklistChange = async (key: string, value: boolean) => {
