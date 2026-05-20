@@ -940,4 +940,101 @@ router.patch("/validation/:id", async (req, res) => {
   });
 });
 
+// ── POST /api/licitaia/ai/processes/:id/chat ─────────────────────────────────
+
+router.post("/licitaia/ai/processes/:id/chat", async (req, res) => {
+  const processId = parseInt(String(req.params.id));
+  if (isNaN(processId)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const { messages } = req.body as { messages: { role: string; content: string }[] };
+  if (!Array.isArray(messages) || messages.length === 0) {
+    res.status(400).json({ error: "Mensagens inválidas" }); return;
+  }
+
+  const userId = (req as any).userId as number;
+
+  const [proc] = await db.select().from(processesTable).where(eq(processesTable.id, processId));
+  if (!proc || proc.userId !== userId) { res.status(404).json({ error: "Processo não encontrado" }); return; }
+
+  const requirements = await db.select().from(extractedRequirementsTable)
+    .where(eq(extractedRequirementsTable.processId, processId));
+
+  const validations = await db.select().from(validationItemsTable)
+    .where(eq(validationItemsTable.processId, processId));
+
+  const reportsRaw = await db.select().from(finalReportsTable)
+    .where(eq(finalReportsTable.processId, processId));
+  const latestReport = reportsRaw[reportsRaw.length - 1];
+
+  const reqSummary = requirements.slice(0, 20).map(r =>
+    `  - [${r.category}] ${r.title}${r.description ? `: ${r.description.slice(0, 80)}` : ""}`
+  ).join("\n");
+
+  const valSummary = validations.slice(0, 20).map(v => {
+    const req = requirements.find(r => r.id === v.requirementId);
+    return `  - ${req?.title ?? "Exigência"}: ${v.status}${v.notes ? ` (${v.notes.slice(0, 60)})` : ""}`;
+  }).join("\n");
+
+  const statsOk = validations.filter(v => v.status === "ok").length;
+  const statsFaltando = validations.filter(v => v.status === "faltando").length;
+  const statsVencido = validations.filter(v => v.status === "vencido").length;
+
+  const systemPrompt = `Você é um assistente especialista em licitações públicas brasileiras do LicitaIA.
+Você está ajudando o usuário com um processo licitatório específico. Seja direto, prático e claro.
+Use linguagem simples — o usuário pode ser um MEI ou microempresário sem experiência jurídica.
+
+## PROCESSO ATUAL
+- **Título:** ${proc.title}
+- **Órgão:** ${proc.agency ?? "Não informado"}
+- **Modalidade:** ${proc.modality ?? "Não informada"}
+- **Número do edital:** ${proc.editalNumber ?? "Não informado"}
+- **Prazo de envio:** ${proc.deadline ? new Date(proc.deadline).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Não informado"}
+- **Status atual:** ${proc.status ?? "criado"}
+- **Objeto:** ${proc.object ?? "Não informado"}
+- **Valor estimado:** ${proc.estimatedValue ? `R$ ${proc.estimatedValue}` : "Não informado"}
+
+## EXIGÊNCIAS IDENTIFICADAS (${requirements.length} no total)
+${reqSummary || "  Nenhuma exigência extraída ainda."}
+
+## STATUS DOS DOCUMENTOS
+- ✅ Tudo certo: ${statsOk}
+- ❌ Faltando: ${statsFaltando}
+- ⚠️ Vencendo/Vencidos: ${statsVencido}
+${valSummary ? "\nDetalhes:\n" + valSummary : ""}
+
+${latestReport?.summary ? `## ANÁLISE DE VIABILIDADE\n${String(latestReport.summary).slice(0, 400)}` : ""}
+
+## INSTRUÇÕES
+- Responda apenas sobre este processo ou sobre licitações em geral
+- Se o usuário perguntar sobre documentos faltando, mencione quais estão com status "faltando" ou "vencido"
+- Se perguntar sobre prazos, mencione o prazo de envio acima
+- Seja encorajador mas realista — indique claramente quando algo está em risco
+- Respostas curtas (3–5 parágrafos máx.)
+- Nunca invente informações que não estão no contexto acima`;
+
+  const validMessages = messages
+    .filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .slice(-16);
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "system", content: systemPrompt }, ...validMessages],
+      max_tokens: 500,
+      temperature: 0.6,
+    });
+
+    const reply = completion.choices[0]?.message?.content ?? "Desculpe, não consegui responder. Tente novamente.";
+    res.json({ reply });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("401") || msg.includes("API key")) {
+      res.status(503).json({ error: "IA temporariamente indisponível." });
+    } else {
+      res.status(500).json({ error: "Erro ao processar. Tente novamente." });
+    }
+  }
+});
+
 export default router;
+
