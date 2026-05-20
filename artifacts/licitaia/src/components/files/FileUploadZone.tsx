@@ -9,10 +9,12 @@ interface FileUploadZoneProps {
   accept?: string;
   isUploading?: boolean;
   label?: string;
+  multiple?: boolean;
 }
 
-export function FileUploadZone({ onUpload, accept = ".pdf", isUploading, label = "Clique ou arraste um arquivo" }: FileUploadZoneProps) {
+export function FileUploadZone({ onUpload, accept = ".pdf", isUploading, label = "Clique ou arraste arquivos", multiple = false }: FileUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -22,32 +24,44 @@ export function FileUploadZone({ onUpload, accept = ".pdf", isUploading, label =
 
   const handleDragLeave = () => setIsDragging(false);
 
+  async function uploadFiles(files: FileList | File[]) {
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    setUploadingCount(arr.length);
+    for (const file of arr) {
+      await onUpload(file);
+      setUploadingCount(c => Math.max(0, c - 1));
+    }
+  }
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      await onUpload(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files?.length) {
+      await uploadFiles(multiple ? e.dataTransfer.files : [e.dataTransfer.files[0]]);
     }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      await onUpload(e.target.files[0]);
+    if (e.target.files?.length) {
+      await uploadFiles(e.target.files);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  const busy = isUploading || uploadingCount > 0;
 
   return (
     <div
       className={cn(
         "border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 flex flex-col items-center justify-center min-h-[160px]",
         isDragging ? "border-primary bg-primary/5" : "border-slate-200 hover:border-primary/50 hover:bg-slate-50",
-        isUploading && "opacity-50 pointer-events-none"
+        busy && "opacity-50 pointer-events-none"
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onClick={() => !isUploading && fileInputRef.current?.click()}
+      onClick={() => !busy && fileInputRef.current?.click()}
       role="button"
       tabIndex={0}
     >
@@ -57,12 +71,15 @@ export function FileUploadZone({ onUpload, accept = ".pdf", isUploading, label =
         onChange={handleFileChange}
         className="hidden"
         accept={accept}
+        multiple={multiple}
       />
       
-      {isUploading ? (
+      {busy ? (
         <div className="flex flex-col items-center text-primary">
           <Loader2 className="w-8 h-8 animate-spin mb-3" />
-          <p className="text-sm font-medium">Enviando arquivo...</p>
+          <p className="text-sm font-medium">
+            {uploadingCount > 1 ? `Enviando ${uploadingCount} arquivo(s)...` : "Enviando arquivo..."}
+          </p>
         </div>
       ) : (
         <>
@@ -70,7 +87,9 @@ export function FileUploadZone({ onUpload, accept = ".pdf", isUploading, label =
             <UploadCloud className="w-6 h-6" />
           </div>
           <p className="text-sm font-medium text-slate-700">{label}</p>
-          <p className="text-xs text-slate-500 mt-1">PDF até 50MB</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {multiple ? "PDF até 50MB · vários arquivos de uma vez" : "PDF até 50MB"}
+          </p>
         </>
       )}
     </div>

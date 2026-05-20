@@ -819,6 +819,7 @@ export function DocumentosTab({
 
             <FileUploadZone
               onUpload={handleDocUpload}
+              multiple={true}
               isUploading={uploadDocument.isPending}
               label="Adicionar documento"
             />
