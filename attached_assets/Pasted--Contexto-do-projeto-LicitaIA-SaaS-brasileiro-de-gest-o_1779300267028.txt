@@ -1,0 +1,449 @@
+## Contexto do projeto
+
+LicitaIA — SaaS brasileiro de gestão de licitações públicas para MEI e microempresas.
+
+Stack:
+- Frontend: React 19 + Vite, Tailwind CSS v4, Wouter, TanStack Query
+- Backend: Node.js + Express, Pino (logs)
+- Banco: PostgreSQL via Drizzle ORM
+- IA: OpenAI GPT-4o / GPT-4o-mini
+- Portas: API 8080, Frontend 24747
+
+## Estado atual
+
+O módulo de Empresas (/companies) já possui:
+- Cadastro de empresa com dados do CNPJ
+- Cofre de documentos (company_documents) com grupos e alertas de vencimento
+- Links para portais de habilitação (modal)
+- Alertas coloridos de vencimento no painel inicial
+
+O usuário hoje precisa:
+1. Acessar manualmente cada portal (Receita Federal, PGFN, FGTS, etc.)
+2. Informar o CNPJ em cada um
+3. Baixar o PDF da certidão
+4. Fazer upload manualmente no LicitaIA
+
+Este é o passo mais trabalhoso e repetitivo da habilitação, 
+especialmente porque as certidões têm validades curtas (90-180 dias) 
+e precisam ser renovadas com frequência.
+
+## O que precisa ser implementado
+
+### 1. Central de certidões na página da empresa
+
+Adicionar nova seção "Central de certidões" na página da empresa 
+(/companies/:id), logo após os dados cadastrais e antes do cofre 
+de documentos atual.
+
+A seção exibe um card para cada tipo de certidão suportada, 
+com status de cada uma e ações disponíveis.
+
+---
+
+### 2. Certidões suportadas e suas fontes
+
+Implementar suporte para as seguintes certidões, todas obtidas 
+via scraping/automação do backend:
+
+**A) CND Federal — Certidão Negativa de Débitos Federais**
+Emissor: Receita Federal + PGFN (emitidas conjuntamente)
+URL de emissão: 
+https://solucoes.receita.fazenda.gov.br/servicos/certidaointernet/pj/emitir
+Método: POST com CNPJ, scraping do PDF gerado
+Validade típica: 180 dias
+Campo no banco: "cnd_federal"
+
+**B) Certidão de Regularidade do FGTS — CRF**
+Emissor: Caixa Econômica Federal
+URL de consulta:
+https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf
+Método: POST com CNPJ, scraping do PDF
+Validade típica: 30 dias
+Campo no banco: "crf_fgts"
+
+**C) CNDT — Certidão Negativa de Débitos Trabalhistas**
+Emissor: Tribunal Superior do Trabalho
+URL de emissão:
+https://cndt-certidao.tst.jus.br/inicio.faces
+Método: POST com CNPJ, scraping do PDF
+Validade típica: 180 dias
+Campo no banco: "cndt"
+
+**D) Certidão Estadual — SEFAZ**
+Emissor: varia por UF da empresa
+Implementar para os principais estados:
+- SP: https://www.fazenda.sp.gov.br/certidaoCD/faces/index.xhtml
+- MG: https://www.fazenda.mg.gov.br/empresas/certidoes/
+- RJ: https://www.fazenda.rj.gov.br/sefaz/faces/home.jspx
+- RS: https://www.sefaz.rs.gov.br/sat/CertidaoSitFiscal.aspx
+- PR: https://www.fazenda.pr.gov.br/
+- BA, SC, GO: exibir link direto sem automação nesta versão
+Validade típica: 30-90 dias (varia por estado)
+Campo no banco: "certidao_estadual"
+
+**E) Certidão Municipal — ISS**
+Emissor: prefeitura do município da empresa
+Implementar para as principais capitais:
+- São Paulo: https://notadomilhao.prefeitura.sp.gov.br/
+- Curitiba: https://www.curitiba.pr.gov.br/
+- Porto Alegre: https://www.portoalegre.rs.gov.br/
+- Para demais municípios: exibir link direto para o site 
+  da prefeitura + instrução manual
+Validade típica: 30-180 dias
+Campo no banco: "certidao_municipal"
+
+---
+
+### 3. Arquitetura de automação no backend
+
+Dado que scraping de portais governamentais é tecnicamente 
+complexo e instável, implementar em camadas:
+
+**Camada 1 — Scraping automatizado (quando viável)**
+
+Usar Puppeteer para automação de browser headless.
+Instalar: npm install puppeteer
+
+Para cada certidão com scraping implementado:
+1. Abrir o portal em browser headless
+2. Preencher o campo de CNPJ
+3. Submeter o formulário
+4. Aguardar o PDF ser gerado ou o resultado aparecer
+5. Se resultado for "negativa" (regular): baixar o PDF
+6. Se resultado for "positiva" (irregular): capturar a mensagem
+7. Fechar o browser e retornar o PDF ou o status
+
+Timeout máximo por certidão: 30 segundos
+Em caso de timeout ou erro: retornar status "falha_automacao"
+
+**Camada 2 — Download direto por código de verificação**
+
+Alguns portais oferecem URL de download direto se o usuário 
+informar o código de verificação de uma certidão anterior.
+Implementar esse fluxo como alternativa ao scraping:
+- Campo: "Tenho o código de verificação de uma certidão válida"
+- Input do código
+- Backend monta a URL de download direto e baixa o PDF
+
+**Camada 3 — Fallback guiado (quando scraping não funciona)**
+
+Quando as camadas 1 e 2 falharem ou não estiverem implementadas:
+- Exibir botão "Emitir manualmente" que abre o portal correto
+- Exibir instruções passo a passo específicas para aquela certidão
+- Após o usuário baixar manualmente, exibir campo de upload
+- Após upload, IA lê o PDF e extrai automaticamente:
+  - Data de emissão
+  - Data de validade  
+  - Resultado (negativa/positiva/positiva com efeito de negativa)
+  - Número/código da certidão
+- Salvar tudo em company_documents sem precisar que o usuário 
+  preencha nenhum campo manualmente
+
+---
+
+### 4. Extração de dados do PDF por IA
+
+Este é o componente mais importante e confiável do módulo.
+Independente de como o PDF chegou (automático ou upload manual),
+sempre processar o PDF com IA para extrair os metadados.
+
+Endpoint: POST /api/companies/:id/certidoes/:tipo/extract
+
+Funcionamento:
+1. Receber o PDF (file ou URL interna)
+2. Extrair texto do PDF usando pdf-parse
+3. Enviar o texto para GPT-4o-mini com o seguinte prompt:
+
+"Você é um assistente especializado em certidões brasileiras.
+Analise o texto da certidão abaixo e extraia as informações 
+em formato JSON. Retorne APENAS o JSON, sem texto adicional.
+
+Texto da certidão:
+[TEXTO_DO_PDF]
+
+Retorne:
+{
+  'tipo_certidao': 'nome oficial da certidão',
+  'emissor': 'órgão emissor',
+  'cnpj': 'CNPJ consultado (apenas números)',
+  'razao_social': 'razão social da empresa',
+  'resultado': 'negativa|positiva|positiva_efeito_negativa|nao_identificado',
+  'data_emissao': 'DD/MM/AAAA',
+  'data_validade': 'DD/MM/AAAA ou null se não encontrada',
+  'codigo_verificacao': 'código ou null',
+  'url_verificacao': 'URL de verificação ou null',
+  'observacoes': 'informações relevantes adicionais ou null'
+}"
+
+4. Parsear o JSON retornado
+5. Validar CNPJ extraído contra o CNPJ da empresa
+6. Criar ou atualizar registro em company_documents com:
+   - name: nome oficial da certidão
+   - type: tipo da certidão (campo no banco)
+   - issue_date: data de emissão
+   - expiry_date: data de validade
+   - file_url: URL do arquivo armazenado
+   - metadata: JSON completo extraído
+   - status: calculado (valid/expiring/expired) baseado em expiry_date
+7. Recriar alertas de vencimento para esta certidão
+8. Retornar dados extraídos para o frontend
+
+---
+
+### 5. Card de certidão no frontend
+
+Para cada certidão, exibir um card com:
+
+**Cabeçalho do card:**
+- Ícone representando o emissor
+- Nome da certidão
+- Badge de status:
+  - "Válida" (verde) — dentro da validade
+  - "Vencendo" (amarelo) — vence em até 30 dias
+  - "Vencida" (vermelho) — data de validade passou
+  - "Não cadastrada" (cinza) — não há documento no sistema
+
+**Corpo do card (quando cadastrada):**
+- Data de emissão
+- Data de validade
+- Resultado: "Negativa (regular)" ou "Positiva (irregular)"
+- Código de verificação (se disponível)
+- Dias restantes de validade
+- Mini barra de progresso da validade
+
+**Rodapé do card — botões de ação:**
+
+Se resultado for "positiva" (empresa com débitos):
+- Exibir alerta vermelho: "Empresa com pendências — certidão positiva"
+- Botão "Ver detalhes no portal"
+- Não exibir opção de renovar automaticamente
+
+Se certidão válida:
+- Botão "Renovar" (disponível mesmo dentro da validade, 
+  pois o usuário pode querer renovar antes de um processo)
+- Botão "Ver PDF"
+- Botão "Baixar PDF"
+
+Se certidão vencida ou não cadastrada:
+- Botão primário "Emitir certidão" (inicia o fluxo automático)
+- Link secundário "Emitir manualmente" (abre portal externo)
+
+---
+
+### 6. Fluxo de emissão automática — UX
+
+Ao clicar em "Emitir certidão", abrir modal com stepper de 3 etapas:
+
+**Etapa 1 — Verificando dados**
+- Exibir CNPJ e razão social da empresa
+- Confirmar que os dados estão corretos
+- Botão "Confirmar e emitir"
+
+**Etapa 2 — Processando**
+- Spinner + mensagem: "Acessando o portal da [emissor]..."
+- Mensagem secundária: "Isso pode levar até 30 segundos"
+- Não fechar o modal durante o processamento
+
+**Etapa 3A — Sucesso**
+- Ícone verde de check
+- Dados extraídos: resultado, emissão, validade
+- Preview do nome do arquivo
+- Botão "Ver certidão" e botão "Fechar"
+- Atualizar o card automaticamente após fechar
+
+**Etapa 3B — Falha na automação**
+- Ícone amarelo de atenção
+- Mensagem: "Não foi possível emitir automaticamente. 
+  O portal pode estar instável ou exigir autenticação adicional."
+- Botão "Emitir manualmente" → abre portal em nova aba
+- Campo de upload aparece imediatamente abaixo
+- Instrução: "Após baixar a certidão, faça o upload aqui 
+  e extrairemos os dados automaticamente"
+- Campo de upload aceita apenas PDF
+- Ao fazer upload: dispara extração por IA (item 4)
+
+---
+
+### 7. Renovação em lote
+
+Botão "Renovar todas as certidões" no topo da Central de Certidões.
+
+Ao clicar:
+- Exibir checklist de quais certidões serão renovadas
+  (apenas as vencidas ou vencendo em 30 dias, pré-selecionadas)
+- Usuário pode desmarcar as que não quer renovar
+- Botão "Iniciar renovação em lote"
+
+Processamento:
+- Executar as renovações em sequência (não paralelo, 
+  para não sobrecarregar os portais)
+- Exibir barra de progresso: "Renovando 2 de 5 certidões..."
+- Para cada certidão: mostrar ✅ sucesso ou ⚠️ falhou (manual necessário)
+- Ao final: resumo com quantas foram renovadas e quais precisam 
+  de atenção manual
+
+---
+
+### 8. Widget atualizado no painel inicial (/inicio)
+
+O painel inicial já possui um widget de documentos a vencer.
+Atualizar para que certidões emitidas automaticamente 
+também apareçam nesse widget com destaque especial:
+
+- Certidões com vencimento em até 30 dias: aparece no widget 
+  com badge "Renovar automaticamente" ao lado
+- Ao clicar no badge: dispara renovação automática diretamente 
+  do painel, sem precisar ir à página da empresa
+
+---
+
+### 9. Histórico de emissões
+
+Para cada tipo de certidão, manter histórico das últimas emissões.
+
+Nova tabela certidao_history:
+CREATE TABLE certidao_history (
+  id serial PRIMARY KEY,
+  company_id integer REFERENCES companies(id),
+  certidao_type text NOT NULL,
+  resultado text NOT NULL,
+  issued_at timestamp NOT NULL,
+  expires_at timestamp,
+  file_url text,
+  extraction_data jsonb,
+  emission_method text NOT NULL, -- 'automatic' | 'manual_upload' | 'code'
+  created_at timestamp DEFAULT now()
+);
+
+Exibir histórico como tabela colapsável no rodapé de cada card de certidão:
+Colunas: Data de emissão | Validade | Resultado | Como foi emitida | PDF
+
+---
+
+### 10. Alterações no banco de dados
+
+Nova tabela certidao_history (ver item 9).
+
+Na tabela company_documents, garantir existência das colunas:
+- metadata: jsonb (para dados extraídos pela IA)
+- emission_method: text ('automatic' | 'manual_upload' | 'manual')
+- certidao_type: text (tipo padronizado para lógica de renovação)
+
+Se essas colunas não existirem, criar migration para adicioná-las.
+
+Criar todas as migrations com Drizzle.
+
+---
+
+### 11. Endpoints de API necessários
+
+- POST /api/companies/:id/certidoes/:tipo/emitir
+  Dispara o scraping automatizado via Puppeteer
+  :tipo = cnd_federal | crf_fgts | cndt | certidao_estadual | certidao_municipal
+  Retorna: { success, data, fileUrl, error }
+
+- POST /api/companies/:id/certidoes/:tipo/extract
+  Recebe PDF via upload, extrai dados com IA, salva em company_documents
+  Retorna: dados extraídos
+
+- POST /api/companies/:id/certidoes/renovar-lote
+  Body: { tipos: string[] }
+  Executa renovação sequencial e retorna resultados por tipo
+
+- GET /api/companies/:id/certidoes
+  Retorna status atual de todas as certidões da empresa
+  (busca em company_documents agrupado por certidao_type)
+
+- GET /api/companies/:id/certidoes/:tipo/history
+  Retorna histórico de emissões de um tipo específico
+
+---
+
+### 12. Tratamento de instabilidade dos portais
+
+Os portais governamentais são notoriamente instáveis. 
+Implementar as seguintes salvaguardas:
+
+- Timeout de 30s por tentativa com mensagem clara ao usuário
+- Retry automático uma vez em caso de timeout
+- Se o portal retornar CAPTCHA: detectar e cair imediatamente 
+  para o fluxo manual, sem tentar resolver o CAPTCHA
+- Logar todas as falhas com detalhes (portal, erro, timestamp) 
+  para análise posterior
+- Nunca exibir erros técnicos (stack trace, mensagens do Puppeteer) 
+  para o usuário — sempre traduzir para linguagem amigável
+- Se Puppeteer não estiver disponível no ambiente (ex: Replit 
+  sem suporte a Chrome headless): detectar no startup e desabilitar 
+  a camada 1 automaticamente, exibindo apenas os fluxos manual 
+  e por código de verificação
+
+**Detecção de ambiente no startup:**
+No server.js, ao iniciar:
+try {
+  const browser = await puppeteer.launch({ 
+    headless: true, 
+    args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+  });
+  await browser.close();
+  console.log('[certidoes] Puppeteer disponível — automação ativa');
+  global.PUPPETEER_AVAILABLE = true;
+} catch (e) {
+  console.log('[certidoes] Puppeteer indisponível — modo manual ativo');
+  global.PUPPETEER_AVAILABLE = false;
+}
+
+Usar global.PUPPETEER_AVAILABLE nos endpoints para decidir 
+qual camada usar.
+
+---
+
+### 13. UX e visual
+
+- Ícones Lucide React:
+  CND Federal: Building2
+  FGTS: Briefcase  
+  Trabalhista: Scale
+  Estadual: MapPin
+  Municipal: Map
+  Renovar: RefreshCw
+  Histórico: History
+  Sucesso: CheckCircle2
+  Falha: AlertCircle
+  PDF: FileText
+
+- Grid de cards: 2 colunas em desktop, 1 em mobile
+- Cards com borda colorida no lado esquerdo por status:
+  verde (válida), amarela (vencendo), vermelha (vencida), 
+  cinza (não cadastrada)
+- Barra de validade: mesma lógica visual do módulo de Contratos
+- Todo texto em português (pt-BR)
+- Datas: dd/mm/yyyy
+- Nunca mostrar "loading" por mais de 30s sem feedback — 
+  após 30s sem resposta do backend, mostrar fallback manual
+
+---
+
+### Observações importantes
+
+- O Replit pode não suportar Puppeteer com Chrome headless 
+  dependendo do plano. O código deve funcionar corretamente 
+  com PUPPETEER_AVAILABLE = false, oferecendo apenas o fluxo 
+  de upload manual + extração por IA, que já agrega 
+  valor enorme sozinho
+  
+- A extração por IA (item 4) é o núcleo do módulo e deve 
+  funcionar independente da automação — mesmo que o usuário 
+  faça o upload manualmente, eliminar o preenchimento manual 
+  de data de validade e resultado já é uma grande melhoria
+
+- Certidões estaduais e municipais têm formatos muito variados — 
+  treinar o prompt de extração para ser resiliente a diferentes 
+  layouts de PDF, sempre retornando o JSON mesmo que alguns 
+  campos sejam null
+
+- Nunca armazenar credenciais do usuário (login/senha dos portais) 
+  — a automação deve funcionar apenas com CNPJ público, 
+  que é o suficiente para emissão das certidões negativas
+
+- Não remover nem alterar funcionalidades existentes do módulo 
+  de Empresas e do cofre de documentos atual
