@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ProcessAnalysisTab } from "./ProcessAnalysisTab";
 import { DocumentosTab } from "./DocumentosTab";
 import { PropostaTab } from "./PropostaTab";
+import { SessionTab } from "./SessionTab";
 import { getToken } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useRoute, useLocation } from "wouter";
@@ -191,7 +192,7 @@ export function ProcessDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"resumo" | "analise" | "documentos" | "proposta" | "verificacao">("resumo");
+  const [activeTab, setActiveTab] = useState<"resumo" | "analise" | "documentos" | "proposta" | "verificacao" | "sessao">("resumo");
   const [companyData, setCompanyData] = useState<any>(null);
 
   const token = getToken();
@@ -436,12 +437,14 @@ export function ProcessDetailPage() {
 
         {/* ── Tab navigation ─────────────────────────────────────────────── */}
         {(() => {
-          const tabs: { id: "resumo" | "analise" | "documentos" | "proposta" | "verificacao"; label: string; locked: boolean }[] = [
+          const isPregao = /pregão/i.test(process.modality ?? "");
+          const tabs: { id: "resumo" | "analise" | "documentos" | "proposta" | "verificacao" | "sessao"; label: string; locked: boolean }[] = [
             { id: "resumo", label: "Resumo", locked: false },
             { id: "analise", label: "Análise IA", locked: !process.editalFile },
             { id: "documentos", label: "Documentos", locked: !hasRequirements && !isInConference },
             { id: "proposta", label: "Proposta", locked: false },
             { id: "verificacao", label: "Verificação", locked: !isInConference },
+            ...(isPregao ? [{ id: "sessao" as const, label: "Sessão", locked: false }] : []),
           ];
           return (
             <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: '#F1F5F9' }}>
@@ -587,6 +590,15 @@ export function ProcessDetailPage() {
         {/* ── ETAPA 4: Proposta Comercial ───────────────────────────────── */}
         {activeTab === "proposta" && (
           <PropostaTab process={process} companyData={companyData} />
+        )}
+
+        {/* ── ETAPA 5: Sessão de Disputa ────────────────────────────────── */}
+        {activeTab === "sessao" && (
+          <SessionTab
+            processId={id}
+            process={process as any}
+            companyData={companyData}
+          />
         )}
 
         {/* ── ETAPA 3: Verificação ──────────────────────────────────────── */}

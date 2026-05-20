@@ -27,3 +27,5 @@ export * from "./generated-declarations";
 export * from "./document-alerts";
 export * from "./process-proposals";
 export * from "./market-price-research";
+export * from "./session-alerts";
+export * from "./session-bids";

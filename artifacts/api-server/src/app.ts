@@ -6,6 +6,7 @@ import fs from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { startMonitorJob } from "./services/monitor-job";
+import { startSessionAlertJob } from "./services/session-alert-job";
 
 const app: Express = express();
 
@@ -39,5 +40,6 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 app.use("/uploads", express.static(UPLOADS_DIR));
 
 startMonitorJob();
+startSessionAlertJob();
 
 export default app;

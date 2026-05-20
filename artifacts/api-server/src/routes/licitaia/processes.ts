@@ -132,6 +132,7 @@ router.get("/:id", async (req, res) => {
     companyName,
     createdAt: process.createdAt.toISOString(),
     updatedAt: process.updatedAt.toISOString(),
+    sessionDate: process.sessionDate ? process.sessionDate.toISOString() : null,
     editalFile: editalFile ? { ...editalFile, uploadedAt: editalFile.uploadedAt.toISOString() } : null,
     documentFiles: documentFiles.map(f => ({ ...f, uploadedAt: f.uploadedAt.toISOString() })),
     requirements: requirements.map(r => ({ ...r, createdAt: r.createdAt.toISOString() })),

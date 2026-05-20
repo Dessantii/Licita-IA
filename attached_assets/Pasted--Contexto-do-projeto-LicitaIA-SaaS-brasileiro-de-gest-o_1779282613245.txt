@@ -1,0 +1,318 @@
+## Contexto do projeto
+
+LicitaIA — SaaS brasileiro de gestão de licitações públicas para MEI e microempresas.
+
+Stack:
+- Frontend: React 19 + Vite, Tailwind CSS v4, Wouter, TanStack Query
+- Backend: Node.js + Express, Pino (logs)
+- Banco: PostgreSQL via Drizzle ORM
+- IA: OpenAI GPT-4o / GPT-4o-mini
+- Portas: API 8080, Frontend 24747
+
+## Estado atual
+
+O processo licitatório (/processes/:id) possui abas de Documentos, 
+Proposta e Análise. Não existe nenhuma funcionalidade relacionada 
+à sessão de disputa (pregão eletrônico). O usuário acompanha a sessão 
+manualmente na plataforma do governo, sem nenhum suporte do LicitaIA 
+durante esse momento crítico.
+
+A tabela processes já possui campos como:
+- session_date (data/hora da sessão, se extraída do edital)
+- estimated_value (valor estimado da licitação)
+- object (objeto licitado)
+- modality (modalidade: pregão, concorrência, etc.)
+
+A tabela process_proposals já possui os dados da proposta do usuário:
+- total_value (valor total da proposta gerada)
+- items (jsonb com itens, quantidades e preços)
+
+## O que precisa ser implementado
+
+### 1. Nova aba "Sessão" na página do processo
+
+Adicionar a aba "Sessão" na navegação interna do processo,
+visível apenas quando a modalidade for Pregão Eletrônico ou 
+Pregão Presencial (verificar campo modality).
+
+A aba deve ter três estados:
+- Pré-sessão: quando session_date ainda não chegou
+- Sessão ao vivo: quando session_date é hoje (dentro de ±4h)
+- Pós-sessão: quando session_date já passou
+
+---
+
+### 2. Estado Pré-sessão
+
+Exibir:
+
+**Card de countdown**
+- Título: "Sessão de disputa em"
+- Countdown em tempo real mostrando: dias, horas, minutos e segundos
+- Atualizar a cada segundo com JavaScript
+- Abaixo do countdown: data e hora formatadas (ex: "Terça-feira, 24 de junho de 2025 às 09h00")
+- Se session_date não estiver preenchido: exibir campo para o usuário 
+  informar manualmente a data/hora da sessão e salvar via PATCH /api/processes/:id
+
+**Card de preparação**
+Checklist simples (checkboxes persistidos no banco) com os itens:
+- [ ] Proposta gerada e assinada
+- [ ] Proposta submetida na plataforma
+- [ ] Certificado digital funcionando e dentro da validade
+- [ ] Acesso à plataforma testado
+- [ ] Calculadora de lance configurada (ver item 3)
+- [ ] Notificação de início ativada (ver item 4)
+
+**Card de resumo da proposta**
+- Valor total da proposta submetida (de process_proposals.total_value)
+- Número de itens
+- Regime tributário utilizado
+- Link para a aba de Proposta
+
+---
+
+### 3. Calculadora de lance mínimo viável
+
+Componente fixo na aba Sessão, disponível em todos os estados.
+
+**Inputs do usuário:**
+- Custo total dos itens (pré-preenchido com o valor de custo calculado 
+  na proposta, editável)
+- Margem mínima aceitável (%) — campo numérico, default 5%
+- Regime tributário (pré-preenchido do perfil da empresa, editável)
+  Opções: MEI, Simples Nacional, Lucro Presumido, Lucro Real
+- Impostos incidentes (%) — calculado automaticamente pelo regime, editável
+
+**Outputs calculados em tempo real:**
+- Lance mínimo viável: valor abaixo do qual o usuário opera no prejuízo
+  Fórmula: custo_total / (1 - impostos/100 - margem/100)
+- Lance atual da proposta: valor de process_proposals.total_value
+- Margem atual (%): (lance_proposta - custo_total) / lance_proposta * 100
+- Economia possível: lance_proposta - lance_minimo (quanto ainda pode baixar)
+
+**Visualização:**
+- Barra horizontal mostrando três pontos:
+  [Lance mínimo] ←————————→ [Lance atual] ←——→ [Proposta original]
+  Colorir a zona entre mínimo e atual em verde (zona segura)
+  Colorir abaixo do mínimo em vermelho (zona de prejuízo)
+- Abaixo da barra: "Você ainda pode reduzir até R$ X,XX sem prejuízo"
+- Se o usuário digitar um valor de lance hipotético, mostrar 
+  instantaneamente se está na zona segura ou de risco
+
+**Campo de simulação rápida:**
+- Input: "Simular lance de R$ ___"
+- Output imediato: 
+  - Margem resultante (%)
+  - Lucro/prejuízo estimado (R$)
+  - Indicador visual: ✅ Viável ou ⚠️ Margem baixa ou ❌ Prejuízo
+
+---
+
+### 4. Notificações de início de sessão
+
+**No frontend:**
+- Toggle "Ativar alerta de início de sessão" 
+- Quando ativado, usar a Notifications API do browser para solicitar permissão
+- Se permissão concedida: agendar notificação via setTimeout para:
+  - 1 hora antes da sessão: "Sessão começa em 1 hora — prepare-se"
+  - 15 minutos antes: "Sessão começa em 15 minutos — acesse a plataforma"
+  - No horário exato: "Sessão iniciando agora!"
+- Exibir aviso: "Mantenha esta aba aberta para receber os alertas"
+
+**Por e-mail (backend):**
+- Criar job agendado simples: ao salvar/atualizar session_date, 
+  registrar na tabela session_alerts:
+  id, process_id, user_id, alert_time, alert_type, sent (boolean)
+  
+  Criar três registros por sessão:
+  - alert_time = session_date - 60 min, type = "1h_before"
+  - alert_time = session_date - 15 min, type = "15min_before"  
+  - alert_time = session_date, type = "session_start"
+
+- Criar endpoint GET /api/cron/session-alerts que:
+  1. Busca registros em session_alerts onde sent = false 
+     e alert_time <= now()
+  2. Para cada registro, envia e-mail simples ao usuário do processo
+     com o template adequado ao type
+  3. Marca sent = true
+
+  Configurar esse endpoint para ser chamado a cada 5 minutos via 
+  setInterval no server startup (sem dependência de cron externo)
+
+- Templates de e-mail (texto simples, sem HTML complexo):
+  - 1h_before: "Sua sessão de disputa para [objeto] começa em 1 hora.
+    Acesse [plataforma] e fique atento."
+  - 15min_before: "ATENÇÃO: sessão de [objeto] começa em 15 minutos."
+  - session_start: "Sua sessão está iniciando agora. Boa sorte!"
+
+---
+
+### 5. Estado Sessão ao vivo
+
+Quando session_date for hoje (dentro de ±4 horas do horário atual):
+
+**Banner de destaque no topo da aba:**
+- Fundo verde pulsante (animação CSS suave, não distrativa)
+- Texto: "🔴 Sessão em andamento"
+- Botão de acesso rápido à plataforma (nome e URL detectados conforme 
+  lógica já implementada no Prompt 1)
+
+**Calculadora de lance em destaque**
+- A calculadora (item 3) deve ficar no topo da página durante a sessão,
+  com destaque visual maior
+- Campo de simulação rápida mais proeminente
+
+**Registro de lances (log manual)**
+Tabela simples onde o usuário pode registrar os lances que observa 
+na plataforma durante a sessão:
+
+Colunas: Horário | Valor do lance | Tipo (próprio / concorrente) | Observação
+
+- Botão "Registrar lance" abre um mini-formulário inline
+- Lances salvos em nova tabela session_bids:
+  id, process_id, bid_time (timestamp), bid_value (numeric), 
+  bid_type (own/competitor), notes (text)
+- Exibir a tabela em ordem cronológica decrescente
+- Calcular e exibir: "Menor lance registrado: R$ X,XX" e 
+  "Seu último lance: R$ X,XX"
+
+**Cronômetro de sessão**
+- Mostrar há quanto tempo a sessão está em andamento
+- Contador crescente a partir de session_date
+
+---
+
+### 6. Estado Pós-sessão
+
+Quando session_date já passou:
+
+**Card de resultado**
+- Campos para o usuário registrar o resultado:
+  - Resultado: dropdown (Vencedor / Não vencedor / Sessão suspensa / 
+    Licitação deserta / Aguardando homologação)
+  - Valor adjudicado: campo numérico (se vencedor)
+  - Posição final: campo numérico (ex: 2º lugar)
+  - Observações: textarea livre
+
+- Salvar em nova coluna session_result (jsonb) na tabela processes
+
+**Se resultado = Vencedor:**
+- Exibir banner verde de parabéns
+- Exibir botão "Ir para Gestão de Contrato" 
+  (redirecionar para /processes/:id, aba Contrato — que será criada 
+  no próximo módulo)
+- Exibir checklist pós-vitória:
+  - [ ] Aguardar homologação oficial
+  - [ ] Verificar prazo para assinatura do contrato
+  - [ ] Providenciar garantia contratual (se exigida)
+  - [ ] Verificar pendências fiscais (prazo LC 123 se aplicável)
+
+**Se resultado = Não vencedor:**
+- Exibir resumo: valor do vencedor (se o usuário souber), diferença 
+  percentual em relação à proposta enviada
+- Sugestão gerada por IA: "Para a próxima licitação similar, considere..."
+  (chamada simples ao GPT-4o-mini com o contexto do resultado)
+
+**Histórico de lances registrados**
+- Exibir a tabela completa dos lances registrados durante a sessão
+- Gráfico de linha simples mostrando evolução dos lances ao longo do tempo
+  (usar recharts, já instalado no projeto)
+
+---
+
+### 7. Alterações no banco de dados
+
+Novas tabelas:
+
+CREATE TABLE session_alerts (
+  id serial PRIMARY KEY,
+  process_id integer REFERENCES processes(id),
+  user_id integer REFERENCES users(id),
+  alert_time timestamp NOT NULL,
+  alert_type text NOT NULL,
+  sent boolean DEFAULT false,
+  created_at timestamp DEFAULT now()
+);
+
+CREATE TABLE session_bids (
+  id serial PRIMARY KEY,
+  process_id integer REFERENCES processes(id),
+  bid_time timestamp DEFAULT now(),
+  bid_value numeric(12,2) NOT NULL,
+  bid_type text NOT NULL,
+  notes text,
+  created_at timestamp DEFAULT now()
+);
+
+Na tabela processes, adicionar:
+- session_alerts_enabled: boolean default false
+- session_result: jsonb
+- session_checklist: jsonb (para os checkboxes de preparação)
+
+Criar todas as migrations com Drizzle.
+
+---
+
+### 8. Endpoints de API necessários
+
+- PATCH /api/processes/:id/session-date
+  Body: { sessionDate: string (ISO) }
+  Atualiza session_date e recria os registros em session_alerts
+
+- PATCH /api/processes/:id/session-alerts
+  Body: { enabled: boolean }
+  Atualiza session_alerts_enabled
+
+- PATCH /api/processes/:id/session-checklist
+  Body: { checklist: object }
+  Atualiza session_checklist
+
+- POST /api/processes/:id/session-bids
+  Body: { bidValue, bidType, notes }
+  Cria registro em session_bids
+
+- GET /api/processes/:id/session-bids
+  Retorna lista de lances do processo
+
+- PATCH /api/processes/:id/session-result
+  Body: { resultado, valorAdjudicado, posicaoFinal, observacoes }
+  Atualiza session_result
+
+- GET /api/cron/session-alerts
+  Endpoint interno de disparo de alertas (chamado pelo setInterval)
+
+---
+
+### 9. UX e visual
+
+- Ícones Lucide React: Timer, Bell, Calculator, TrendingDown, 
+  Trophy, AlertCircle, CheckCircle2
+- Calculadora deve atualizar outputs sem delay perceptível (onChange)
+- A barra de margem deve ser um componente SVG ou div simples com 
+  larguras calculadas em porcentagem
+- Animação do banner "em andamento": usar pulse do Tailwind 
+  (animate-pulse) no indicador vermelho, não no card inteiro
+- Gráfico de lances: LineChart do recharts com eixo X = horário, 
+  eixo Y = valor em R$, uma linha para lances próprios (verde) 
+  e uma para concorrentes (vermelho)
+- Todo texto em português (pt-BR), valores monetários 
+  formatados como R$ X.XXX,XX
+- Responsivo para mobile (usuário provavelmente estará no celular 
+  durante a sessão)
+
+---
+
+### Observações importantes
+
+- A sessão de disputa é o momento de maior pressão para o usuário —
+  a UX deve ser limpa, sem distrações, com as informações mais 
+  importantes em destaque
+- A calculadora é o componente mais crítico: deve funcionar 
+  100% offline (sem chamadas à API), calculando tudo no frontend
+- Não implementar automação de lances — apenas monitoramento e 
+  suporte à decisão humana
+- O registro de lances é manual por design: não tentamos integrar 
+  com as plataformas, apenas ajudamos o usuário a organizar 
+  o que ele está vendo
+- Toda a lógica de countdown deve tratar corretamente 
+  fusos horários (usar horário de Brasília — UTC-3)

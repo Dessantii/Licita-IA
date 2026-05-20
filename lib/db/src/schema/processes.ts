@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { companiesTable } from "./companies";
@@ -26,6 +26,10 @@ export const processesTable = pgTable("processes", {
   deadline: text("deadline"),
   notes: text("notes"),
   status: text("status").notNull().default("criado"),
+  sessionDate: timestamp("session_date", { withTimezone: true }),
+  sessionAlertsEnabled: boolean("session_alerts_enabled").default(false),
+  sessionResult: jsonb("session_result"),
+  sessionChecklist: jsonb("session_checklist"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
