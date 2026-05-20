@@ -398,6 +398,7 @@ export function SessionTab({ processId, process, companyData }: {
     setSavingResult(false);
     setResultSaved(true);
     setTimeout(() => setResultSaved(false), 3000);
+    queryClient.invalidateQueries({ queryKey: getGetProcessQueryKey(processId) });
   };
 
   const handleGetSuggestion = async () => {
@@ -628,6 +629,56 @@ export function SessionTab({ processId, process, companyData }: {
                 </div>
               ))
             )}
+          </div>
+        </div>
+
+        {/* Result form — available during live session too */}
+        <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #E8EFF6' }}>
+          <div className="px-5 py-4 flex items-center gap-2" style={{ background: '#F8FAFC', borderBottom: '1px solid #E8EFF6' }}>
+            <Trophy className="w-4 h-4 text-amber-500" />
+            <h4 className="font-semibold text-slate-800 text-sm">Registrar resultado da sessão</h4>
+            <span className="ml-auto text-xs text-slate-400">Preencha ao encerrar a sessão</span>
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Resultado</label>
+              <select value={result.resultado} onChange={e => setResult(p => ({ ...p, resultado: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border text-sm" style={{ borderColor: '#E2E8F0', background: 'white' }}>
+                <option value="">Selecione...</option>
+                <option value="vencedor">Vencedor</option>
+                <option value="nao_vencedor">Não vencedor</option>
+                <option value="suspenso">Sessão suspensa</option>
+                <option value="deserta">Licitação deserta</option>
+                <option value="aguardando">Aguardando homologação</option>
+              </select>
+            </div>
+            {(result.resultado === "vencedor" || result.resultado === "nao_vencedor") && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
+                    {result.resultado === "vencedor" ? "Valor adjudicado (R$)" : "Valor do vencedor (R$)"}
+                  </label>
+                  <input type="number" value={result.valorAdjudicado ?? ""} onChange={e => setResult(p => ({ ...p, valorAdjudicado: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border text-sm" style={{ borderColor: '#E2E8F0', background: 'white' }} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Posição final</label>
+                  <input type="number" value={result.posicaoFinal ?? ""} onChange={e => setResult(p => ({ ...p, posicaoFinal: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border text-sm" style={{ borderColor: '#E2E8F0', background: 'white' }} />
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Observações</label>
+              <textarea value={result.observacoes ?? ""} onChange={e => setResult(p => ({ ...p, observacoes: e.target.value }))}
+                rows={3} className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
+                style={{ borderColor: '#E2E8F0', background: 'white' }} placeholder="Anotações sobre a sessão..." />
+            </div>
+            <Button onClick={handleSaveResult} disabled={savingResult || !result.resultado}
+              style={{ background: '#0066FF' }} className="text-white gap-2">
+              {savingResult ? <Loader2 className="w-4 h-4 animate-spin" /> : resultSaved ? <Check className="w-4 h-4" /> : null}
+              {resultSaved ? "Salvo!" : "Salvar resultado"}
+            </Button>
           </div>
         </div>
       </div>
