@@ -8,6 +8,9 @@ import { logger } from "./lib/logger";
 import { startMonitorJob } from "./services/monitor-job";
 import { startSessionAlertJob } from "./services/session-alert-job";
 import { startProcessMonitor } from "./services/process-monitor";
+import { checkBrowserAvailable } from "./rpa/index";
+
+process.env["PLAYWRIGHT_BROWSERS_PATH"] = path.join(process.cwd(), "../../../.cache/ms-playwright");
 
 const app: Express = express();
 
@@ -43,5 +46,13 @@ app.use("/uploads", express.static(UPLOADS_DIR));
 startMonitorJob();
 startSessionAlertJob();
 startProcessMonitor();
+
+checkBrowserAvailable().then(available => {
+  (global as any).PUPPETEER_AVAILABLE = available;
+  logger.info({ available }, "[rpa] Browser availability check complete");
+}).catch(err => {
+  (global as any).PUPPETEER_AVAILABLE = false;
+  logger.warn({ err }, "[rpa] Browser check failed");
+});
 
 export default app;

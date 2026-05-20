@@ -7,6 +7,7 @@ import { companiesTable, companyDocumentsTable, certidaoHistoryTable } from "@wo
 import { eq, and, desc } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { createRequire } from "node:module";
+import { emitirCertidao } from "../../rpa/index";
 
 const require = createRequire(import.meta.url);
 const { PDFParse } = require("pdf-parse") as {
@@ -365,24 +366,130 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
   const def = CERTIDAO_DEFS[tipo]!;
   const puppeteerAvailable = (global as any).PUPPETEER_AVAILABLE === true;
 
-  if (!puppeteerAvailable) {
+  const AUTOMATION_TYPES = ["cnd_federal", "crf_fgts", "cndt"];
+
+  if (!puppeteerAvailable || !AUTOMATION_TYPES.includes(tipo)) {
     res.json({
       success: false,
       method: "manual",
       portalUrl: def.portalUrl,
       instructions: def.instructions,
-      message: "A emissão automática não está disponível neste ambiente. Emita manualmente e faça o upload do PDF.",
+      message: puppeteerAvailable
+        ? "Emissão automática não disponível para este tipo de certidão. Emita manualmente e faça o upload do PDF."
+        : "A emissão automática não está disponível neste ambiente. Emita manualmente e faça o upload do PDF.",
     });
     return;
   }
 
-  res.json({
-    success: false,
-    method: "manual",
-    portalUrl: def.portalUrl,
-    instructions: def.instructions,
-    message: "Automação não implementada para este tipo de certidão. Emita manualmente e faça o upload do PDF.",
-  });
+  const cnpj = company.cnpj ?? "";
+  if (!cnpj) {
+    res.json({
+      success: false,
+      method: "manual",
+      portalUrl: def.portalUrl,
+      instructions: def.instructions,
+      message: "CNPJ da empresa não cadastrado. Atualize o cadastro antes de emitir.",
+    });
+    return;
+  }
+
+  console.log(`[certidoes/emitir] Iniciando automação para ${tipo} | empresa ${companyId}`);
+
+  let rpaResult: Awaited<ReturnType<typeof emitirCertidao>>;
+  try {
+    rpaResult = await emitirCertidao(tipo, cnpj);
+  } catch (err) {
+    console.error("[certidoes/emitir] RPA error:", err);
+    res.json({
+      success: false,
+      method: "manual",
+      portalUrl: def.portalUrl,
+      instructions: def.instructions,
+      message: "Erro interno durante a automação. Emita manualmente e faça o upload do PDF.",
+    });
+    return;
+  }
+
+  if (!rpaResult.success || !rpaResult.pdfPath) {
+    const message = rpaResult.captchaDetected
+      ? "CAPTCHA detectado no portal. Emita manualmente e faça o upload do PDF."
+      : (rpaResult.error ?? "Automação falhou. Emita manualmente e faça o upload do PDF.");
+    res.json({
+      success: false,
+      method: "manual",
+      portalUrl: def.portalUrl,
+      instructions: def.instructions,
+      message,
+      captchaDetected: rpaResult.captchaDetected ?? false,
+    });
+    return;
+  }
+
+  const pdfPath = rpaResult.pdfPath;
+
+  try {
+    const extracted = await extractCertidaoData(pdfPath);
+
+    const dataEmissao = extracted ? toISO(extracted.data_emissao) : null;
+    const dataValidade = extracted ? toISO(extracted.data_validade) : null;
+    const resultado = extracted?.resultado ?? "nao_identificado";
+    const titulo = extracted?.tipo_certidao ?? def.label;
+
+    const destFilename = `certidao-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const destPath = path.join(process.cwd(), "uploads", destFilename);
+    fs.copyFileSync(pdfPath, destPath);
+
+    const pdfSize = fs.statSync(destPath).size;
+
+    const [doc] = await db.insert(companyDocumentsTable).values({
+      companyId,
+      titulo,
+      tipo: tipo === "cnd_federal" ? "certidao_federal"
+          : tipo === "crf_fgts" ? "certidao_fgts"
+          : tipo === "cndt" ? "certidao_trabalhista"
+          : tipo === "certidao_estadual" ? "certidao_estadual"
+          : "certidao_municipal",
+      certidaoType: tipo,
+      dataEmissao,
+      dataValidade,
+      name: `${tipo}-${Date.now()}.pdf`,
+      path: destFilename,
+      mimeType: "application/pdf",
+      size: pdfSize,
+      source: "automatic",
+      emissionMethod: "automatic",
+      metadata: extracted ?? null,
+    }).returning();
+
+    await db.insert(certidaoHistoryTable).values({
+      companyId,
+      certidaoType: tipo,
+      resultado,
+      issuedAt: dataEmissao ? new Date(dataEmissao + "T12:00:00Z") : new Date(),
+      expiresAt: dataValidade ? new Date(dataValidade + "T12:00:00Z") : null,
+      fileUrl: `/api/companies/${companyId}/documents/${doc!.id}/download`,
+      extractionData: extracted ?? null,
+      emissionMethod: "automatic",
+    });
+
+    try { fs.unlinkSync(pdfPath); } catch { }
+
+    res.json({
+      success: true,
+      method: "automatic",
+      documentId: doc!.id,
+      fileUrl: `/api/companies/${companyId}/documents/${doc!.id}/download`,
+      extracted,
+      dataEmissao,
+      dataValidade,
+      resultado,
+      status: calcStatus(dataValidade),
+    });
+  } catch (err) {
+    console.error("[certidoes/emitir] post-processing error:", err);
+    try { if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath); } catch { }
+    res.status(500).json({ error: "Erro ao processar o PDF baixado automaticamente" });
+  }
 });
 
 // ── POST /api/companies/:id/certidoes/renovar-lote ───────────────────────────
