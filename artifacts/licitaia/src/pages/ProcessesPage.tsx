@@ -16,6 +16,20 @@ import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
 
+function getPhase(process: any): { label: string; color: string; bg: string } | null {
+  if (process.homologatedAt) return { label: "Homologado", color: "#059669", bg: "#F0FDF4" };
+  if (process.adjudicatedAt) return { label: "Adjudicado", color: "#2563EB", bg: "#EFF6FF" };
+  if (process.sessionResult?.resultado) return { label: "Pós-disputa", color: "#7C3AED", bg: "#F5F3FF" };
+  if (process.sessionDate) {
+    const sd = new Date(process.sessionDate);
+    const diffH = (sd.getTime() - Date.now()) / (1000 * 60 * 60);
+    if (diffH < 0 && diffH > -4) return { label: "Em sessão", color: "#DC2626", bg: "#FEF2F2" };
+    if (diffH >= 0) return { label: "Aguardando sessão", color: "#D97706", bg: "#FFFBEB" };
+    return { label: "Pós-disputa", color: "#7C3AED", bg: "#F5F3FF" };
+  }
+  return null;
+}
+
 interface AlertPrefill {
   title?: string;
   agency?: string;
@@ -343,11 +357,21 @@ export function ProcessesPage() {
                         className="px-5 py-3 flex items-center justify-between rounded-b-2xl"
                         style={{ background: '#F8FAFC', borderTop: '1px solid #E8EFF6' }}
                       >
-                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
-                          {process.modality}
-                          {process.editalNumber ? ` · ${process.editalNumber}` : ""}
-                        </span>
-                        <span className="text-xs font-semibold text-blue-600 flex items-center gap-1 group-hover:gap-1.5 transition-all">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide truncate">
+                            {process.modality}
+                            {process.editalNumber ? ` · ${process.editalNumber}` : ""}
+                          </span>
+                          {(() => {
+                            const phase = getPhase(process as any);
+                            return phase ? (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ color: phase.color, background: phase.bg }}>
+                                {phase.label}
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
+                        <span className="text-xs font-semibold text-blue-600 flex items-center gap-1 group-hover:gap-1.5 transition-all flex-shrink-0">
                           Abrir <ChevronRight className="w-3.5 h-3.5" />
                         </span>
                       </div>

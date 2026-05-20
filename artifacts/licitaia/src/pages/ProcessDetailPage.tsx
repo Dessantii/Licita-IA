@@ -3,6 +3,7 @@ import { ProcessAnalysisTab } from "./ProcessAnalysisTab";
 import { DocumentosTab } from "./DocumentosTab";
 import { PropostaTab } from "./PropostaTab";
 import { SessionTab } from "./SessionTab";
+import { PostSessionTab } from "./PostSessionTab";
 import { getToken } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useRoute, useLocation } from "wouter";
@@ -192,7 +193,7 @@ export function ProcessDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"resumo" | "analise" | "documentos" | "proposta" | "verificacao" | "sessao">("resumo");
+  const [activeTab, setActiveTab] = useState<"resumo" | "analise" | "documentos" | "proposta" | "verificacao" | "sessao" | "pos-disputa">("resumo");
   const [companyData, setCompanyData] = useState<any>(null);
 
   const token = getToken();
@@ -438,13 +439,14 @@ export function ProcessDetailPage() {
         {/* ── Tab navigation ─────────────────────────────────────────────── */}
         {(() => {
           const isPregao = /pregão/i.test(process.modality ?? "");
-          const tabs: { id: "resumo" | "analise" | "documentos" | "proposta" | "verificacao" | "sessao"; label: string; locked: boolean }[] = [
+          const tabs: { id: "resumo" | "analise" | "documentos" | "proposta" | "verificacao" | "sessao" | "pos-disputa"; label: string; locked: boolean }[] = [
             { id: "resumo", label: "Resumo", locked: false },
             { id: "analise", label: "Análise IA", locked: !process.editalFile },
             { id: "documentos", label: "Documentos", locked: !hasRequirements && !isInConference },
             { id: "proposta", label: "Proposta", locked: false },
             { id: "verificacao", label: "Verificação", locked: !isInConference },
             ...(isPregao ? [{ id: "sessao" as const, label: "Sessão", locked: false }] : []),
+            { id: "pos-disputa" as const, label: "Pós-disputa", locked: !(process as any)?.sessionResult?.resultado },
           ];
           return (
             <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: '#F1F5F9' }}>
@@ -598,6 +600,14 @@ export function ProcessDetailPage() {
             processId={id}
             process={process as any}
             companyData={companyData}
+          />
+        )}
+
+        {/* ── ETAPA 6: Pós-disputa ──────────────────────────────────────── */}
+        {activeTab === "pos-disputa" && (
+          <PostSessionTab
+            processId={id}
+            process={process as any}
           />
         )}
 

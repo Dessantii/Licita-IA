@@ -7,6 +7,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { startMonitorJob } from "./services/monitor-job";
 import { startSessionAlertJob } from "./services/session-alert-job";
+import { startProcessMonitor } from "./services/process-monitor";
 
 const app: Express = express();
 
@@ -41,5 +42,6 @@ app.use("/uploads", express.static(UPLOADS_DIR));
 
 startMonitorJob();
 startSessionAlertJob();
+startProcessMonitor();
 
 export default app;

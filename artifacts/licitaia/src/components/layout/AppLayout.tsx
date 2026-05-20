@@ -231,6 +231,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const bellRef = useRef<HTMLDivElement>(null);
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [notifKeywords, setNotifKeywords] = useState<string[]>([]);
+  const [processNotifs, setProcessNotifs] = useState<{id:number;processId:number|null;type:string;message:string;read:boolean;createdAt:string}[]>([]);
 
   // Company switcher
   const [companySwitcherOpen, setCompanySwitcherOpen] = useState(false);
@@ -275,10 +276,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     } catch {}
   }
 
+  async function loadProcessNotifs() {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setProcessNotifs(await res.json());
+    } catch {}
+  }
+
   useEffect(() => {
     loadNotifSettings();
     loadAlerts();
-    const iv = setInterval(loadAlerts, 60_000);
+    loadProcessNotifs();
+    const iv = setInterval(() => { loadAlerts(); loadProcessNotifs(); }, 60_000);
     return () => clearInterval(iv);
   }, []);
 
@@ -308,13 +318,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, isRead: true } : a)));
   }
 
+  async function markAllProcessNotifsRead() {
+    await fetch("/api/notifications/read-all", { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    setProcessNotifs(prev => prev.map(n => ({ ...n, read: true })));
+  }
+
+  async function markProcessNotifRead(notifId: number) {
+    await fetch(`/api/notifications/${notifId}/read`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    setProcessNotifs(prev => prev.map(n => n.id === notifId ? { ...n, read: true } : n));
+  }
+
   function handleLogout() {
     clearAuth();
     navigate("/login");
   }
 
   const filtered = applyFilter(alerts, notifEnabled, notifKeywords);
-  const unreadCount = filtered.filter((a) => !a.isRead).length;
+  const processNotifsUnread = processNotifs.filter(n => !n.read).length;
+  const unreadCount = filtered.filter((a) => !a.isRead).length + processNotifsUnread;
 
   return (
     <div className="min-h-screen flex flex-row" style={{ backgroundColor: '#F6F9FC' }}>
@@ -699,6 +720,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       Ver todos os alertas →
                     </Link>
                   </div>
+
+                  {processNotifsUnread > 0 && (
+                    <>
+                      <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: "1px solid #f1f5f9", background: '#F8FAFC' }}>
+                        <span className="text-xs font-semibold text-slate-600">Atualizações de processos</span>
+                        <button onClick={markAllProcessNotifsRead} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                          <CheckCheck className="w-3 h-3" /> Marcar lidas
+                        </button>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto divide-y divide-slate-50">
+                        {processNotifs.filter(n => !n.read).slice(0, 5).map(n => (
+                          <div
+                            key={n.id}
+                            className="px-4 py-3 bg-blue-50/60 cursor-pointer hover:bg-blue-50 transition-colors"
+                            onClick={() => {
+                              markProcessNotifRead(n.id);
+                              if (n.processId) navigate(`/processes/${n.processId}`);
+                              setBellOpen(false);
+                            }}
+                          >
+                            <p className="text-xs text-slate-800 line-clamp-2 leading-snug">{n.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

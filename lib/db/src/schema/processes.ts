@@ -26,10 +26,20 @@ export const processesTable = pgTable("processes", {
   deadline: text("deadline"),
   notes: text("notes"),
   status: text("status").notNull().default("criado"),
+  pncpId: text("pncp_id"),
+  // Session
   sessionDate: timestamp("session_date", { withTimezone: true }),
   sessionAlertsEnabled: boolean("session_alerts_enabled").default(false),
   sessionResult: jsonb("session_result"),
   sessionChecklist: jsonb("session_checklist"),
+  // Post-session
+  postSessionTimeline: jsonb("post_session_timeline"),
+  postSessionHabilitacaoDeadline: timestamp("post_session_habilitacao_deadline", { withTimezone: true }),
+  adjudicatedAt: timestamp("adjudicated_at", { withTimezone: true }),
+  adjudicationNumber: text("adjudication_number"),
+  homologatedAt: timestamp("homologated_at", { withTimezone: true }),
+  homologationNumber: text("homologation_number"),
+  currentPhase: text("current_phase"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

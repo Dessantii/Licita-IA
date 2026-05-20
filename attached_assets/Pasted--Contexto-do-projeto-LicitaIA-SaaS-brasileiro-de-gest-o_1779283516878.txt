@@ -1,0 +1,358 @@
+## Contexto do projeto
+
+LicitaIA — SaaS brasileiro de gestão de licitações públicas para MEI e microempresas.
+
+Stack:
+- Frontend: React 19 + Vite, Tailwind CSS v4, Wouter, TanStack Query
+- Backend: Node.js + Express, Pino (logs)
+- Banco: PostgreSQL via Drizzle ORM
+- IA: OpenAI GPT-4o / GPT-4o-mini
+- Portas: API 8080, Frontend 24747
+
+## Estado atual
+
+Com os módulos anteriores implementados, o processo agora possui:
+- Aba Análise (extração de requisitos + análise de risco)
+- Aba Documentos (checklist + declarações)
+- Aba Proposta (pesquisa de preços + geração + assinatura + submissão)
+- Aba Sessão (countdown + calculadora + registro de lances + resultado)
+
+Após o usuário registrar o resultado da sessão como "Vencedor" ou 
+"Aguardando homologação", não existe nenhum fluxo de acompanhamento 
+do que acontece a seguir. O usuário fica sem suporte para:
+- Monitorar se algum concorrente entrou com recurso
+- Saber os prazos que precisa cumprir
+- Acompanhar a homologação
+- Gerir a fase de habilitação pós-sessão
+
+## O que precisa ser implementado
+
+### 1. Nova aba "Pós-disputa" na página do processo
+
+Adicionar a aba "Pós-disputa" na navegação interna do processo.
+
+Visibilidade: exibir a aba sempre, mas com estado "bloqueado" até que 
+o resultado da sessão seja registrado. Quando bloqueada, exibir mensagem:
+"Esta aba ficará disponível após o registro do resultado da sessão."
+
+Quando desbloqueada, a aba exibe quatro seções em sequência vertical, 
+cada uma com seu próprio status de conclusão.
+
+---
+
+### 2. Seção A — Linha do tempo pós-sessão
+
+Componente visual de timeline horizontal (ou vertical em mobile) 
+mostrando as etapas obrigatórias após a sessão, com prazos calculados 
+automaticamente a partir de session_date.
+
+**Etapas da timeline:**
+
+1. Sessão de disputa encerrada
+   Data: session_date (já registrada)
+   Status: sempre concluída ao entrar na aba
+
+2. Prazo de intenção de recurso (se aberto)
+   Prazo: até 1 dia útil após o encerramento da sessão (pregão eletrônico)
+   Status: pendente / encerrado sem recurso / recurso aberto
+   Ação: usuário informa se houve ou não intenção de recurso de concorrentes
+
+3. Prazo de razões de recurso (se houve intenção)
+   Prazo: 3 dias úteis após a manifestação de intenção
+   Visível apenas se houver recurso aberto
+
+4. Prazo de contrarrazões (se houve recurso)
+   Prazo: 3 dias úteis após o fim do prazo de razões
+   Visível apenas se houver recurso aberto
+
+5. Decisão do recurso (se houve recurso)
+   Status: aguardando / mantida a decisão / recurso provido
+   Usuário registra o resultado
+
+6. Habilitação
+   Prazo: conforme edital (extrair do edital se disponível)
+   Status: pendente / em análise / habilitado / inabilitado
+
+7. Adjudicação
+   Status: pendente / adjudicado
+   Usuário registra quando ocorrer
+
+8. Homologação
+   Status: pendente / homologado
+   Usuário registra quando ocorrer
+
+**Cálculo de dias úteis:**
+Implementar função utilitária calculateWorkingDays(date, days) que 
+soma dias úteis ignorando sábados e domingos. Não é necessário 
+considerar feriados nacionais nesta versão (adicionar nota para 
+o usuário sobre feriados locais).
+
+**Visual da timeline:**
+- Círculo para cada etapa: cinza (pendente), azul (em andamento/próxima), 
+  verde (concluída), vermelho (com problema)
+- Linha conectando os círculos
+- À direita de cada círculo: nome da etapa, data limite calculada 
+  e status badge
+- Etapas com prazo vencendo em até 2 dias: destacar em amarelo
+- Etapas com prazo já vencido e não concluídas: destacar em vermelho
+
+**Persistência:**
+Salvar o estado da timeline em coluna post_session_timeline (jsonb) 
+na tabela processes.
+
+---
+
+### 3. Seção B — Gestão de recursos
+
+Exibida quando o usuário informa que houve intenção de recurso 
+de algum concorrente.
+
+**Campos para registro do recurso:**
+- Recorrente: nome do concorrente (texto livre)
+- Motivo alegado: textarea (o usuário escreve o que sabe)
+- Status: Em prazo de razões / Em prazo de contrarrazões / 
+  Aguardando decisão / Decidido
+
+**Gerador de contrarrazões por IA:**
+
+Botão "Gerar minuta de contrarrazões"
+
+Ao clicar, abrir modal com:
+- Campo: "Qual o argumento principal do recurso do concorrente?"
+- Campo: "Quais os pontos que você quer contestar?"
+- Botão "Gerar com IA"
+
+A IA (GPT-4o) recebe:
+- Dados do processo (objeto, modalidade, número)
+- Motivo alegado pelo recorrente
+- Pontos de contestação do usuário
+- Instrução para gerar minuta formal de contrarrazões
+
+A minuta gerada deve conter:
+- Cabeçalho formal com identificação do processo e das partes
+- Seção "Dos fatos" (resumo da sessão)
+- Seção "Das contrarrazões" (argumentos contra o recurso)
+- Seção "Do pedido" (manutenção da decisão)
+- Linguagem jurídica adequada, mas acessível
+
+Exibir a minuta em textarea editável para o usuário ajustar.
+Botões: "Copiar texto" e "Baixar como .txt"
+
+**Se o usuário for o recorrente** (perdeu e quer recorrer):
+
+Toggle "Quero entrar com recurso"
+
+Ao ativar, exibir:
+- Campo: "Motivo do recurso" (textarea)
+- Campo: "Qual foi o lance vencedor?" (numérico)
+- Campo: "Qual foi o lance que você ofertou?" (numérico)
+- Botão "Gerar minuta de recurso com IA"
+
+A IA gera minuta de recurso com estrutura similar à de contrarrazões, 
+mas argumentando em favor do usuário.
+
+---
+
+### 4. Seção C — Checklist de habilitação pós-sessão
+
+Se o usuário for declarado provisoriamente vencedor, precisará 
+apresentar os documentos de habilitação.
+
+Esta seção cruza dois dados já existentes no sistema:
+1. Exigências de habilitação extraídas do edital 
+   (da tabela extracted_requirements, categoria habilitação)
+2. Documentos que o usuário já possui na empresa 
+   (da tabela company_documents)
+
+**Lógica de cruzamento:**
+- Para cada exigência de habilitação do edital, verificar se 
+  existe um documento correspondente em company_documents
+- Se existir e estiver válido: status "✅ Documento disponível"
+- Se existir mas estiver vencido: status "⚠️ Documento vencido — renovar"
+- Se não existir: status "❌ Documento ausente — providenciar"
+
+**Exibição:**
+Tabela com colunas:
+Documento exigido | Status | Documento no sistema | Validade | Ação
+
+Coluna Ação:
+- Se disponível: botão "Ver documento"
+- Se vencido: botão "Emitir novamente" (link para portal conforme 
+  tipo do documento — mesma lógica dos links já implementados 
+  no módulo de Documentos)
+- Se ausente: botão "Como obter" (abre modal com instruções 
+  para emissão do documento específico)
+
+**Campo de prazo de habilitação:**
+- Input de data: "Prazo para entrega da documentação de habilitação"
+- Alertas automáticos quando prazo < 3 dias (banner na aba)
+- Salvar em post_session_habilitacao_deadline na tabela processes
+
+---
+
+### 5. Seção D — Registro de adjudicação e homologação
+
+Dois cards simples lado a lado (ou empilhados em mobile):
+
+**Card Adjudicação:**
+- Status: Pendente / Adjudicado
+- Data de adjudicação: datepicker
+- Campo: Número do ato de adjudicação (texto)
+- Botão "Registrar adjudicação"
+
+**Card Homologação:**
+- Status: Pendente / Homologado
+- Data de homologação: datepicker
+- Campo: Número do ato de homologação (texto)
+- Botão "Registrar homologação"
+- Ao registrar homologação: exibir banner verde 
+  "Licitação homologada! Próximo passo: assinatura do contrato."
+  com botão "Ir para Gestão de Contrato" 
+  (redirecionar para aba Contrato — criada no Prompt 5)
+
+---
+
+### 6. Monitoramento automático via PNCP
+
+Criar rotina de monitoramento que consulta o PNCP periodicamente 
+para detectar atualizações no processo:
+
+Endpoint interno: GET /api/cron/monitor-processes
+
+Funcionamento:
+1. Buscar todos os processos com pncp_id preenchido e que estejam 
+   na fase pós-sessão (session_date no passado, homologated_at nulo)
+2. Para cada processo, consultar a API do PNCP:
+   GET https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}
+3. Comparar o status retornado pelo PNCP com o status atual no banco
+4. Se detectar mudança de status (ex: novo campo "situacao" diferente):
+   - Atualizar o banco
+   - Criar notificação para o usuário (tabela notifications):
+     { user_id, process_id, type: "pncp_status_change", 
+       message: "Status do processo [número] atualizado no PNCP: [novo status]",
+       read: false, created_at }
+5. Executar a cada 6 horas via setInterval no server startup
+
+**Exibição das notificações:**
+- Ícone de sino no header da aplicação com badge de contagem não lidas
+- Ao clicar: dropdown listando notificações recentes
+- Clicar em notificação: marca como lida e navega para o processo
+
+Se a tabela notifications não existir, criá-la:
+CREATE TABLE notifications (
+  id serial PRIMARY KEY,
+  user_id integer REFERENCES users(id),
+  process_id integer REFERENCES processes(id),
+  type text NOT NULL,
+  message text NOT NULL,
+  read boolean DEFAULT false,
+  created_at timestamp DEFAULT now()
+);
+
+Endpoints necessários:
+- GET /api/notifications — retorna notificações não lidas do usuário
+- PATCH /api/notifications/:id/read — marca como lida
+- PATCH /api/notifications/read-all — marca todas como lidas
+
+---
+
+### 7. Indicador de fase no painel do processo
+
+Atualizar o card do processo na listagem (/processes) para exibir 
+a fase atual além do status:
+
+Fases possíveis (em ordem):
+Prospecção → Análise → Documentação → Proposta → 
+Aguardando sessão → Em sessão → Pós-disputa → 
+Habilitação → Adjudicado → Homologado → Contrato
+
+A fase deve ser calculada automaticamente com base nos dados do processo:
+- Se session_result for nulo e session_date futuro: "Aguardando sessão"
+- Se session_date passado e session_result nulo: "Em pós-disputa"
+- Se post_session_timeline tiver habilitação pendente: "Habilitação"
+- Se adjudicated_at preenchido: "Adjudicado"
+- Se homologated_at preenchido: "Homologado"
+
+Exibir como badge colorido no card do processo.
+
+---
+
+### 8. Alterações no banco de dados
+
+Na tabela processes, adicionar:
+- post_session_timeline: jsonb
+- post_session_habilitacao_deadline: timestamp
+- adjudicated_at: timestamp
+- adjudication_number: text
+- homologated_at: timestamp
+- homologation_number: text
+- current_phase: text (fase calculada, atualizada a cada mudança)
+
+Nova tabela notifications (se não existir — ver item 6).
+
+Criar todas as migrations com Drizzle.
+
+---
+
+### 9. Endpoints de API necessários
+
+- PATCH /api/processes/:id/post-session-timeline
+  Body: { timeline: object }
+  Atualiza post_session_timeline
+
+- PATCH /api/processes/:id/habilitacao-deadline
+  Body: { deadline: string (ISO) }
+  Atualiza post_session_habilitacao_deadline
+
+- PATCH /api/processes/:id/adjudication
+  Body: { adjudicatedAt, adjudicationNumber }
+
+- PATCH /api/processes/:id/homologation
+  Body: { homologatedAt, homologationNumber }
+
+- POST /api/processes/:id/generate-recurso
+  Body: { type: "recurso|contrarrazoes", motivoRecurso, 
+          pontosContestacao, lanceVencedor, lanceUsuario }
+  Chama GPT-4o e retorna minuta gerada
+
+- GET /api/notifications
+- PATCH /api/notifications/:id/read
+- PATCH /api/notifications/read-all
+- GET /api/cron/monitor-processes (interno)
+
+---
+
+### 10. UX e visual
+
+- Ícones Lucide React: 
+  Timeline: GitCommitHorizontal, CheckCircle2, Clock, AlertTriangle
+  Recurso: Scale, FileText, MessageSquare
+  Habilitação: FolderCheck, FileBadge
+  Notificações: Bell, BellDot
+- A timeline deve ser o elemento visual central da aba —
+  dar espaço generoso para ela
+- Prazos próximos do vencimento devem "saltar" visualmente 
+  (borda amarela + ícone de alerta)
+- Prazos vencidos não concluídos: borda vermelha + texto em vermelho
+- Em mobile: timeline vertical (círculos empilhados com linha vertical)
+- Em desktop: timeline horizontal com cards abaixo de cada etapa
+- Todo texto em português (pt-BR)
+- Valores monetários: R$ X.XXX,XX
+- Datas: dd/mm/yyyy às HH:mm
+
+---
+
+### Observações importantes
+
+- O cruzamento de documentos de habilitação (seção C) depende de 
+  dados já existentes em extracted_requirements e company_documents —
+  garantir que a query faça o JOIN correto entre essas tabelas
+- O monitoramento PNCP pode falhar (API instável) — sempre envolver 
+  em try/catch, registrar falha em log e continuar sem quebrar o servidor
+- A geração de minutas jurídicas deve sempre incluir disclaimer:
+  "Esta minuta é gerada por IA para fins de apoio e deve ser revisada 
+  por advogado antes de protocolo."
+- O cron de monitoramento PNCP deve ter rate limiting para não 
+  sobrecarregar a API pública — máximo 1 requisição por segundo, 
+  processar em fila sequencial
+- Não remover nem alterar funcionalidades existentes dos módulos anteriores

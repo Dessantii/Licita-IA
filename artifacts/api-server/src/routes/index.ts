@@ -17,6 +17,8 @@ import opportunitiesRouter from "./captacao/opportunities";
 import ajudaChatRouter from "./ajuda/chat";
 import proposalsRouter from "./licitaia/proposals";
 import sessionRouter from "./licitaia/session";
+import postSessionRouter from "./licitaia/post-session";
+import notificationsRouter from "./licitaia/notifications";
 
 const router: IRouter = Router();
 
@@ -44,5 +46,7 @@ router.use("/opportunities", opportunitiesRouter);
 router.use(ajudaChatRouter);
 router.use(proposalsRouter);
 router.use(sessionRouter);
+router.use(postSessionRouter);
+router.use(notificationsRouter);
 
 export default router;
