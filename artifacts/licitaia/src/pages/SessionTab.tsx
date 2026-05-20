@@ -419,15 +419,6 @@ export function SessionTab({ processId, process, companyData }: {
       concorrente: b.bidType === "competitor" ? parseFloat(b.bidValue) : undefined,
     }));
 
-  const DateEditForm = () => (
-    <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
-      <input type="datetime-local" value={dateInput} onChange={e => setDateInput(e.target.value)}
-        className="px-3 py-2 rounded-lg border text-sm" style={{ borderColor: '#E2E8F0' }} />
-      <Button onClick={handleSaveDate} size="sm" style={{ background: '#0066FF' }} className="text-white">Salvar</Button>
-      <Button variant="outline" size="sm" onClick={() => setEditingDate(false)}>Cancelar</Button>
-    </div>
-  );
-
   // ── No date ────────────────────────────────────────────────────────────────
 
   if (sessionState === "no_date") {
@@ -442,7 +433,12 @@ export function SessionTab({ processId, process, companyData }: {
             <p className="text-sm text-slate-500">Informe quando ocorrerá a sessão de disputa para ativar todos os recursos.</p>
           </div>
           {editingDate ? (
-            <DateEditForm />
+            <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
+              <input type="datetime-local" value={dateInput} onChange={e => setDateInput(e.target.value)}
+                className="px-3 py-2 rounded-lg border text-sm" style={{ borderColor: '#E2E8F0' }} />
+              <Button onClick={handleSaveDate} size="sm" style={{ background: '#0066FF' }} className="text-white">Salvar</Button>
+              <Button variant="outline" size="sm" onClick={() => setEditingDate(false)}>Cancelar</Button>
+            </div>
           ) : (
             <Button onClick={() => setEditingDate(true)} style={{ background: '#0066FF' }} className="text-white gap-2">
               <Calendar className="w-4 h-4" /> Informar data da sessão
@@ -489,7 +485,14 @@ export function SessionTab({ processId, process, companyData }: {
           }} className="text-xs text-blue-500 hover:text-blue-700 mt-2 transition-colors">
             Editar data
           </button>
-          {editingDate && <DateEditForm />}
+          {editingDate && (
+            <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
+              <input type="datetime-local" value={dateInput} onChange={e => setDateInput(e.target.value)}
+                className="px-3 py-2 rounded-lg border text-sm" style={{ borderColor: '#E2E8F0' }} />
+              <Button onClick={handleSaveDate} size="sm" style={{ background: '#0066FF' }} className="text-white">Salvar</Button>
+              <Button variant="outline" size="sm" onClick={() => setEditingDate(false)}>Cancelar</Button>
+            </div>
+          )}
         </div>
 
         {/* Checklist */}
