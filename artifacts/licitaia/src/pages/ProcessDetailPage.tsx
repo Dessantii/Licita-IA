@@ -10,6 +10,7 @@ import { Link, useRoute, useLocation } from "wouter";
 import { useGetProcess, useDeleteProcess, ProcessStatus, getListProcessesQueryKey } from "@workspace/api-client-react";
 import { useAppActions } from "@/hooks/use-app-actions";
 import { RequirementsReviewPanel } from "@/components/processes/RequirementsReviewPanel";
+import { ProcessChatBubble } from "@/components/processes/ProcessChatBubble";
 import { EditProcessDialog } from "@/components/processes/EditProcessDialog";
 import { FileUploadZone, FileListItem } from "@/components/files/FileUploadZone";
 import { ValidationStatusBadge } from "@/components/processes/ValidationStatusBadge";
@@ -745,6 +746,9 @@ export function ProcessDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Floating AI chat bubble — context-aware for this process */}
+      <ProcessChatBubble processId={id} processTitle={process.title} />
     </AppLayout>
   );
 }
