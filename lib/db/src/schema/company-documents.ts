@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { companiesTable } from "./companies";
@@ -33,6 +33,9 @@ export const companyDocumentsTable = pgTable("company_documents", {
   source: text("source").default("manual"),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }),
   ocrExtractedExpiry: boolean("ocr_extracted_expiry").default(false),
+  metadata: jsonb("metadata"),
+  emissionMethod: text("emission_method").default("manual"),
+  certidaoType: text("certidao_type"),
 });
 
 export const insertCompanyDocumentSchema = createInsertSchema(companyDocumentsTable).omit({

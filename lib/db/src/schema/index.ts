@@ -30,3 +30,4 @@ export * from "./market-price-research";
 export * from "./session-alerts";
 export * from "./session-bids";
 export * from "./notifications";
+export * from "./certidao-history";

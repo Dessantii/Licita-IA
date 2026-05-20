@@ -13,8 +13,9 @@ import {
 import {
   Building2, ChevronLeft, ChevronRight, Mail, Phone, MapPin, FileText, BookOpen,
   Pencil, Trash2, Loader2, Hash, Globe, User, ShieldCheck, Award, BarChart3,
-  RefreshCw, AlertTriangle, CheckCircle2, Search, Save, X, Target,
+  RefreshCw, AlertTriangle, CheckCircle2, Search, Save, X, Target, Scale,
 } from "lucide-react";
+import { CentralCertidoes } from "./CentralCertidoes";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -45,7 +46,7 @@ const CALL_STATUS: Record<string, { label: string; color: string }> = {
   concluido: { label: "Concluído", color: "bg-green-100 text-green-700" },
 };
 
-type TabId = "dados" | "regularidade" | "certificado" | "financeiro" | "processos" | "chamamentos" | "perfil";
+type TabId = "dados" | "certidoes_central" | "regularidade" | "certificado" | "financeiro" | "processos" | "chamamentos" | "perfil";
 
 interface Certidao { validade?: string; url?: string }
 interface Certidoes {
@@ -257,7 +258,8 @@ export function EmpresaDetailPage() {
 
   const tabs: { id: TabId; label: string; icon: any; badge?: number | string }[] = [
     { id: "dados", label: "Dados", icon: Building2 },
-    { id: "regularidade", label: "Certidões", icon: ShieldCheck, badge: hasExpiring ? "!" : undefined },
+    { id: "certidoes_central", label: "Central de Certidões", icon: Scale },
+    { id: "regularidade", label: "Regularidade", icon: ShieldCheck, badge: hasExpiring ? "!" : undefined },
     { id: "certificado", label: "Certificado Digital", icon: Award },
     { id: "financeiro", label: "Financeiro", icon: BarChart3 },
     { id: "processos", label: "Licitações", icon: FileText, badge: company.processes.length },
@@ -549,6 +551,14 @@ export function EmpresaDetailPage() {
             ) : <p className="text-sm text-slate-600 italic">{company.observacoes || "Nenhuma observação cadastrada."}</p>}
           </Card>
         </div>
+      )}
+
+      {/* ── TAB: CENTRAL DE CERTIDÕES ───────────────────────────── */}
+      {tab === "certidoes_central" && (
+        <CentralCertidoes
+          companyId={id}
+          company={{ id, cnpj: company.cnpj, razaoSocial: company.razaoSocial }}
+        />
       )}
 
       {/* ── TAB: REGULARIDADE ───────────────────────────────────── */}

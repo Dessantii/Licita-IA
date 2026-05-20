@@ -23,6 +23,7 @@ interface CompanyDoc {
   titulo: string;
   dataValidade: string | null;
   validade?: string | null;
+  certidaoType?: string | null;
 }
 
 interface MonitorAlert {
@@ -172,12 +173,17 @@ function simplifyModalidade(m: string | null): string {
 function DocExpiryWidget({
   docs,
   companyId,
+  token,
   onNavigate,
 }: {
   docs: CompanyDoc[];
   companyId: number;
+  token: string;
   onNavigate: (href: string) => void;
 }) {
+  const [renewing, setRenewing] = React.useState<number | null>(null);
+  const [renewed, setRenewed] = React.useState<Set<number>>(new Set());
+
   const expiring = docs
     .filter(d => d.dataValidade)
     .map(d => ({ ...d, days: daysUntilExpiry(d.dataValidade!) }))
@@ -185,6 +191,27 @@ function DocExpiryWidget({
     .sort((a, b) => a.days - b.days);
 
   if (expiring.length === 0) return null;
+
+  async function handleAutoRenew(doc: (typeof expiring)[number]) {
+    if (!doc.certidaoType || renewing !== null) return;
+    setRenewing(doc.id);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/certidoes/${doc.certidaoType}/emitir`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRenewed(r => new Set([...r, doc.id]));
+      } else {
+        onNavigate(`/companies/${companyId}?tab=certidoes_central`);
+      }
+    } catch {
+      onNavigate(`/companies/${companyId}?tab=certidoes_central`);
+    } finally {
+      setRenewing(null);
+    }
+  }
 
   return (
     <div className="mb-7">
@@ -208,6 +235,9 @@ function DocExpiryWidget({
       >
         {expiring.map((doc, i) => {
           const { color, bg, border } = expiryColor(doc.days);
+          const isCertidao = !!doc.certidaoType;
+          const isRenewed = renewed.has(doc.id);
+          const isRenewing = renewing === doc.id;
           return (
             <div
               key={doc.id}
@@ -233,13 +263,32 @@ function DocExpiryWidget({
               >
                 {expiryLabel(doc.days)}
               </span>
-              <button
-                onClick={() => onNavigate(`/companies/${companyId}`)}
-                className="text-xs font-semibold flex-shrink-0"
-                style={{ color: "#0066FF" }}
-              >
-                Renovar →
-              </button>
+              {isCertidao ? (
+                isRenewed ? (
+                  <span className="text-xs font-semibold text-green-600 flex-shrink-0">✓ Renovada</span>
+                ) : (
+                  <button
+                    onClick={() => handleAutoRenew(doc)}
+                    disabled={isRenewing || renewing !== null}
+                    className="text-xs font-semibold flex-shrink-0 px-2.5 py-1 rounded-full transition-all"
+                    style={{
+                      color: "#fff",
+                      background: isRenewing ? "#93c5fd" : "#0066FF",
+                      opacity: renewing !== null && !isRenewing ? 0.5 : 1,
+                    }}
+                  >
+                    {isRenewing ? "Renovando..." : "Renovar automaticamente"}
+                  </button>
+                )
+              ) : (
+                <button
+                  onClick={() => onNavigate(`/companies/${companyId}`)}
+                  className="text-xs font-semibold flex-shrink-0"
+                  style={{ color: "#0066FF" }}
+                >
+                  Renovar →
+                </button>
+              )}
             </div>
           );
         })}
@@ -542,6 +591,7 @@ export function InicioPage() {
           <DocExpiryWidget
             docs={data.documents}
             companyId={data.companies[0].id}
+            token={token ?? ""}
             onNavigate={navigate}
           />
         )}
