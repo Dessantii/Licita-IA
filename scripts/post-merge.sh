@@ -2,3 +2,16 @@
 set -e
 pnpm install --frozen-lockfile
 timeout 90 pnpm --filter db push || echo "Schema push timed out or had no changes — continuing"
+
+# Ensure Chromium is present in the workspace cache (persists across restarts)
+export PLAYWRIGHT_BROWSERS_PATH="/home/runner/workspace/.cache/ms-playwright"
+CHROMIUM_1="$PLAYWRIGHT_BROWSERS_PATH/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell"
+CHROMIUM_2="$PLAYWRIGHT_BROWSERS_PATH/chromium-1169/chrome-linux/chrome"
+
+if [ ! -f "$CHROMIUM_1" ] && [ ! -f "$CHROMIUM_2" ]; then
+  echo "[post-merge] Chromium not cached, downloading..."
+  pnpm --filter @workspace/api-server exec playwright install chromium
+  echo "[post-merge] Chromium download complete."
+else
+  echo "[post-merge] Chromium already cached, skipping download."
+fi

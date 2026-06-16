@@ -27,6 +27,7 @@ function resolveChromiumPath(): string | undefined {
   const customPath = process.env["PLAYWRIGHT_BROWSERS_PATH"] ?? BROWSERS_CACHE;
   const candidates = [
     path.join(customPath, "chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell"),
+    path.join(customPath, "chromium-1217/chrome-linux64/chrome"),
     path.join(customPath, "chromium-1169/chrome-linux/chrome"),
   ];
   for (const c of candidates) {
