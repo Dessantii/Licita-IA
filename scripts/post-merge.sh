@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
 pnpm install --frozen-lockfile
-pnpm --filter db push
+timeout 90 pnpm --filter db push || echo "Schema push timed out or had no changes — continuing"

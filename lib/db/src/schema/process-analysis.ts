@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, boolean, numeric, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, numeric, jsonb, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { processesTable } from "./processes";
 
 export const processAnalysisTable = pgTable("process_analysis", {
@@ -40,6 +40,8 @@ export const processAnalysisTable = pgTable("process_analysis", {
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  uniqueIndex("process_analysis_process_id_unique").on(t.processId),
+]);
 
 export type ProcessAnalysis = typeof processAnalysisTable.$inferSelect;
