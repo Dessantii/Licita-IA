@@ -11,6 +11,7 @@ export const certidaoHistoryTable = pgTable("certidao_history", {
   fileUrl: text("file_url"),
   extractionData: jsonb("extraction_data"),
   emissionMethod: text("emission_method").notNull().default("manual_upload"),
+  verificacaoStatus: text("verificacao_status"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

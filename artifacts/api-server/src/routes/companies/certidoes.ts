@@ -460,11 +460,30 @@ router.post("/:id/certidoes/:tipo/verificar", async (req, res) => {
   const codigoVerificacao = meta?.codigo_verificacao as string | null | undefined;
   const urlVerificacao = meta?.url_verificacao as string | null | undefined;
 
+  async function updateLatestHistoryVerificacao(status: string) {
+    const [latestHistory] = await db
+      .select({ id: certidaoHistoryTable.id })
+      .from(certidaoHistoryTable)
+      .where(and(
+        eq(certidaoHistoryTable.companyId, companyId),
+        eq(certidaoHistoryTable.certidaoType, tipo),
+      ))
+      .orderBy(desc(certidaoHistoryTable.createdAt))
+      .limit(1);
+    if (latestHistory) {
+      await db
+        .update(certidaoHistoryTable)
+        .set({ verificacaoStatus: status })
+        .where(eq(certidaoHistoryTable.id, latestHistory.id));
+    }
+  }
+
   if (!codigoVerificacao || !urlVerificacao) {
     await db
       .update(companyDocumentsTable)
       .set({ verificacaoStatus: "nao_verificavel" })
       .where(eq(companyDocumentsTable.id, doc.id));
+    await updateLatestHistoryVerificacao("nao_verificavel");
     res.json({ verificacaoStatus: "nao_verificavel", documentId: doc.id });
     return;
   }
@@ -477,6 +496,7 @@ router.post("/:id/certidoes/:tipo/verificar", async (req, res) => {
     .update(companyDocumentsTable)
     .set({ verificacaoStatus })
     .where(eq(companyDocumentsTable.id, doc.id));
+  await updateLatestHistoryVerificacao(verificacaoStatus);
 
   res.json({ verificacaoStatus, documentId: doc.id, codigoVerificacao, urlVerificacao });
 });
@@ -546,7 +566,7 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
     }).returning();
 
     // ── Always persist to certidao_history ──────────────────────────────────
-    await db.insert(certidaoHistoryTable).values({
+    const [historyRow] = await db.insert(certidaoHistoryTable).values({
       companyId,
       certidaoType: tipo,
       resultado,
@@ -555,7 +575,7 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
       fileUrl: `/api/companies/${companyId}/documents/${doc!.id}/download`,
       extractionData: extracted ?? null,
       emissionMethod: "manual_upload",
-    });
+    }).returning();
 
     const codigoVerificacaoExtracted = extracted?.codigo_verificacao as string | null | undefined;
     const urlVerificacaoExtracted = extracted?.url_verificacao as string | null | undefined;
@@ -567,6 +587,12 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
             .update(companyDocumentsTable)
             .set({ verificacaoStatus: status })
             .where(eq(companyDocumentsTable.id, doc!.id));
+          if (historyRow) {
+            await db
+              .update(certidaoHistoryTable)
+              .set({ verificacaoStatus: status })
+              .where(eq(certidaoHistoryTable.id, historyRow.id));
+          }
           console.log(`[certidoes/extract] Verificação automática: ${status} para doc ${doc!.id}`);
         })
         .catch(err => console.error("[certidoes/extract] Verificação automática falhou:", err));

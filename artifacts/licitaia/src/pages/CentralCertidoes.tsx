@@ -44,6 +44,7 @@ interface HistoryEntry {
   expiresAt: string | null;
   fileUrl: string | null;
   emissionMethod: string;
+  verificacaoStatus: "valido" | "invalido" | "nao_verificavel" | null;
 }
 
 // ── Config ───────────────────────────────────────────────────────────────────
@@ -190,6 +191,7 @@ function HistoryPanel({ companyId, tipo, token }: { companyId: number; tipo: str
                   <th className="text-left pb-1 font-medium">Emissão</th>
                   <th className="text-left pb-1 font-medium">Validade</th>
                   <th className="text-left pb-1 font-medium">Resultado</th>
+                  <th className="text-left pb-1 font-medium">Verificação</th>
                   <th className="text-left pb-1 font-medium">Método</th>
                   <th className="text-left pb-1 font-medium">PDF</th>
                 </tr>
@@ -202,6 +204,11 @@ function HistoryPanel({ companyId, tipo, token }: { companyId: number; tipo: str
                       <td className="py-1.5 pr-2">{fmtDate(h.issuedAt.split("T")[0]!)}</td>
                       <td className="py-1.5 pr-2">{h.expiresAt ? fmtDate(h.expiresAt.split("T")[0]!) : "—"}</td>
                       <td className="py-1.5 pr-2" style={{ color: res?.color ?? "#64748b" }}>{res?.label ?? h.resultado}</td>
+                      <td className="py-1.5 pr-2">
+                        {h.verificacaoStatus ? (
+                          <VerificacaoBadge status={h.verificacaoStatus} />
+                        ) : "—"}
+                      </td>
                       <td className="py-1.5 pr-2 text-slate-500">{METHOD_LABELS[h.emissionMethod] ?? h.emissionMethod}</td>
                       <td className="py-1.5">
                         {h.fileUrl ? (
