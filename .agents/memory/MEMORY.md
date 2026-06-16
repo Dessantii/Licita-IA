@@ -1,0 +1,1 @@
+- [CNPJ extraction anti-hallucination](cnpj-extraction.md) — prompt with descriptive placeholder values causes GPT to invent fictional data; use strict system prompt + json_object format instead.

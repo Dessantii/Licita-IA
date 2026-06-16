@@ -89,6 +89,24 @@ const createCompanySchema = z.object({
 const updateCompanySchema = createCompanySchema.partial();
 
 // ── CNPJ Card extraction ──────────────────────────────────────────────────────
+const EXTRACTION_SYSTEM_PROMPT =
+  "Você é um extrator de dados estrito. Copie valores SOMENTE do documento fornecido. " +
+  "NUNCA invente, suponha ou complete dados ausentes. " +
+  "Se um campo não estiver visível no documento, retorne null para aquele campo. " +
+  "Proibido usar valores fictícios ou de exemplo.";
+
+const EXTRACTION_JSON_SCHEMA = `{
+  "razaoSocial": <string exata do documento ou null>,
+  "nomeFantasia": <string exata do documento ou null>,
+  "cnpj": <CNPJ no formato XX.XXX.XXX/XXXX-XX exatamente como no documento ou null>,
+  "email": <e-mail exato do documento ou null>,
+  "telefone": <telefone exato do documento ou null>,
+  "endereco": <endereço completo em uma linha exatamente como no documento ou null>,
+  "inscricaoEstadual": <inscrição estadual exata ou null>,
+  "inscricaoMunicipal": <inscrição municipal exata ou null>,
+  "representanteLegal": <nome do responsável legal exato ou null>
+}`;
+
 router.post("/extract-cnpj", tempUpload.single("file"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Nenhum arquivo enviado" });
@@ -96,17 +114,11 @@ router.post("/extract-cnpj", tempUpload.single("file"), async (req, res) => {
   }
 
   const tmpPath = req.file.path;
-  let text = "";
+  const mime = req.file.mimetype;
 
   try {
-    const mime = req.file.mimetype;
-
-    if (mime === "application/pdf") {
-      const parser = new PDFParse({ url: `file://${tmpPath}` });
-      const data = await parser.getText();
-      text = data.text;
-    } else if (mime.startsWith("image/")) {
-      // For images, convert to base64 and use vision
+    // ── IMAGES: single vision call → JSON directly ───────────────────────
+    if (mime.startsWith("image/")) {
       const imgBuffer = fs.readFileSync(tmpPath);
       const b64 = imgBuffer.toString("base64");
       const dataUrl = `data:${mime};base64,${b64}`;
@@ -114,80 +126,96 @@ router.post("/extract-cnpj", tempUpload.single("file"), async (req, res) => {
       const visionRes = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
+          { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
           {
             role: "user",
             content: [
-              {
-                type: "image_url",
-                image_url: { url: dataUrl, detail: "high" },
-              },
+              { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
               {
                 type: "text",
-                text: "Extraia todo o texto desta imagem de Cartão CNPJ brasileiro. Retorne apenas o texto extraído, sem formatação extra.",
+                text: `Analise esta imagem de Cartão CNPJ (Comprovante de Inscrição e de Situação Cadastral da Receita Federal Brasileira).
+
+Extraia SOMENTE os dados que estão VISÍVEIS na imagem. NÃO invente dados.
+
+Retorne um objeto JSON com exatamente estas chaves:
+${EXTRACTION_JSON_SCHEMA}
+
+Se a imagem não for um Cartão CNPJ ou não contiver dados legíveis, retorne todas as chaves com valor null.`,
               },
             ],
           },
         ],
-        max_tokens: 1500,
+        temperature: 0,
+        max_tokens: 700,
+        response_format: { type: "json_object" },
       });
-      text = visionRes.choices[0]?.message?.content ?? "";
-    }
-  } catch (err) {
-    fs.existsSync(tmpPath) && fs.unlinkSync(tmpPath);
-    res.status(500).json({ error: "Não foi possível ler o arquivo" });
-    return;
-  } finally {
-    fs.existsSync(tmpPath) && fs.unlinkSync(tmpPath);
-  }
 
-  if (!text.trim()) {
-    res.status(422).json({ error: "Não foi possível extrair texto do arquivo" });
-    return;
-  }
-
-  const prompt = `Você é um especialista em documentos empresariais brasileiros. Analise o texto abaixo extraído de um Cartão CNPJ (Comprovante de Inscrição e de Situação Cadastral da Receita Federal) e extraia os dados cadastrais da empresa.
-
-TEXTO DO CARTÃO CNPJ:
-${text.slice(0, 8000)}
-
-Retorne um JSON com a seguinte estrutura exata (sem markdown, sem texto extra):
-{
-  "razaoSocial": "razão social completa da empresa",
-  "nomeFantasia": "nome fantasia ou null se não houver",
-  "cnpj": "CNPJ formatado como XX.XXX.XXX/XXXX-XX",
-  "email": "e-mail ou null",
-  "telefone": "telefone ou null",
-  "endereco": "endereço completo em uma linha: rua, número, bairro, cidade - UF, CEP ou null",
-  "inscricaoEstadual": "inscrição estadual ou null",
-  "inscricaoMunicipal": "inscrição municipal ou null",
-  "representanteLegal": "nome do responsável legal ou sócio administrador ou null"
-}
-
-Regras:
-- Se um campo não estiver presente no texto, use null
-- O CNPJ deve ter a máscara XX.XXX.XXX/XXXX-XX
-- O endereço deve ser uma única string compacta
-- Razão social é obrigatória`;
-
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0,
-      max_tokens: 600,
-    });
-
-    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      res.status(422).json({ error: "IA não retornou dados estruturados" });
+      const raw = visionRes.choices[0]?.message?.content?.trim() ?? "";
+      if (!raw) {
+        res.status(422).json({ error: "IA não retornou dados da imagem" });
+        return;
+      }
+      const extracted = JSON.parse(raw);
+      res.json({ extracted });
       return;
     }
 
-    const extracted = JSON.parse(jsonMatch[0]);
+    // ── PDFs: extract text first, then structured JSON ───────────────────
+    if (mime !== "application/pdf") {
+      res.status(400).json({ error: "Formato não suportado. Envie um PDF ou imagem." });
+      return;
+    }
+
+    let text = "";
+    try {
+      const parser = new PDFParse({ url: `file://${tmpPath}` });
+      const data = await parser.getText();
+      text = data.text;
+    } catch {
+      res.status(500).json({ error: "Não foi possível ler o PDF" });
+      return;
+    }
+
+    if (!text.trim()) {
+      res.status(422).json({ error: "PDF não contém texto extraível" });
+      return;
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Analise o texto abaixo extraído de um Cartão CNPJ (Comprovante de Inscrição e de Situação Cadastral da Receita Federal Brasileira).
+
+Extraia SOMENTE os dados que aparecem LITERALMENTE no texto. NÃO invente dados.
+
+TEXTO DO DOCUMENTO:
+${text.slice(0, 8000)}
+
+Retorne um objeto JSON com exatamente estas chaves:
+${EXTRACTION_JSON_SCHEMA}
+
+Se o texto não contiver dados de uma empresa real, retorne todas as chaves com valor null.`,
+        },
+      ],
+      temperature: 0,
+      max_tokens: 700,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    if (!raw) {
+      res.status(422).json({ error: "IA não retornou dados estruturados" });
+      return;
+    }
+    const extracted = JSON.parse(raw);
     res.json({ extracted });
-  } catch {
-    res.status(500).json({ error: "Erro ao processar com IA" });
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao processar o arquivo" });
+  } finally {
+    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch {}
   }
 });
 
