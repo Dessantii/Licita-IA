@@ -561,6 +561,7 @@ function RenovarLoteModal({
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<Record<string, "pending" | "ok" | "manual">>({});
   const [current, setCurrent] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<string>("");
   const [done, setDone] = useState(false);
 
   function toggle(tipo: string) {
@@ -581,6 +582,7 @@ function RenovarLoteModal({
 
     for (const tipo of tipos) {
       setCurrent(tipo);
+      setCurrentStep("Iniciando...");
       try {
         const res = await fetch(`${API}/api/companies/${companyId}/certidoes/${tipo}/emitir`, {
           method: "POST",
@@ -593,13 +595,14 @@ function RenovarLoteModal({
           continue;
         }
 
-        const result = await pollJobUntilDone(companyId, tipo, startData.jobId, token, () => {});
+        const result = await pollJobUntilDone(companyId, tipo, startData.jobId, token, msg => setCurrentStep(msg));
         setProgress(p => ({ ...p, [tipo]: result.success ? "ok" : "manual" }));
       } catch {
         setProgress(p => ({ ...p, [tipo]: "manual" }));
       }
     }
     setCurrent(null);
+    setCurrentStep("");
     setRunning(false);
     setDone(true);
     onComplete();
@@ -687,7 +690,12 @@ function RenovarLoteModal({
                         : st === "manual" ? <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
                         : current === tipo ? <Loader2 className="w-4 h-4 animate-spin text-blue-500 shrink-0" />
                         : <div className="w-4 h-4 rounded-full border-2 border-slate-200 shrink-0" />}
-                      <span className="text-sm text-slate-700">{c.label}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-700">{c.label}</p>
+                        {current === tipo && st === "pending" && (
+                          <p className="text-xs text-blue-500 truncate">{currentStep}</p>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
