@@ -5,6 +5,7 @@ import {
   Building2, Briefcase, Scale, MapPin, Map,
   RefreshCw, History, CheckCircle2, AlertCircle, FileText,
   Loader2, Upload, ExternalLink, ChevronDown, ChevronUp, X,
+  ShieldCheck, ShieldAlert, ShieldQuestion,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -26,6 +27,8 @@ export interface CertidaoData {
   dataValidade: string | null;
   resultado: string | null;
   codigoVerificacao: string | null;
+  urlVerificacao: string | null;
+  verificacaoStatus: "valido" | "invalido" | "nao_verificavel" | "verificando" | null;
   fileUrl: string | null;
   documentId?: number;
   metadata?: Record<string, any> | null;
@@ -109,6 +112,36 @@ function ValidityBar({ status, dataValidade }: { status: CertidaoStatus; dataVal
         />
       </div>
     </div>
+  );
+}
+
+// ── VerificacaoBadge ──────────────────────────────────────────────────────────
+
+const VERIFICACAO_CONFIG = {
+  valido: { label: "Autenticado", color: "#059669", bg: "#f0fdf4", Icon: ShieldCheck },
+  invalido: { label: "Inválido", color: "#dc2626", bg: "#fef2f2", Icon: ShieldAlert },
+  nao_verificavel: { label: "Não verificável", color: "#64748b", bg: "#f8fafc", Icon: ShieldQuestion },
+  verificando: { label: "Verificando...", color: "#2563eb", bg: "#eff6ff", Icon: Loader2 },
+} as const;
+
+function VerificacaoBadge({
+  status,
+}: {
+  status: CertidaoData["verificacaoStatus"];
+}) {
+  if (!status) return null;
+  const cfg = VERIFICACAO_CONFIG[status];
+  const { Icon } = cfg;
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+      style={{ color: cfg.color, background: cfg.bg }}
+    >
+      <Icon
+        className={cn("w-3.5 h-3.5", status === "verificando" && "animate-spin")}
+      />
+      {cfg.label}
+    </span>
   );
 }
 
@@ -624,10 +657,35 @@ function CertidaoCard({
   onRefresh: () => void;
 }) {
   const [emitirOpen, setEmitirOpen] = useState(false);
+  const [verificando, setVerificando] = useState(false);
+  const [verificacaoStatus, setVerificacaoStatus] = useState<CertidaoData["verificacaoStatus"]>(
+    data.verificacaoStatus
+  );
   const cfg = STATUS_CONFIG[data.status];
   const Icon = CERTIDAO_ICONS[data.tipo] ?? FileText;
   const res = data.resultado ? RESULTADO_LABELS[data.resultado] : null;
   const isPositiva = data.resultado === "positiva";
+
+  async function handleVerificar() {
+    setVerificando(true);
+    setVerificacaoStatus("verificando");
+    try {
+      const res = await fetch(`${API}/api/companies/${companyId}/certidoes/${data.tipo}/verificar`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setVerificacaoStatus(json.verificacaoStatus);
+      } else {
+        setVerificacaoStatus("nao_verificavel");
+      }
+    } catch {
+      setVerificacaoStatus("nao_verificavel");
+    } finally {
+      setVerificando(false);
+    }
+  }
 
   return (
     <>
@@ -682,7 +740,10 @@ function CertidaoCard({
               )}
 
               {data.codigoVerificacao && (
-                <p className="text-xs text-slate-500 font-mono truncate">Cód: {data.codigoVerificacao}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs text-slate-500 font-mono truncate">Cód: {data.codigoVerificacao}</p>
+                  <VerificacaoBadge status={verificacaoStatus} />
+                </div>
               )}
 
               {isPositiva && (
@@ -732,6 +793,16 @@ function CertidaoCard({
                 >
                   <FileText className="w-3.5 h-3.5" /> Ver PDF
                 </a>
+              )}
+
+              {data.codigoVerificacao && !verificando && verificacaoStatus !== "valido" && verificacaoStatus !== "verificando" && (
+                <button
+                  onClick={handleVerificar}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Verificar autenticidade
+                </button>
               )}
 
               {data.status === "nao_cadastrada" && (

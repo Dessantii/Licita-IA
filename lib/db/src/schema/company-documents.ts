@@ -36,6 +36,7 @@ export const companyDocumentsTable = pgTable("company_documents", {
   metadata: jsonb("metadata"),
   emissionMethod: text("emission_method").default("manual"),
   certidaoType: text("certidao_type"),
+  verificacaoStatus: text("verificacao_status"),
 });
 
 export const insertCompanyDocumentSchema = createInsertSchema(companyDocumentsTable).omit({

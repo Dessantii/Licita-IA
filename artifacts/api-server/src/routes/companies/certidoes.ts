@@ -164,6 +164,177 @@ function calcStatus(dataValidade: string | null): "valida" | "vencendo" | "venci
   return "valida";
 }
 
+// ── Verification helpers ───────────────────────────────────────────────────────
+
+type VerificacaoStatus = "valido" | "invalido" | "nao_verificavel";
+
+/**
+ * Trusted hostname suffixes for Brazilian government certificate verification portals.
+ * Only URLs whose hostname ends with one of these suffixes will be fetched.
+ * This prevents SSRF by refusing to contact any host not on this list.
+ */
+const ALLOWED_HOSTNAME_SUFFIXES = [
+  ".receita.fazenda.gov.br",
+  ".receita.economia.gov.br",
+  ".pgfn.gov.br",
+  ".caixa.gov.br",
+  ".tst.jus.br",
+  ".fazenda.sp.gov.br",
+  ".sefaz.sp.gov.br",
+  ".sefaz.rj.gov.br",
+  ".sefaz.mg.gov.br",
+  ".sefaz.ba.gov.br",
+  ".sefaz.rs.gov.br",
+  ".sefaz.pr.gov.br",
+  ".sefaz.sc.gov.br",
+  ".sefaz.go.gov.br",
+  ".sefaz.pe.gov.br",
+  ".sefaz.ce.gov.br",
+  ".sefaz.am.gov.br",
+  ".sefaz.pa.gov.br",
+  ".sefaz.mt.gov.br",
+  ".sefaz.ms.gov.br",
+  ".sefaz.df.gov.br",
+  ".fazenda.gov.br",
+  ".gov.br",
+  ".jus.br",
+];
+
+const PRIVATE_IP_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^::1$/,
+  /^fd[0-9a-f]{2}:/i,
+  /^169\.254\./,
+  /^0\./,
+];
+
+const VALID_KEYWORDS = [
+  "certidão negativa",
+  "certidao negativa",
+  "regularidade",
+  "negativa de débitos",
+  "negativa de debitos",
+  "situação regular",
+  "situacao regular",
+  "certidão válida",
+  "certidao valida",
+  "documento válido",
+  "documento valido",
+  "autêntico",
+  "autentico",
+];
+
+const INVALID_KEYWORDS = [
+  "não encontrado",
+  "nao encontrado",
+  "não localizado",
+  "nao localizado",
+  "código inválido",
+  "codigo invalido",
+  "código não",
+  "codigo nao",
+  "expirado",
+  "revogado",
+  "cancelado",
+];
+
+function isUrlAllowed(rawUrl: string): { allowed: boolean; reason?: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return { allowed: false, reason: "URL inválida" };
+  }
+
+  if (parsed.protocol !== "https:") {
+    return { allowed: false, reason: "Apenas HTTPS é permitido" };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  if (PRIVATE_IP_PATTERNS.some(re => re.test(hostname))) {
+    return { allowed: false, reason: "Hostname privado/interno bloqueado" };
+  }
+
+  const allowed = ALLOWED_HOSTNAME_SUFFIXES.some(
+    suffix => hostname === suffix.slice(1) || hostname.endsWith(suffix),
+  );
+  if (!allowed) {
+    return { allowed: false, reason: `Hostname não está na lista de portais confiáveis: ${hostname}` };
+  }
+
+  return { allowed: true };
+}
+
+async function verificarAutenticidade(
+  codigoVerificacao: string,
+  urlVerificacao: string,
+): Promise<VerificacaoStatus> {
+  const { allowed, reason } = isUrlAllowed(urlVerificacao);
+  if (!allowed) {
+    console.warn(`[certidoes/verificar] URL bloqueada: ${reason}`);
+    return "nao_verificavel";
+  }
+
+  let targetUrl: string;
+  try {
+    const base = new URL(urlVerificacao);
+    base.searchParams.set("codigo", codigoVerificacao);
+    targetUrl = base.toString();
+  } catch {
+    return "nao_verificavel";
+  }
+
+  const { allowed: recheck } = isUrlAllowed(targetUrl);
+  if (!recheck) {
+    console.warn("[certidoes/verificar] URL após modificação de params bloqueada");
+    return "nao_verificavel";
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    let response: Response;
+    try {
+      response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "LicitaIA/1.0 (+https://licitaia.com.br)",
+          Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        },
+        redirect: "manual",
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location") ?? "";
+      const { allowed: redirAllowed } = isUrlAllowed(location);
+      if (!redirAllowed) {
+        console.warn("[certidoes/verificar] Redirect bloqueado para host não confiável");
+        return "nao_verificavel";
+      }
+    }
+
+    if (!response.ok) return "nao_verificavel";
+
+    const text = (await response.text()).toLowerCase();
+
+    if (INVALID_KEYWORDS.some(kw => text.includes(kw))) return "invalido";
+    if (VALID_KEYWORDS.some(kw => text.includes(kw))) return "valido";
+  } catch (err) {
+    console.warn("[certidoes/verificar] fetch falhou (detalhes omitidos por segurança)");
+  }
+
+  return "nao_verificavel";
+}
+
 // ── GET /api/companies/:id/certidoes ─────────────────────────────────────────
 
 router.get("/:id/certidoes", async (req, res) => {
@@ -215,6 +386,8 @@ router.get("/:id/certidoes", async (req, res) => {
         dataValidade: doc.dataValidade,
         resultado: meta?.resultado ?? null,
         codigoVerificacao: meta?.codigo_verificacao ?? null,
+        urlVerificacao: meta?.url_verificacao ?? null,
+        verificacaoStatus: doc.verificacaoStatus ?? null,
         fileUrl: `/api/companies/${companyId}/documents/${doc.id}/download`,
         documentId: doc.id,
         metadata: meta,
@@ -254,6 +427,58 @@ router.get("/:id/certidoes/:tipo/history", async (req, res) => {
     expiresAt: h.expiresAt?.toISOString() ?? null,
     createdAt: h.createdAt.toISOString(),
   })));
+});
+
+// ── POST /api/companies/:id/certidoes/:tipo/verificar ────────────────────────
+
+router.post("/:id/certidoes/:tipo/verificar", async (req, res) => {
+  const companyId = parseInt(req.params.id!);
+  const tipo = req.params.tipo!;
+
+  if (isNaN(companyId) || !VALID_TIPOS.includes(tipo)) {
+    res.status(400).json({ error: "Parâmetros inválidos" }); return;
+  }
+
+  const userId = (req as any).userId as number;
+  const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
+  if (!company || company.userId !== userId) { res.status(404).json({ error: "Empresa não encontrada" }); return; }
+
+  const docs = await db
+    .select()
+    .from(companyDocumentsTable)
+    .where(and(
+      eq(companyDocumentsTable.companyId, companyId),
+      eq(companyDocumentsTable.certidaoType, tipo),
+    ))
+    .orderBy(desc(companyDocumentsTable.uploadedAt))
+    .limit(1);
+
+  const doc = docs[0];
+  if (!doc) { res.status(404).json({ error: "Certidão não encontrada" }); return; }
+
+  const meta = doc.metadata as Record<string, any> | null;
+  const codigoVerificacao = meta?.codigo_verificacao as string | null | undefined;
+  const urlVerificacao = meta?.url_verificacao as string | null | undefined;
+
+  if (!codigoVerificacao || !urlVerificacao) {
+    await db
+      .update(companyDocumentsTable)
+      .set({ verificacaoStatus: "nao_verificavel" })
+      .where(eq(companyDocumentsTable.id, doc.id));
+    res.json({ verificacaoStatus: "nao_verificavel", documentId: doc.id });
+    return;
+  }
+
+  console.log(`[certidoes/verificar] Verificando ${tipo} para empresa ${companyId} com código ${codigoVerificacao}`);
+
+  const verificacaoStatus = await verificarAutenticidade(codigoVerificacao, urlVerificacao);
+
+  await db
+    .update(companyDocumentsTable)
+    .set({ verificacaoStatus })
+    .where(eq(companyDocumentsTable.id, doc.id));
+
+  res.json({ verificacaoStatus, documentId: doc.id, codigoVerificacao, urlVerificacao });
 });
 
 // ── POST /api/companies/:id/certidoes/:tipo/extract ──────────────────────────
@@ -332,6 +557,21 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
       emissionMethod: "manual_upload",
     });
 
+    const codigoVerificacaoExtracted = extracted?.codigo_verificacao as string | null | undefined;
+    const urlVerificacaoExtracted = extracted?.url_verificacao as string | null | undefined;
+
+    if (codigoVerificacaoExtracted && urlVerificacaoExtracted) {
+      verificarAutenticidade(codigoVerificacaoExtracted, urlVerificacaoExtracted)
+        .then(async (status) => {
+          await db
+            .update(companyDocumentsTable)
+            .set({ verificacaoStatus: status })
+            .where(eq(companyDocumentsTable.id, doc!.id));
+          console.log(`[certidoes/extract] Verificação automática: ${status} para doc ${doc!.id}`);
+        })
+        .catch(err => console.error("[certidoes/extract] Verificação automática falhou:", err));
+    }
+
     res.json({
       success: true,
       documentId: doc!.id,
@@ -341,6 +581,10 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
       dataValidade,
       resultado,
       status: calcStatus(dataValidade),
+      verificacaoStatus: codigoVerificacaoExtracted && urlVerificacaoExtracted
+        ? "verificando"
+        : null,
+      hasCodigoVerificacao: !!codigoVerificacaoExtracted,
     });
   } catch (err) {
     console.error("[certidoes] extract error:", err);
