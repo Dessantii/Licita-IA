@@ -248,6 +248,14 @@ async function pollJobUntilDone(
     const res = await fetch(`${API}/api/companies/${companyId}/certidoes/${tipo}/status/${jobId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (res.status === 404) {
+      return {
+        success: false,
+        method: "manual",
+        message: "O servidor foi reiniciado enquanto a certidão estava sendo emitida. Emita manualmente e faça o upload do PDF.",
+        _serverRestart: true,
+      };
+    }
     if (!res.ok) throw new Error("Falha ao consultar status do job");
     const data = await res.json();
     if (data.step) onStep(data.step);

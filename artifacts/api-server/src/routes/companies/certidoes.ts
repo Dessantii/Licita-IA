@@ -3,8 +3,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "@workspace/db";
-import { companiesTable, companyDocumentsTable, certidaoHistoryTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { companiesTable, companyDocumentsTable, certidaoHistoryTable, emitirJobsTable } from "@workspace/db";
+import { eq, and, desc, lte } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { createRequire } from "node:module";
 import { emitirCertidao, isEstadoSupported, isMunicipioSupported } from "../../rpa/index";
@@ -807,21 +807,75 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
   }
 });
 
-// ── In-memory job store ───────────────────────────────────────────────────────
+// ── DB-backed job store ───────────────────────────────────────────────────────
 
-interface JobState {
-  status: "running" | "done" | "failed";
-  step: string;
-  result?: Record<string, any>;
+async function createJob(companyId: number, certidaoType: string): Promise<string> {
+  const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  await db.insert(emitirJobsTable).values({
+    jobId,
+    companyId,
+    certidaoType,
+    status: "running",
+    step: "Iniciando...",
+  });
+  setTimeout(async () => {
+    try { await db.delete(emitirJobsTable).where(eq(emitirJobsTable.jobId, jobId)); } catch {}
+  }, 10 * 60 * 1000);
+  return jobId;
 }
 
-const jobStore = new Map<string, JobState>();
+async function updateJobStep(jobId: string, step: string): Promise<void> {
+  try {
+    await db.update(emitirJobsTable).set({ step }).where(eq(emitirJobsTable.jobId, jobId));
+  } catch {}
+}
 
-function createJob(): string {
-  const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  jobStore.set(jobId, { status: "running", step: "Iniciando..." });
-  setTimeout(() => jobStore.delete(jobId), 10 * 60 * 1000);
-  return jobId;
+async function finalizeJob(
+  jobId: string,
+  status: "done" | "failed",
+  step: string,
+  result: Record<string, any>,
+): Promise<void> {
+  try {
+    await db.update(emitirJobsTable)
+      .set({ status, step, result })
+      .where(eq(emitirJobsTable.jobId, jobId));
+  } catch (err) {
+    console.error("[certidoes] finalizeJob DB error:", err);
+  }
+}
+
+// A running job is considered orphaned (server restarted) after this
+// threshold — must be shorter than the frontend's maxWaitMs (120 s) so the
+// restart-specific error message surfaces before the UI poll loop times out.
+const JOB_STALE_MS = 90 * 1000;
+
+// ── Startup: mark any orphaned running jobs as failed ─────────────────────────
+
+export async function cleanupOrphanedJobs(): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - JOB_STALE_MS);
+    const orphanedJobs = await db
+      .select()
+      .from(emitirJobsTable)
+      .where(and(eq(emitirJobsTable.status, "running"), lte(emitirJobsTable.updatedAt, cutoff)));
+
+    for (const job of orphanedJobs) {
+      const staleResult = {
+        success: false,
+        method: "manual",
+        portalUrl: CERTIDAO_DEFS[job.certidaoType]?.portalUrl ?? "",
+        instructions: CERTIDAO_DEFS[job.certidaoType]?.instructions ?? "",
+        message: "O servidor foi reiniciado enquanto a certidão estava sendo emitida. Emita manualmente e faça o upload do PDF.",
+      };
+      await finalizeJob(job.jobId, "failed", "Interrompido por reinício do servidor", staleResult);
+    }
+    if (orphanedJobs.length > 0) {
+      console.log(`[certidoes] Cleaned up ${orphanedJobs.length} orphaned running job(s) on startup`);
+    }
+  } catch (err) {
+    console.error("[certidoes] cleanupOrphanedJobs error:", err);
+  }
 }
 
 // ── GET /api/companies/:id/certidoes/:tipo/status/:jobId ──────────────────────
@@ -839,8 +893,28 @@ router.get("/:id/certidoes/:tipo/status/:jobId", async (req, res) => {
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
   if (!company || company.userId !== userId) { res.status(404).json({ error: "Empresa não encontrada" }); return; }
 
-  const job = jobStore.get(jobId);
+  const [job] = await db.select().from(emitirJobsTable).where(eq(emitirJobsTable.jobId, jobId));
   if (!job) { res.status(404).json({ error: "Job não encontrado ou expirado" }); return; }
+
+  if (job.companyId !== companyId) {
+    res.status(403).json({ error: "Acesso não autorizado a este job" }); return;
+  }
+
+  if (job.status === "running") {
+    const staleSince = Date.now() - job.updatedAt.getTime();
+    if (staleSince > JOB_STALE_MS) {
+      const staleResult = {
+        success: false,
+        method: "manual",
+        portalUrl: CERTIDAO_DEFS[job.certidaoType]?.portalUrl ?? "",
+        instructions: CERTIDAO_DEFS[job.certidaoType]?.instructions ?? "",
+        message: "O servidor foi reiniciado enquanto a certidão estava sendo emitida. Emita manualmente e faça o upload do PDF.",
+      };
+      await finalizeJob(jobId, "failed", "Interrompido por reinício do servidor", staleResult);
+      res.json({ status: "failed", step: "Interrompido por reinício do servidor", result: staleResult });
+      return;
+    }
+  }
 
   res.json({ status: job.status, step: job.step, result: job.result ?? null });
 });
@@ -921,14 +995,12 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
 
   console.log(`[certidoes/emitir] Iniciando job de automação para ${tipo} | empresa ${companyId}`);
 
-  const jobId = createJob();
+  const jobId = await createJob(companyId, tipo);
   res.json({ jobId, status: "running", step: "Iniciando..." });
 
   (async () => {
-    const job = jobStore.get(jobId)!;
-
     const onStep = (msg: string) => {
-      job.step = msg;
+      updateJobStep(jobId, msg);
     };
 
     let rpaResult: Awaited<ReturnType<typeof emitirCertidao>>;
@@ -936,15 +1008,13 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
       rpaResult = await emitirCertidao(tipo, cnpj, onStep, { uf: company.uf, municipio: company.municipio });
     } catch (err) {
       console.error("[certidoes/emitir] RPA error:", err);
-      job.status = "done";
-      job.step = "Concluído";
-      job.result = {
+      await finalizeJob(jobId, "done", "Concluído", {
         success: false,
         method: "manual",
         portalUrl: def.portalUrl,
         instructions: def.instructions,
         message: "Erro interno durante a automação. Emita manualmente e faça o upload do PDF.",
-      };
+      });
       return;
     }
 
@@ -952,16 +1022,14 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
       const message = rpaResult.captchaDetected
         ? "CAPTCHA detectado no portal. Emita manualmente e faça o upload do PDF."
         : (rpaResult.error ?? "Automação falhou. Emita manualmente e faça o upload do PDF.");
-      job.status = "done";
-      job.step = "Concluído";
-      job.result = {
+      await finalizeJob(jobId, "done", "Concluído", {
         success: false,
         method: "manual",
         portalUrl: def.portalUrl,
         instructions: def.instructions,
         message,
         captchaDetected: rpaResult.captchaDetected ?? false,
-      };
+      });
       return;
     }
 
@@ -1015,9 +1083,7 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
 
       try { fs.unlinkSync(pdfPath); } catch { }
 
-      job.status = "done";
-      job.step = "Concluído";
-      job.result = {
+      await finalizeJob(jobId, "done", "Concluído", {
         success: true,
         method: "automatic",
         documentId: doc!.id,
@@ -1027,19 +1093,17 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
         dataValidade,
         resultado,
         status: calcStatus(dataValidade),
-      };
+      });
     } catch (err) {
       console.error("[certidoes/emitir] post-processing error:", err);
       try { if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath); } catch { }
-      job.status = "failed";
-      job.step = "Erro ao processar PDF";
-      job.result = {
+      await finalizeJob(jobId, "failed", "Erro ao processar PDF", {
         success: false,
         method: "manual",
         portalUrl: def.portalUrl,
         instructions: def.instructions,
         message: "Erro ao processar o PDF baixado automaticamente. Emita manualmente e faça o upload.",
-      };
+      });
     }
   })();
 });

@@ -9,6 +9,7 @@ import { startMonitorJob } from "./services/monitor-job";
 import { startSessionAlertJob } from "./services/session-alert-job";
 import { startProcessMonitor } from "./services/process-monitor";
 import { startCertidaoExpiryJob } from "./services/certidao-expiry-job";
+import { cleanupOrphanedJobs } from "./routes/companies/certidoes";
 import { checkBrowserAvailable } from "./rpa/index";
 
 process.env["PLAYWRIGHT_BROWSERS_PATH"] = path.join(process.cwd(), "../../../.cache/ms-playwright");
@@ -48,6 +49,7 @@ startMonitorJob();
 startSessionAlertJob();
 startProcessMonitor();
 startCertidaoExpiryJob();
+cleanupOrphanedJobs();
 
 checkBrowserAvailable().then(available => {
   (global as any).PUPPETEER_AVAILABLE = available;

@@ -32,3 +32,4 @@ export * from "./session-bids";
 export * from "./notifications";
 export * from "./certidao-history";
 export * from "./guide-articles";
+export * from "./emitir-jobs";
