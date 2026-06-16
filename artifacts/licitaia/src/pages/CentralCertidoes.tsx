@@ -226,6 +226,31 @@ function HistoryPanel({ companyId, tipo, token }: { companyId: number; tipo: str
 
 type ModalStep = "confirm" | "processing" | "success" | "failure";
 
+async function pollJobUntilDone(
+  companyId: number,
+  tipo: string,
+  jobId: string,
+  token: string,
+  onStep: (msg: string) => void,
+  intervalMs = 2000,
+  maxWaitMs = 120_000,
+): Promise<Record<string, any>> {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise(r => setTimeout(r, intervalMs));
+    const res = await fetch(`${API}/api/companies/${companyId}/certidoes/${tipo}/status/${jobId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Falha ao consultar status do job");
+    const data = await res.json();
+    if (data.step) onStep(data.step);
+    if (data.status === "done" || data.status === "failed") {
+      return data.result ?? {};
+    }
+  }
+  throw new Error("Timeout ao aguardar emissão automática");
+}
+
 function EmitirModal({
   certidao,
   company,
@@ -240,6 +265,7 @@ function EmitirModal({
   onSuccess: () => void;
 }) {
   const [step, setStep] = useState<ModalStep>("confirm");
+  const [liveStep, setLiveStep] = useState("Iniciando...");
   const [failureData, setFailureData] = useState<{ portalUrl: string; instructions: string; message: string } | null>(null);
   const [successData, setSuccessData] = useState<{ dataValidade: string | null; resultado: string | null } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -247,19 +273,34 @@ function EmitirModal({
 
   async function handleEmitir() {
     setStep("processing");
+    setLiveStep("Iniciando...");
     try {
       const res = await fetch(`${API}/api/companies/${company.id}/certidoes/${certidao.tipo}/emitir`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
-      const data = await res.json();
+      const startData = await res.json();
 
-      if (data.success) {
-        setSuccessData({ dataValidade: data.dataValidade, resultado: data.resultado });
+      if (!startData.jobId) {
+        setFailureData({ portalUrl: startData.portalUrl, instructions: startData.instructions, message: startData.message });
+        setStep("failure");
+        return;
+      }
+
+      const result = await pollJobUntilDone(
+        company.id,
+        certidao.tipo,
+        startData.jobId,
+        token,
+        (msg) => setLiveStep(msg),
+      );
+
+      if (result.success) {
+        setSuccessData({ dataValidade: result.dataValidade, resultado: result.resultado });
         setStep("success");
         onSuccess();
       } else {
-        setFailureData({ portalUrl: data.portalUrl, instructions: data.instructions, message: data.message });
+        setFailureData({ portalUrl: result.portalUrl ?? certidao.portalUrl, instructions: result.instructions ?? "", message: result.message ?? "Automação falhou." });
         setStep("failure");
       }
     } catch {
@@ -366,9 +407,36 @@ function EmitirModal({
               <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
               </div>
-              <div>
-                <p className="font-semibold text-slate-900 mb-1">Acessando o portal da {certidao.emissor}...</p>
-                <p className="text-sm text-slate-500">Isso pode levar até 30 segundos</p>
+              <div className="space-y-1">
+                <p className="font-semibold text-slate-900">{liveStep}</p>
+                <p className="text-xs text-slate-400">Isso pode levar até 30 segundos</p>
+              </div>
+              <div className="w-full space-y-1.5">
+                {["Abrindo portal...", "Preenchendo CNPJ...", "Baixando PDF...", "Extraindo dados..."].map((s) => {
+                  const steps = ["Abrindo portal...", "Preenchendo CNPJ...", "Baixando PDF...", "Extraindo dados..."];
+                  const currentIdx = steps.indexOf(liveStep);
+                  const sIdx = steps.indexOf(s);
+                  const isDone = sIdx < currentIdx;
+                  const isActive = sIdx === currentIdx;
+                  return (
+                    <div
+                      key={s}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all",
+                        isDone ? "bg-green-50 text-green-700" : isActive ? "bg-blue-50 text-blue-700 font-semibold" : "bg-slate-50 text-slate-400"
+                      )}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-green-500" />
+                      ) : isActive ? (
+                        <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-blue-500" />
+                      ) : (
+                        <div className="w-3.5 h-3.5 shrink-0 rounded-full border border-slate-300" />
+                      )}
+                      {s}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -503,8 +571,15 @@ function RenovarLoteModal({
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         });
-        const data = await res.json();
-        setProgress(p => ({ ...p, [tipo]: data.success ? "ok" : "manual" }));
+        const startData = await res.json();
+
+        if (!startData.jobId) {
+          setProgress(p => ({ ...p, [tipo]: startData.success ? "ok" : "manual" }));
+          continue;
+        }
+
+        const result = await pollJobUntilDone(companyId, tipo, startData.jobId, token, () => {});
+        setProgress(p => ({ ...p, [tipo]: result.success ? "ok" : "manual" }));
       } catch {
         setProgress(p => ({ ...p, [tipo]: "manual" }));
       }
