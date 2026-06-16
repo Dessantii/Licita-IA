@@ -212,7 +212,7 @@ const PRIVATE_IP_PATTERNS = [
   /^0\./,
 ];
 
-const VALID_KEYWORDS = [
+const GENERIC_VALID_KEYWORDS = [
   "certidão negativa",
   "certidao negativa",
   "regularidade",
@@ -228,7 +228,7 @@ const VALID_KEYWORDS = [
   "autentico",
 ];
 
-const INVALID_KEYWORDS = [
+const GENERIC_INVALID_KEYWORDS = [
   "não encontrado",
   "nao encontrado",
   "não localizado",
@@ -241,6 +241,160 @@ const INVALID_KEYWORDS = [
   "revogado",
   "cancelado",
 ];
+
+// ── Per-portal verification strategies ────────────────────────────────────────
+
+type PortalStrategy = {
+  /**
+   * If set, ignores the URL stored in the document and always POSTs/GETs to
+   * this fixed endpoint for the given portal.
+   */
+  fixedUrl?: string;
+  method: "GET" | "POST";
+  /**
+   * For POST: build the application/x-www-form-urlencoded body.
+   * For GET: if set, the returned params are appended to the URL instead of
+   *          the default `?codigo=<code>` approach.
+   */
+  buildParams?: (code: string) => URLSearchParams;
+  extraHeaders?: Record<string, string>;
+  validKeywords: string[];
+  invalidKeywords: string[];
+};
+
+/**
+ * Portal-specific strategies keyed by certidão tipo.
+ * Each strategy encodes the correct HTTP method, endpoint, request params, and
+ * the keyword sets that are meaningful for that portal's response HTML.
+ */
+const PORTAL_STRATEGIES: Record<string, PortalStrategy> = {
+  /**
+   * Certidão Negativa de Débitos Federais — Receita Federal / PGFN
+   * Verification endpoint: POST with CodVerificacao in the form body.
+   * Response HTML contains "Certidão Autêntica" or "Certidão Não Autêntica".
+   */
+  cnd_federal: {
+    fixedUrl: "https://solucoes.receita.fazenda.gov.br/servicos/certidaointernet/pj/autenticar",
+    method: "POST",
+    buildParams: (code) => {
+      const p = new URLSearchParams();
+      p.set("CodVerificacao", code);
+      return p;
+    },
+    extraHeaders: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Origin": "https://solucoes.receita.fazenda.gov.br",
+      "Referer": "https://solucoes.receita.fazenda.gov.br/servicos/certidaointernet/pj/autenticar",
+    },
+    validKeywords: [
+      "certidão autêntica",
+      "certidao autentica",
+      "autenticidade confirmada",
+      "documento autêntico",
+      "documento autentico",
+      "situação regular",
+      "situacao regular",
+      "negativa de débitos",
+      "negativa de debitos",
+    ],
+    invalidKeywords: [
+      "certidão não autêntica",
+      "certidao nao autentica",
+      "não autêntica",
+      "nao autentica",
+      "não localizada",
+      "nao localizada",
+      "não encontrada",
+      "nao encontrada",
+      "código inválido",
+      "codigo invalido",
+    ],
+  },
+
+  /**
+   * CRF — Certificado de Regularidade do FGTS — Caixa Econômica Federal
+   * The extracted URL from the document is used (caixa.gov.br domains).
+   * Response uses FGTS-specific terminology.
+   */
+  crf_fgts: {
+    method: "GET",
+    buildParams: (code) => {
+      const p = new URLSearchParams();
+      p.set("codigo", code);
+      return p;
+    },
+    validKeywords: [
+      "regularidade fiscal",
+      "em situação regular",
+      "situação regular",
+      "situacao regular",
+      "regular perante o fgts",
+      "crf válido",
+      "crf valido",
+      "certificado válido",
+      "certificado valido",
+      "autêntico",
+      "autentico",
+    ],
+    invalidKeywords: [
+      "não regular",
+      "nao regular",
+      "irregular",
+      "não localizado",
+      "nao localizado",
+      "não encontrado",
+      "nao encontrado",
+      "certificado inválido",
+      "certificado invalido",
+      "código não",
+      "codigo nao",
+    ],
+  },
+
+  /**
+   * CNDT — Certidão Negativa de Débitos Trabalhistas — TST
+   * The TST portal accepts the code via GET query param on the verification URL
+   * extracted from the document.
+   */
+  cndt: {
+    method: "GET",
+    buildParams: (code) => {
+      const p = new URLSearchParams();
+      p.set("codigo", code);
+      return p;
+    },
+    extraHeaders: {
+      "Referer": "https://cndt-certidao.tst.jus.br/",
+    },
+    validKeywords: [
+      "certidão autêntica",
+      "certidao autentica",
+      "certidão negativa",
+      "certidao negativa",
+      "negativa de débitos trabalhistas",
+      "negativa de debitos trabalhistas",
+      "autenticidade confirmada",
+      "documento autêntico",
+      "documento autentico",
+      "situação regular",
+      "situacao regular",
+    ],
+    invalidKeywords: [
+      "certidão não autêntica",
+      "certidao nao autentica",
+      "não autêntica",
+      "nao autentica",
+      "não localizada",
+      "nao localizada",
+      "não encontrada",
+      "nao encontrada",
+      "código inválido",
+      "codigo invalido",
+      "positiva de débitos",
+      "positiva de debitos",
+    ],
+  },
+};
 
 function isUrlAllowed(rawUrl: string): { allowed: boolean; reason?: string } {
   let parsed: URL;
@@ -273,27 +427,53 @@ function isUrlAllowed(rawUrl: string): { allowed: boolean; reason?: string } {
 async function verificarAutenticidade(
   codigoVerificacao: string,
   urlVerificacao: string,
+  tipo?: string,
 ): Promise<VerificacaoStatus> {
-  const { allowed, reason } = isUrlAllowed(urlVerificacao);
-  if (!allowed) {
-    console.warn(`[certidoes/verificar] URL bloqueada: ${reason}`);
-    return "nao_verificavel";
-  }
+  const strategy = tipo ? PORTAL_STRATEGIES[tipo] : undefined;
 
+  // ── Determine the target URL ────────────────────────────────────────────────
+  // For portals with a fixed endpoint (e.g. Receita Federal POST), we bypass
+  // the URL stored in the document and always hit the canonical endpoint.
+  // For all others we start from the document URL and append params.
   let targetUrl: string;
-  try {
-    const base = new URL(urlVerificacao);
-    base.searchParams.set("codigo", codigoVerificacao);
-    targetUrl = base.toString();
-  } catch {
-    return "nao_verificavel";
+
+  if (strategy?.fixedUrl) {
+    const { allowed, reason } = isUrlAllowed(strategy.fixedUrl);
+    if (!allowed) {
+      console.warn(`[certidoes/verificar] Fixed strategy URL bloqueada para ${tipo}: ${reason}`);
+      return "nao_verificavel";
+    }
+    targetUrl = strategy.fixedUrl;
+  } else {
+    const { allowed, reason } = isUrlAllowed(urlVerificacao);
+    if (!allowed) {
+      console.warn(`[certidoes/verificar] URL bloqueada: ${reason}`);
+      return "nao_verificavel";
+    }
+
+    try {
+      const base = new URL(urlVerificacao);
+      if (strategy?.buildParams) {
+        for (const [k, v] of strategy.buildParams(codigoVerificacao)) {
+          base.searchParams.set(k, v);
+        }
+      } else {
+        base.searchParams.set("codigo", codigoVerificacao);
+      }
+      targetUrl = base.toString();
+    } catch {
+      return "nao_verificavel";
+    }
+
+    const { allowed: recheck } = isUrlAllowed(targetUrl);
+    if (!recheck) {
+      console.warn("[certidoes/verificar] URL após modificação de params bloqueada");
+      return "nao_verificavel";
+    }
   }
 
-  const { allowed: recheck } = isUrlAllowed(targetUrl);
-  if (!recheck) {
-    console.warn("[certidoes/verificar] URL após modificação de params bloqueada");
-    return "nao_verificavel";
-  }
+  const validKeywords = strategy?.validKeywords ?? GENERIC_VALID_KEYWORDS;
+  const invalidKeywords = strategy?.invalidKeywords ?? GENERIC_INVALID_KEYWORDS;
 
   try {
     const controller = new AbortController();
@@ -301,12 +481,20 @@ async function verificarAutenticidade(
 
     let response: Response;
     try {
+      const isPost = strategy?.method === "POST";
+      const body = isPost && strategy?.buildParams
+        ? strategy.buildParams(codigoVerificacao).toString()
+        : undefined;
+
       response = await fetch(targetUrl, {
+        method: strategy?.method ?? "GET",
         signal: controller.signal,
         headers: {
           "User-Agent": "LicitaIA/1.0 (+https://licitaia.com.br)",
           Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+          ...(strategy?.extraHeaders ?? {}),
         },
+        body,
         redirect: "manual",
       });
     } finally {
@@ -326,8 +514,8 @@ async function verificarAutenticidade(
 
     const text = (await response.text()).toLowerCase();
 
-    if (INVALID_KEYWORDS.some(kw => text.includes(kw))) return "invalido";
-    if (VALID_KEYWORDS.some(kw => text.includes(kw))) return "valido";
+    if (invalidKeywords.some(kw => text.includes(kw))) return "invalido";
+    if (validKeywords.some(kw => text.includes(kw))) return "valido";
   } catch (err) {
     console.warn("[certidoes/verificar] fetch falhou (detalhes omitidos por segurança)");
   }
@@ -490,7 +678,7 @@ router.post("/:id/certidoes/:tipo/verificar", async (req, res) => {
 
   console.log(`[certidoes/verificar] Verificando ${tipo} para empresa ${companyId} com código ${codigoVerificacao}`);
 
-  const verificacaoStatus = await verificarAutenticidade(codigoVerificacao, urlVerificacao);
+  const verificacaoStatus = await verificarAutenticidade(codigoVerificacao, urlVerificacao, tipo);
 
   await db
     .update(companyDocumentsTable)
@@ -581,7 +769,7 @@ router.post("/:id/certidoes/:tipo/extract", upload.single("file"), async (req, r
     const urlVerificacaoExtracted = extracted?.url_verificacao as string | null | undefined;
 
     if (codigoVerificacaoExtracted && urlVerificacaoExtracted) {
-      verificarAutenticidade(codigoVerificacaoExtracted, urlVerificacaoExtracted)
+      verificarAutenticidade(codigoVerificacaoExtracted, urlVerificacaoExtracted, tipo)
         .then(async (status) => {
           await db
             .update(companyDocumentsTable)
