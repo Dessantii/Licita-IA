@@ -885,6 +885,45 @@ router.post("/:id/certidoes/renovar-lote", async (req, res) => {
   res.json({ results });
 });
 
+// ── DELETE /api/companies/:id/certidoes/:tipo ─────────────────────────────────
+
+router.delete("/:id/certidoes/:tipo", async (req, res) => {
+  const userId = (req as any).userId as number;
+  const companyId = parseInt(req.params.id!);
+  const tipo = req.params.tipo!;
+  if (isNaN(companyId) || !VALID_TIPOS.includes(tipo)) {
+    res.status(400).json({ error: "Parâmetros inválidos" }); return;
+  }
+
+  const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
+  if (!company || company.userId !== userId) {
+    res.status(404).json({ error: "Empresa não encontrada" }); return;
+  }
+
+  const [doc] = await db
+    .select()
+    .from(companyDocumentsTable)
+    .where(and(
+      eq(companyDocumentsTable.companyId, companyId),
+      eq(companyDocumentsTable.certidaoType, tipo)
+    ))
+    .orderBy(desc(companyDocumentsTable.uploadedAt))
+    .limit(1);
+
+  if (!doc) {
+    res.status(404).json({ error: "Certidão não encontrada" }); return;
+  }
+
+  try {
+    const filePath = path.join(UPLOADS_DIR, doc.path);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch {}
+
+  await db.delete(companyDocumentsTable).where(eq(companyDocumentsTable.id, doc.id));
+
+  res.status(204).send();
+});
+
 // ── GET /api/companies/:id/documents/:docId/download ─────────────────────────
 
 router.get("/:id/documents/:docId/download", async (req, res) => {

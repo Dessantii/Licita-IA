@@ -5,7 +5,7 @@ import {
   Building2, Briefcase, Scale, MapPin, Map,
   RefreshCw, History, CheckCircle2, AlertCircle, FileText,
   Loader2, Upload, ExternalLink, ChevronDown, ChevronUp, X,
-  ShieldCheck, ShieldAlert, ShieldQuestion,
+  ShieldCheck, ShieldAlert, ShieldQuestion, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -740,6 +740,7 @@ function CertidaoCard({
 }) {
   const [emitirOpen, setEmitirOpen] = useState(false);
   const [verificando, setVerificando] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [verificacaoStatus, setVerificacaoStatus] = useState<CertidaoData["verificacaoStatus"]>(
     data.verificacaoStatus
   );
@@ -747,6 +748,34 @@ function CertidaoCard({
   const Icon = CERTIDAO_ICONS[data.tipo] ?? FileText;
   const res = data.resultado ? RESULTADO_LABELS[data.resultado] : null;
   const isPositiva = data.resultado === "positiva";
+
+  async function handleViewPdf() {
+    if (!data.fileUrl) return;
+    try {
+      const resp = await fetch(`${API}${data.fileUrl}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) return;
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {}
+  }
+
+  async function handleDelete() {
+    if (!confirm("Excluir esta certidão? O arquivo será removido permanentemente.")) return;
+    setDeleting(true);
+    try {
+      const resp = await fetch(`${API}/api/companies/${companyId}/certidoes/${data.tipo}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) onRefresh();
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleVerificar() {
     setVerificando(true);
@@ -867,14 +896,25 @@ function CertidaoCard({
               </Button>
 
               {data.fileUrl && (
-                <a
-                  href={`${API}${data.fileUrl}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  onClick={handleViewPdf}
                   className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors"
                 >
                   <FileText className="w-3.5 h-3.5" /> Ver PDF
-                </a>
+                </button>
+              )}
+
+              {data.status !== "nao_cadastrada" && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
+                  {deleting
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Trash2 className="w-3.5 h-3.5" />}
+                  Excluir
+                </button>
               )}
 
               {data.codigoVerificacao && !verificando && verificacaoStatus !== "valido" && verificacaoStatus !== "verificando" && (
