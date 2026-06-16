@@ -35,8 +35,7 @@ const tempUpload = multer({
 });
 
 async function extractTextFromFile(filePath: string, mimeType: string): Promise<string> {
-  // filePath is stored as "/uploads/filename.pdf" (URL path).
-  // Strip the leading "/uploads/" prefix so we can join it with UPLOADS_DIR correctly.
+  // filePath may be stored with or without a leading "/uploads/" prefix.
   const filename = filePath.replace(/^\/uploads\//, "");
   const fullPath = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(fullPath)) {
@@ -44,10 +43,56 @@ async function extractTextFromFile(filePath: string, mimeType: string): Promise<
   }
 
   if (mimeType.includes("pdf")) {
-    const fileUrl = `file://${fullPath}`;
-    const parser = new PDFParse({ url: fileUrl });
-    const data = await parser.getText();
-    return data.text;
+    // ── Step 1: try text extraction with pdf-parse ──────────────────────────
+    let text = "";
+    try {
+      const parser = new PDFParse({ url: `file://${fullPath}` });
+      const data = await parser.getText();
+      text = data.text?.trim() ?? "";
+    } catch { /* image-based PDF – will fall through */ }
+
+    if (text.length > 80) return text;
+
+    // ── Step 2: image-based PDF — extract embedded JPEG and OCR via vision ─
+    const pdfBytes = fs.readFileSync(fullPath);
+
+    // Find first JPEG stream (SOI marker = FF D8 FF)
+    let jpegStart = -1;
+    for (let i = 0; i < pdfBytes.length - 2; i++) {
+      if (pdfBytes[i] === 0xFF && pdfBytes[i + 1] === 0xD8 && pdfBytes[i + 2] === 0xFF) {
+        jpegStart = i; break;
+      }
+    }
+    if (jpegStart === -1) return text; // no embedded image found
+
+    // Find EOI marker (FF D9)
+    let jpegEnd = -1;
+    for (let i = jpegStart + 2; i < pdfBytes.length - 1; i++) {
+      if (pdfBytes[i] === 0xFF && pdfBytes[i + 1] === 0xD9) {
+        jpegEnd = i + 2; break;
+      }
+    }
+    if (jpegEnd <= jpegStart) return text;
+
+    const b64 = pdfBytes.slice(jpegStart, jpegEnd).toString("base64");
+    const dataUrl = `data:image/jpeg;base64,${b64}`;
+
+    const visionRes = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
+          {
+            type: "text",
+            text: "Transcreva TODO o texto desta imagem de edital de licitação pública brasileira. Preserve numeração de cláusulas, valores, datas e estrutura. Retorne apenas o texto transcrito.",
+          },
+        ],
+      }],
+      max_tokens: 4096,
+    });
+
+    return visionRes.choices[0]?.message?.content ?? text;
   }
 
   return "";
@@ -777,6 +822,7 @@ async function generateDeclarationText(
   company: typeof companiesTable.$inferSelect | null,
   process: typeof processesTable.$inferSelect,
   today: string,
+  requirements: { title: string; description?: string | null; category?: string | null }[],
 ): Promise<string> {
   const humanLabel = DECLARATION_LABELS[declType] ?? declType;
   const cidade = company?.municipio ?? "___________";
@@ -794,39 +840,60 @@ async function generateDeclarationText(
   const cpf = company?.cpfResponsavel ?? "___.___.___-__";
   const porte = company?.porte ?? "ME/EPP";
 
-  const prompt = `Você é um assistente jurídico especializado em licitações públicas brasileiras.
-Gere a declaração "${humanLabel}" completa e juridicamente correta para a empresa abaixo.
-Retorne APENAS o texto da declaração, sem explicações adicionais.
-Use linguagem formal e jurídica adequada, conforme exigido pela legislação vigente.
+  // Build edital context from extracted requirements
+  const editalContext = requirements.length > 0
+    ? `\nEXIGÊNCIAS EXTRAÍDAS DO EDITAL:\n${
+        requirements
+          .filter(r => r.category !== "informacao_principal")
+          .slice(0, 20)
+          .map(r => `- ${r.title}${r.description ? `: ${r.description.slice(0, 120)}` : ""}`)
+          .join("\n")
+      }`
+    : "";
 
-Dados da empresa:
+  const editalInfo = [
+    requirements.find(r => r.title?.toLowerCase().includes("objeto"))?.description,
+    requirements.find(r => r.title?.toLowerCase().includes("valor"))?.description,
+    requirements.find(r => r.title?.toLowerCase().includes("prazo"))?.description,
+  ].filter(Boolean).slice(0, 3).join(" | ");
+
+  const prompt = `Você é um assistente jurídico especializado em licitações públicas brasileiras.
+Gere a declaração "${humanLabel}" completa, juridicamente correta e ESPECÍFICA para este processo licitatório.
+Retorne APENAS o texto da declaração, sem explicações adicionais.
+Use linguagem formal e jurídica adequada, citando a base legal vigente.
+
+DADOS DA EMPRESA LICITANTE:
 - Razão social: ${razaoSocial}
 - CNPJ: ${cnpj}
 - Endereço: ${logradouro}
 - Representante legal: ${representante}
 - CPF do representante: ${cpf}
-- Porte: ${porte}
+- Porte da empresa: ${porte}
 
-Processo licitatório: ${process.title}
-Órgão: ${process.agency}
-${process.editalNumber ? `Edital: ${process.editalNumber}` : ""}
+PROCESSO LICITATÓRIO:
+- Objeto: ${process.title}${editalInfo ? ` — ${editalInfo}` : ""}
+- Órgão contratante: ${process.agency ?? "Não informado"}
+- Modalidade: ${process.modality ?? "Não informada"}
+${process.editalNumber ? `- Número do edital: ${process.editalNumber}` : ""}
+${editalContext}
 
-Data de hoje: ${today}
+Data: ${today}
 Cidade/UF: ${cidade}/${uf}
 
-Inclua no texto:
-1. Título da declaração em destaque
-2. Identificação completa da empresa e representante
-3. Texto jurídico completo, com base legal correta
-4. Local, data e linha de assinatura (nome, CPF e cargo do representante)
+INSTRUÇÕES:
+1. Escreva o TÍTULO da declaração em destaque (maiúsculas)
+2. Identifique a empresa e o representante legal com todos os dados acima
+3. Redija o corpo jurídico completo, citando a lei aplicável (ex: LC 123/2006, Lei 9.854/99, Lei 14.133/2021)
+4. Referencie explicitamente o processo licitatório (objeto e órgão)
+5. Termine com local, data e espaço para assinatura (nome, CPF, cargo)
 
-Retorne APENAS o texto completo da declaração.`;
+Retorne APENAS o texto completo da declaração, pronto para ser assinado.`;
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-4o",
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.2,
-    max_tokens: 1500,
+    temperature: 0.1,
+    max_tokens: 2000,
   });
 
   return completion.choices[0]?.message?.content?.trim() ?? `[Declaração ${humanLabel} — dados insuficientes para geração automática]`;
@@ -870,12 +937,18 @@ router.post("/processes/:id/generate-declarations", async (req, res) => {
     company = c ?? null;
   }
 
+  // Fetch extracted requirements to provide edital context in declarations
+  const requirements = await db
+    .select()
+    .from(extractedRequirementsTable)
+    .where(eq(extractedRequirementsTable.processId, id));
+
   const today = new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
   const generated = [];
 
   for (const declType of declarationTypes) {
     try {
-      const text = await generateDeclarationText(declType, company, process, today);
+      const text = await generateDeclarationText(declType, company, process, today, requirements);
       const safeType = declType.replace(/[^a-z0-9_]/g, "").slice(0, 30);
       const filename = `decl-${id}-${safeType}-${Date.now()}.txt`;
       const filepath = path.join(UPLOADS_DIR, filename);

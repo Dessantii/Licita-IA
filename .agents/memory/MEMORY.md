@@ -1,1 +1,2 @@
 - [CNPJ extraction anti-hallucination](cnpj-extraction.md) — prompt with descriptive placeholder values causes GPT to invent fictional data; use strict system prompt + json_object format instead.
+- [Edital text extraction for image PDFs](cnpj-extraction.md) — same binary JPEG scan technique used for CNPJ cards also applies to edital PDFs in extractTextFromFile().
