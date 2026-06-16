@@ -7,7 +7,7 @@ import { companiesTable, companyDocumentsTable, certidaoHistoryTable } from "@wo
 import { eq, and, desc } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { createRequire } from "node:module";
-import { emitirCertidao } from "../../rpa/index";
+import { emitirCertidao, isEstadoSupported, isMunicipioSupported } from "../../rpa/index";
 
 const require = createRequire(import.meta.url);
 const { PDFParse } = require("pdf-parse") as {
@@ -648,7 +648,23 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
   const def = CERTIDAO_DEFS[tipo]!;
   const puppeteerAvailable = (global as any).PUPPETEER_AVAILABLE === true;
 
-  const AUTOMATION_TYPES = ["cnd_federal", "crf_fgts", "cndt"];
+  const AUTOMATION_TYPES = ["cnd_federal", "crf_fgts", "cndt", "certidao_estadual", "certidao_municipal"];
+
+  const isRegionSupported = (): boolean => {
+    if (tipo === "certidao_estadual") return isEstadoSupported(company.uf);
+    if (tipo === "certidao_municipal") return isMunicipioSupported(company.municipio, company.uf);
+    return true;
+  };
+
+  const regionFallbackMessage = (): string => {
+    if (tipo === "certidao_estadual") {
+      return `Emissão automática não disponível para o estado "${company.uf ?? "não informado"}". Emita manualmente e faça o upload do PDF.`;
+    }
+    if (tipo === "certidao_municipal") {
+      return `Emissão automática não disponível para o município "${company.municipio ?? "não informado"} - ${company.uf ?? ""}". Emita manualmente e faça o upload do PDF.`;
+    }
+    return "Emissão automática não disponível para este tipo de certidão. Emita manualmente e faça o upload do PDF.";
+  };
 
   if (!puppeteerAvailable || !AUTOMATION_TYPES.includes(tipo)) {
     res.json({
@@ -660,6 +676,18 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
       message: puppeteerAvailable
         ? "Emissão automática não disponível para este tipo de certidão. Emita manualmente e faça o upload do PDF."
         : "A emissão automática não está disponível neste ambiente. Emita manualmente e faça o upload do PDF.",
+    });
+    return;
+  }
+
+  if (!isRegionSupported()) {
+    res.json({
+      jobId: null,
+      success: false,
+      method: "manual",
+      portalUrl: def.portalUrl,
+      instructions: def.instructions,
+      message: regionFallbackMessage(),
     });
     return;
   }
@@ -691,7 +719,7 @@ router.post("/:id/certidoes/:tipo/emitir", async (req, res) => {
 
     let rpaResult: Awaited<ReturnType<typeof emitirCertidao>>;
     try {
-      rpaResult = await emitirCertidao(tipo, cnpj, onStep);
+      rpaResult = await emitirCertidao(tipo, cnpj, onStep, { uf: company.uf, municipio: company.municipio });
     } catch (err) {
       console.error("[certidoes/emitir] RPA error:", err);
       job.status = "done";
