@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
-import { LogOut, Building2, Gavel, Users, TrendingUp, ChevronRight, Bell } from "lucide-react";
-import { clearAuth, getUser } from "@/hooks/use-auth";
+import { LogOut, Building2, Gavel, Users, TrendingUp, ChevronRight, Bell, Lock } from "lucide-react";
+import { clearAuth, getUser, getUserModules } from "@/hooks/use-auth";
 import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
 
 function getGreeting(name: string) {
@@ -50,6 +50,7 @@ const MODULES = [
 export function ModuleHubPage() {
   const [, navigate] = useLocation();
   const user = getUser();
+  const allowedModules = getUserModules();
 
   const initials = user?.name
     ? user.name
@@ -125,48 +126,73 @@ export function ModuleHubPage() {
 
           {/* Module cards */}
           <div className="space-y-3 mb-6">
-            {MODULES.map(({ id, href, icon: Icon, iconBg, iconColor, label, description, tag }) => (
-              <button
-                key={id}
-                onClick={() => navigate(href)}
-                className="group w-full text-left bg-white rounded-2xl flex items-center gap-4 p-5 transition-all duration-150"
-                style={{
-                  border: "1px solid #E8EFF6",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement;
-                  el.style.borderColor = "#0066FF30";
-                  el.style.boxShadow = "0 4px 16px rgba(0,102,255,0.08)";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement;
-                  el.style.borderColor = "#E8EFF6";
-                  el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-                }}
-              >
-                {/* Icon */}
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: iconBg }}
+            {MODULES.map(({ id, href, icon: Icon, iconBg, iconColor, label, description, tag }) => {
+              const hasAccess = allowedModules.includes(id as any);
+              return hasAccess ? (
+                <button
+                  key={id}
+                  onClick={() => navigate(href)}
+                  className="group w-full text-left bg-white rounded-2xl flex items-center gap-4 p-5 transition-all duration-150"
+                  style={{
+                    border: "1px solid #E8EFF6",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.borderColor = "#0066FF30";
+                    el.style.boxShadow = "0 4px 16px rgba(0,102,255,0.08)";
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.borderColor = "#E8EFF6";
+                    el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+                  }}
                 >
-                  <Icon className="w-5 h-5" style={{ color: iconColor }} />
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: iconBg }}
+                  >
+                    <Icon className="w-5 h-5" style={{ color: iconColor }} />
+                  </div>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm font-semibold text-slate-900 mb-0.5">{label}</p>
+                    <p className="text-xs text-slate-500 leading-relaxed">{description}</p>
+                    <p className="text-[10px] text-slate-400 mt-1.5 font-medium">{tag}</p>
+                  </div>
+                  <ChevronRight
+                    className="w-4 h-4 flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5"
+                    style={{ color: "#94a3b8" }}
+                  />
+                </button>
+              ) : (
+                <div
+                  key={id}
+                  className="w-full text-left rounded-2xl flex items-center gap-4 p-5 cursor-not-allowed"
+                  style={{
+                    border: "1px solid #E8EFF6",
+                    background: "#FAFAFA",
+                    opacity: 0.6,
+                  }}
+                  title="Módulo não disponível no seu plano"
+                >
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: "#F1F5F9" }}
+                  >
+                    <Icon className="w-5 h-5 text-slate-300" />
+                  </div>
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-sm font-semibold text-slate-400">{label}</p>
+                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full">
+                        <Lock className="w-2.5 h-2.5" /> Sem acesso
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">{description}</p>
+                  </div>
                 </div>
-
-                {/* Text */}
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-semibold text-slate-900 mb-0.5">{label}</p>
-                  <p className="text-xs text-slate-500 leading-relaxed">{description}</p>
-                  <p className="text-[10px] text-slate-400 mt-1.5 font-medium">{tag}</p>
-                </div>
-
-                {/* Arrow */}
-                <ChevronRight
-                  className="w-4 h-4 flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5"
-                  style={{ color: "#94a3b8" }}
-                />
-              </button>
-            ))}
+              );
+            })}
           </div>
 
           {/* Divider */}

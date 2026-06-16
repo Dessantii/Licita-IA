@@ -7,7 +7,7 @@ import {
   Gavel, Search, TrendingUp, Compass, ArrowLeft, ChevronLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { clearAuth, getUser, getToken } from "@/hooks/use-auth";
+import { clearAuth, getUser, getToken, hasModule } from "@/hooks/use-auth";
 import { LicitaIALogo } from "@/components/brand/LicitaIALogo";
 import { useActiveCompany } from "@/contexts/CompanyContext";
 
@@ -220,6 +220,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const moduleId = detectModule(location);
   const moduleConfig = getModuleConfig(moduleId);
+
+  // Gate: redirect to hub if user doesn't have access to this module
+  useEffect(() => {
+    const gated: string[] = ["licitacoes", "chamamentos", "captacao"];
+    if (gated.includes(moduleId) && !hasModule(moduleId as any)) {
+      navigate("/");
+    }
+  }, [moduleId]);
 
   const initials = user?.name
     ? user.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()

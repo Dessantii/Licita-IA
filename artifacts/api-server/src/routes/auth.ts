@@ -15,6 +15,10 @@ function signToken(userId: number) {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: TOKEN_TTL });
 }
 
+function userPayload(user: { id: number; name: string; email: string; role: string; modules?: string[] | null }) {
+  return { id: user.id, name: user.name, email: user.email, role: user.role, modules: user.modules ?? ["licitacoes", "chamamentos", "captacao"] };
+}
+
 router.get("/status", async (_req, res) => {
   const [{ value }] = await db.select({ value: count() }).from(usersTable);
   res.json({ hasUsers: Number(value) > 0 });
@@ -48,7 +52,7 @@ router.post("/setup", async (req, res) => {
   }).returning();
 
   const token = signToken(user!.id);
-  res.status(201).json({ token, user: { id: user!.id, name: user!.name, email: user!.email, role: user!.role } });
+  res.status(201).json({ token, user: userPayload(user!) });
 });
 
 router.post("/login", async (req, res) => {
@@ -76,7 +80,7 @@ router.post("/login", async (req, res) => {
   }
 
   const token = signToken(user.id);
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  res.json({ token, user: userPayload(user) });
 });
 
 router.post("/change-password", async (req, res) => {
@@ -134,7 +138,7 @@ router.get("/me", async (req, res) => {
       res.status(401).json({ error: "Usuário não encontrado" });
       return;
     }
-    res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
+    res.json(userPayload(user));
   } catch {
     res.status(401).json({ error: "Token inválido" });
   }
@@ -175,7 +179,7 @@ router.patch("/me", async (req, res) => {
     return;
   }
 
-  res.json({ id: updated.id, name: updated.name, email: updated.email, role: updated.role });
+  res.json(userPayload(updated));
 });
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {

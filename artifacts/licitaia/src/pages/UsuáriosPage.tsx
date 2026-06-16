@@ -19,13 +19,25 @@ import {
   X,
   ChevronDown,
   KeyRound,
+  LayoutGrid,
+  Check,
 } from "lucide-react";
+
+type ModuleKey = "licitacoes" | "chamamentos" | "captacao";
+
+const MODULE_LABELS: Record<ModuleKey, { label: string; color: string; bg: string }> = {
+  licitacoes: { label: "Licitações", color: "#0066FF", bg: "#E5F0FF" },
+  chamamentos: { label: "Chamamentos", color: "#059669", bg: "#E5F6F3" },
+  captacao: { label: "Captação", color: "#6366F1", bg: "#EFEFFF" },
+};
+const ALL_MODULES: ModuleKey[] = ["licitacoes", "chamamentos", "captacao"];
 
 interface UserData {
   id: number;
   name: string;
   email: string;
   role: "admin" | "user";
+  modules: ModuleKey[];
   createdAt: string;
 }
 
@@ -47,6 +59,18 @@ async function apiFetch(path: string, options?: RequestInit) {
   return res.json();
 }
 
+function ModuleBadge({ mod }: { mod: ModuleKey }) {
+  const { label, color, bg } = MODULE_LABELS[mod];
+  return (
+    <span
+      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+      style={{ color, background: bg }}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function UsuáriosPage() {
   const me = getUser();
   const { toast } = useToast();
@@ -55,7 +79,19 @@ export function UsuáriosPage() {
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "user" as "user" | "admin" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "user" as "user" | "admin",
+    modules: ALL_MODULES as ModuleKey[],
+  });
+
+  // Module editing state
+  const [modulesTarget, setModulesTarget] = useState<UserData | null>(null);
+  const [editModules, setEditModules] = useState<ModuleKey[]>([]);
+  const [savingModules, setSavingModules] = useState(false);
+
   const [resetTarget, setResetTarget] = useState<UserData | null>(null);
   const [resetPassword, setResetPassword] = useState("");
   const [resetting, setResetting] = useState(false);
@@ -69,7 +105,7 @@ export function UsuáriosPage() {
     try {
       const data = await apiFetch("/api/admin/users");
       setUsers(data);
-    } catch (e: any) {
+    } catch {
       notify(toast, "user_load_error");
     } finally {
       setLoading(false);
@@ -85,7 +121,7 @@ export function UsuáriosPage() {
         body: JSON.stringify(form),
       });
       setUsers((prev) => [...prev, newUser]);
-      setForm({ name: "", email: "", password: "", role: "user" });
+      setForm({ name: "", email: "", password: "", role: "user", modules: ALL_MODULES });
       setShowForm(false);
       notify(toast, "user_created");
     } catch {
@@ -119,6 +155,36 @@ export function UsuáriosPage() {
       notify(toast, "user_role_changed", { title: `Função de ${user.name} alterada para ${newRole === "admin" ? "Administrador" : "Usuário"}` });
     } catch {
       notify(toast, "user_role_change_error");
+    }
+  }
+
+  function openModulesEditor(user: UserData) {
+    setModulesTarget(user);
+    setEditModules(user.modules ?? ALL_MODULES);
+  }
+
+  function toggleEditModule(mod: ModuleKey) {
+    setEditModules((prev) =>
+      prev.includes(mod) ? prev.filter((m) => m !== mod) : [...prev, mod]
+    );
+  }
+
+  async function handleSaveModules(e: React.FormEvent) {
+    e.preventDefault();
+    if (!modulesTarget) return;
+    setSavingModules(true);
+    try {
+      const updated = await apiFetch(`/api/admin/users/${modulesTarget.id}/modules`, {
+        method: "PATCH",
+        body: JSON.stringify({ modules: editModules }),
+      });
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      toast({ title: `Módulos de ${modulesTarget.name} atualizados` });
+      setModulesTarget(null);
+    } catch {
+      toast({ title: "Erro ao salvar módulos", variant: "destructive" });
+    } finally {
+      setSavingModules(false);
     }
   }
 
@@ -221,6 +287,44 @@ export function UsuáriosPage() {
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
             </div>
+
+            {/* Module checkboxes */}
+            <div className="md:col-span-2 space-y-2">
+              <Label>Módulos liberados</Label>
+              <div className="flex flex-wrap gap-3">
+                {ALL_MODULES.map((mod) => {
+                  const { label, color, bg } = MODULE_LABELS[mod];
+                  const checked = form.modules.includes(mod);
+                  return (
+                    <button
+                      key={mod}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          modules: checked ? f.modules.filter((m) => m !== mod) : [...f.modules, mod],
+                        }))
+                      }
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all"
+                      style={{
+                        borderColor: checked ? color : "#E2E8F0",
+                        background: checked ? bg : "white",
+                        color: checked ? color : "#64748B",
+                      }}
+                    >
+                      <div
+                        className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border"
+                        style={{ borderColor: checked ? color : "#CBD5E1", background: checked ? color : "white" }}
+                      >
+                        {checked && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="md:col-span-2 flex justify-end">
               <Button type="submit" disabled={creating} className="gap-2">
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
@@ -231,6 +335,65 @@ export function UsuáriosPage() {
         </Card>
       )}
 
+      {/* Module editor modal */}
+      {modulesTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-sm p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <LayoutGrid className="w-5 h-5 text-primary" />
+                <h3 className="font-bold text-slate-900">Módulos</h3>
+              </div>
+              <button onClick={() => setModulesTarget(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">
+              Defina os módulos que <span className="font-semibold text-slate-700">{modulesTarget.name}</span> pode acessar.
+            </p>
+            <form onSubmit={handleSaveModules} className="space-y-4">
+              <div className="space-y-2">
+                {ALL_MODULES.map((mod) => {
+                  const { label, color, bg } = MODULE_LABELS[mod];
+                  const checked = editModules.includes(mod);
+                  return (
+                    <button
+                      key={mod}
+                      type="button"
+                      onClick={() => toggleEditModule(mod)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all text-left"
+                      style={{
+                        borderColor: checked ? color : "#E2E8F0",
+                        background: checked ? bg : "white",
+                        color: checked ? color : "#64748B",
+                      }}
+                    >
+                      <div
+                        className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border"
+                        style={{ borderColor: checked ? color : "#CBD5E1", background: checked ? color : "white" }}
+                      >
+                        {checked && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="ghost" onClick={() => setModulesTarget(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={savingModules} className="gap-2">
+                  {savingModules ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  {savingModules ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Reset password modal */}
       {resetTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-sm p-6 shadow-xl">
@@ -286,15 +449,15 @@ export function UsuáriosPage() {
         ) : (
           <div className="divide-y">
             {users.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+              <div key={user.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                     user.role === "admin" ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-600"
                   }`}>
                     {user.name.charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-slate-900 text-sm">{user.name}</p>
                       {user.id === me?.id && (
                         <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Você</span>
@@ -304,14 +467,31 @@ export function UsuáriosPage() {
                     <p className="text-xs text-slate-400 mt-0.5">
                       Desde {format(new Date(user.createdAt), "dd/MM/yyyy", { locale: ptBR })}
                     </p>
+                    {/* Module badges */}
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {user.role === "admin" ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          Todos os módulos
+                        </span>
+                      ) : (user.modules ?? ALL_MODULES).length === 0 ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">
+                          Sem módulos
+                        </span>
+                      ) : (
+                        (user.modules ?? ALL_MODULES).map((mod) => (
+                          <ModuleBadge key={mod} mod={mod} />
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Role toggle */}
                   <button
                     onClick={() => handleRoleToggle(user)}
                     disabled={user.id === me?.id}
                     title={user.id === me?.id ? "Você não pode alterar sua própria função" : "Alterar função"}
-                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors ${
                       user.role === "admin"
                         ? "bg-primary/10 text-primary hover:bg-primary/20"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -322,8 +502,23 @@ export function UsuáriosPage() {
                     ) : (
                       <User className="w-3.5 h-3.5" />
                     )}
-                    {user.role === "admin" ? "Admin" : "Usuário"}
+                    <span className="hidden sm:inline">{user.role === "admin" ? "Admin" : "Usuário"}</span>
                   </button>
+
+                  {/* Module editor button */}
+                  {user.id !== me?.id && user.role !== "admin" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openModulesEditor(user)}
+                      title="Editar módulos"
+                      className="text-slate-400 hover:text-primary h-8 w-8"
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </Button>
+                  )}
+
+                  {/* Reset password */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -333,6 +528,8 @@ export function UsuáriosPage() {
                   >
                     <KeyRound className="w-4 h-4" />
                   </Button>
+
+                  {/* Delete */}
                   {user.id !== me?.id && (
                     <Button
                       variant="ghost"

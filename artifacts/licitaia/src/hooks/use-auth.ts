@@ -1,11 +1,15 @@
 const TOKEN_KEY = "licitaia_token";
 const USER_KEY = "licitaia_user";
 
+export type ModuleKey = "licitacoes" | "chamamentos" | "captacao";
+export const ALL_MODULES: ModuleKey[] = ["licitacoes", "chamamentos", "captacao"];
+
 export interface AuthUser {
   id: number;
   name: string;
   email: string;
   role: string;
+  modules?: ModuleKey[];
 }
 
 export function getToken(): string | null {
@@ -19,6 +23,17 @@ export function getUser(): AuthUser | null {
   } catch {
     return null;
   }
+}
+
+export function getUserModules(): ModuleKey[] {
+  const user = getUser();
+  if (!user) return [];
+  if (user.role === "admin") return ALL_MODULES;
+  return user.modules ?? ALL_MODULES;
+}
+
+export function hasModule(moduleId: ModuleKey): boolean {
+  return getUserModules().includes(moduleId);
 }
 
 export function saveAuth(token: string, user: AuthUser) {
