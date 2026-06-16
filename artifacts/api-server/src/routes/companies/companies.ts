@@ -166,28 +166,25 @@ Se a imagem não for um Cartão CNPJ ou não contiver dados legíveis, retorne t
       return;
     }
 
+    // Try text extraction first
     let text = "";
     try {
       const parser = new PDFParse({ url: `file://${tmpPath}` });
       const data = await parser.getText();
-      text = data.text;
+      text = data.text?.trim() ?? "";
     } catch {
-      res.status(500).json({ error: "Não foi possível ler o PDF" });
-      return;
+      // text stays empty; we'll fall back to image rendering below
     }
 
-    if (!text.trim()) {
-      res.status(422).json({ error: "PDF não contém texto extraível" });
-      return;
-    }
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Analise o texto abaixo extraído de um Cartão CNPJ (Comprovante de Inscrição e de Situação Cadastral da Receita Federal Brasileira).
+    // If text is sufficient, use text-based extraction
+    if (text.length > 80) {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Analise o texto abaixo extraído de um Cartão CNPJ (Comprovante de Inscrição e de Situação Cadastral da Receita Federal Brasileira).
 
 Extraia SOMENTE os dados que aparecem LITERALMENTE no texto. NÃO invente dados.
 
@@ -198,6 +195,80 @@ Retorne um objeto JSON com exatamente estas chaves:
 ${EXTRACTION_JSON_SCHEMA}
 
 Se o texto não contiver dados de uma empresa real, retorne todas as chaves com valor null.`,
+          },
+        ],
+        temperature: 0,
+        max_tokens: 700,
+        response_format: { type: "json_object" },
+      });
+
+      const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+      if (!raw) {
+        res.status(422).json({ error: "IA não retornou dados estruturados" });
+        return;
+      }
+      res.json({ extracted: JSON.parse(raw) });
+      return;
+    }
+
+    // PDF has no text layer (image-based PDF) — extract the embedded JPEG directly
+    // from the binary without relying on any external rendering tools.
+    const pdfBytes = fs.readFileSync(tmpPath);
+
+    // Find first JPEG stream: SOI marker = 0xFF 0xD8 0xFF
+    let jpegStart = -1;
+    for (let i = 0; i < pdfBytes.length - 2; i++) {
+      if (pdfBytes[i] === 0xFF && pdfBytes[i + 1] === 0xD8 && pdfBytes[i + 2] === 0xFF) {
+        jpegStart = i;
+        break;
+      }
+    }
+
+    if (jpegStart === -1) {
+      res.status(422).json({
+        error: "O PDF não contém imagem ou texto legível. Tente digitalizar o documento e enviar como JPG/PNG.",
+      });
+      return;
+    }
+
+    // Find EOI marker = 0xFF 0xD9
+    let jpegEnd = -1;
+    for (let i = jpegStart + 2; i < pdfBytes.length - 1; i++) {
+      if (pdfBytes[i] === 0xFF && pdfBytes[i + 1] === 0xD9) {
+        jpegEnd = i + 2;
+        break;
+      }
+    }
+
+    if (jpegEnd <= jpegStart) {
+      res.status(422).json({ error: "Falha ao extrair imagem do PDF." });
+      return;
+    }
+
+    const jpegBuffer = pdfBytes.slice(jpegStart, jpegEnd);
+    const b64 = jpegBuffer.toString("base64");
+    const dataUrl = `data:image/jpeg;base64,${b64}`;
+
+    const visionRes = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
+            {
+              type: "text",
+              text: `Analise esta imagem de Cartão CNPJ (Comprovante de Inscrição e de Situação Cadastral da Receita Federal Brasileira).
+
+Extraia SOMENTE os dados que estão VISÍVEIS na imagem. NÃO invente dados.
+
+Retorne um objeto JSON com exatamente estas chaves:
+${EXTRACTION_JSON_SCHEMA}
+
+Se a imagem não contiver dados legíveis de uma empresa real, retorne todas as chaves com valor null.`,
+            },
+          ],
         },
       ],
       temperature: 0,
@@ -205,13 +276,12 @@ Se o texto não contiver dados de uma empresa real, retorne todas as chaves com 
       response_format: { type: "json_object" },
     });
 
-    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    const raw = visionRes.choices[0]?.message?.content?.trim() ?? "";
     if (!raw) {
-      res.status(422).json({ error: "IA não retornou dados estruturados" });
+      res.status(422).json({ error: "IA não retornou dados da imagem do PDF" });
       return;
     }
-    const extracted = JSON.parse(raw);
-    res.json({ extracted });
+    res.json({ extracted: JSON.parse(raw) });
   } catch (err) {
     res.status(500).json({ error: "Erro ao processar o arquivo" });
   } finally {
