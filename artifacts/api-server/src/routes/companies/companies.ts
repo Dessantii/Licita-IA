@@ -271,10 +271,11 @@ router.get("/cnpj-lookup/:cnpj", async (req, res) => {
 });
 
 router.post("/:id/verificar-sicaf", async (req, res) => {
+  const userId = (req as any).userId as number;
   const id = parseInt(req.params.id!);
   if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
-  if (!company) { res.status(404).json({ error: "Empresa não encontrada" }); return; }
+  if (!company || company.userId !== userId) { res.status(404).json({ error: "Empresa não encontrada" }); return; }
   const cnpj = company.cnpj.replace(/\D/g, "");
   try {
     const r = await fetch(
@@ -306,12 +307,17 @@ router.post("/:id/verificar-sicaf", async (req, res) => {
   }
 });
 
-router.get("/", async (_req, res) => {
-  const companies = await db.select().from(companiesTable).orderBy(companiesTable.razaoSocial);
-  const documents = await db.select().from(companyDocumentsTable);
+router.get("/", async (req, res) => {
+  const userId = (req as any).userId as number;
+  const companies = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.userId, userId))
+    .orderBy(companiesTable.razaoSocial);
+  const allDocs = await db.select().from(companyDocumentsTable);
 
   const result = companies.map(c => {
-    const companyDocs = documents.filter(d => d.companyId === c.id);
+    const companyDocs = allDocs.filter(d => d.companyId === c.id);
     return {
       ...formatCompany(c),
       documentStatus: getDocumentStatus(companyDocs),
@@ -323,24 +329,23 @@ router.get("/", async (_req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  const userId = (req as any).userId as number;
   const parsed = createCompanySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [company] = await db.insert(companiesTable).values(parsed.data).returning();
+  const [company] = await db.insert(companiesTable).values({ ...parsed.data, userId }).returning();
   res.status(201).json(formatCompany(company!));
 });
 
 router.get("/:id", async (req, res) => {
+  const userId = (req as any).userId as number;
   const id = parseInt(req.params.id!);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "Invalid ID" });
-    return;
-  }
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
-  if (!company) {
+  if (!company || company.userId !== userId) {
     res.status(404).json({ error: "Company not found" });
     return;
   }
@@ -367,17 +372,18 @@ router.get("/:id", async (req, res) => {
 });
 
 router.patch("/:id", async (req, res) => {
+  const userId = (req as any).userId as number;
   const id = parseInt(req.params.id!);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "Invalid ID" });
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [existing] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
+  if (!existing || existing.userId !== userId) {
+    res.status(404).json({ error: "Company not found" });
     return;
   }
 
   const parsed = updateCompanySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const [company] = await db
     .update(companiesTable)
@@ -385,23 +391,16 @@ router.patch("/:id", async (req, res) => {
     .where(eq(companiesTable.id, id))
     .returning();
 
-  if (!company) {
-    res.status(404).json({ error: "Company not found" });
-    return;
-  }
-
-  res.json(formatCompany(company));
+  res.json(formatCompany(company!));
 });
 
 router.delete("/:id", async (req, res) => {
+  const userId = (req as any).userId as number;
   const id = parseInt(req.params.id!);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "Invalid ID" });
-    return;
-  }
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
-  if (!company) {
+  if (!company || company.userId !== userId) {
     res.status(404).json({ error: "Company not found" });
     return;
   }

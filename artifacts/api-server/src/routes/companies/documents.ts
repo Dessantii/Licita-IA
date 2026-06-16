@@ -201,6 +201,7 @@ function formatDocument(d: typeof companyDocumentsTable.$inferSelect) {
 }
 
 router.post("/:id/documents", upload.single("file"), async (req, res) => {
+  const userId = (req as any).userId as number;
   const id = parseInt(req.params.id!);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid ID" });
@@ -208,7 +209,7 @@ router.post("/:id/documents", upload.single("file"), async (req, res) => {
   }
 
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
-  if (!company) {
+  if (!company || company.userId !== userId) {
     res.status(404).json({ error: "Company not found" });
     return;
   }
@@ -245,10 +246,20 @@ router.post("/:id/documents", upload.single("file"), async (req, res) => {
 });
 
 router.delete("/:companyId/documents/:docId", async (req, res) => {
+  const userId = (req as any).userId as number;
+  const companyId = parseInt(req.params.companyId!);
   const docId = parseInt(req.params.docId!);
   if (isNaN(docId)) {
     res.status(400).json({ error: "Invalid document ID" });
     return;
+  }
+
+  if (!isNaN(companyId)) {
+    const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
+    if (!company || company.userId !== userId) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
   }
 
   const [doc] = await db.select().from(companyDocumentsTable).where(eq(companyDocumentsTable.id, docId));
